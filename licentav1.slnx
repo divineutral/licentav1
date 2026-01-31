@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="DebugLocal" />
+    <BuildType Name="Release" />
+  </Configurations>
+  <Project Path="Licenta.Rapoarte/Licenta.Rapoarte.rptproj">
+    <Deploy Solution="Debug|*" />
+    <Deploy Solution="Release|*" />
+  </Project>
+  <Project Path="licentav1/licentav1.csproj">
+    <BuildType Solution="DebugLocal|*" Project="Debug" />
+  </Project>
+</Solution>

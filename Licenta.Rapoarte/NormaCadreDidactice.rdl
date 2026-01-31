@@ -1,0 +1,819 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Report MustUnderstand="df" xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner" xmlns:df="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition/defaultfontfamily" xmlns:am="http://schemas.microsoft.com/sqlserver/reporting/authoringmetadata">
+  <am:AuthoringMetadata>
+    <am:CreatedBy>
+      <am:Name>SSDTRS</am:Name>
+      <am:Version>18.1.11312.151</am:Version>
+    </am:CreatedBy>
+    <am:UpdatedBy>
+      <am:Name>SSDTRS</am:Name>
+      <am:Version>18.2.11415.280</am:Version>
+    </am:UpdatedBy>
+    <am:LastModifiedTimestamp>2026-01-31T09:26:03.3170719Z</am:LastModifiedTimestamp>
+  </am:AuthoringMetadata>
+  <df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>
+  <AutoRefresh>0</AutoRefresh>
+  <DataSources>
+    <DataSource Name="NormaCadreDidactice">
+      <ConnectionProperties>
+        <DataProvider>SQL</DataProvider>
+        <ConnectString>Data Source=YOUR_SERVER;Initial Catalog=agsis_dw</ConnectString>
+      </ConnectionProperties>
+      <rd:SecurityType>DataBase</rd:SecurityType>
+      <rd:DataSourceID>b2d8d7a1-556f-4ea7-8f08-13b638ee0a7b</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="DataSet_Norma">
+      <Query>
+        <DataSourceName>NormaCadreDidactice</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@Specializare">
+            <Value>=Parameters!Specializare.Value</Value>
+          </QueryParameter>
+          <QueryParameter Name="@facultate">
+            <Value>=Parameters!facultate.Value</Value>
+            <rd:UserDefined>true</rd:UserDefined>
+          </QueryParameter>
+          <QueryParameter Name="@Profesor">
+            <Value>=Parameters!Profesor.Value</Value>
+          </QueryParameter>
+          <QueryParameter Name="@AnUniv">
+            <Value>=Parameters!AnUniv.Value</Value>
+            <rd:UserDefined>true</rd:UserDefined>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>WITH DateNormalizate AS (
+    SELECT 
+        ppm.NumeIntreg,
+        sf.DenumireMaterie,
+        ISNULL(sf.NrSemestruDinAn, 0) AS Semestru,
+        ISNULL(sf.TitularSauSuplinitor, 0) AS TitularSauSuplinitor,
+        sf.Nr_Ore_Curs, 
+        sf.Nr_Ore_Seminar, 
+        sf.Nr_Ore_Laborator,
+        -- Curățare și normalizare
+        UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
+            CASE 
+                WHEN CHARINDEX('+', sf.DenumireSpecializare) &gt; 0 
+                THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
+                ELSE sf.DenumireSpecializare 
+            END, 
+        'Ș', 'S'), 'Ț', 'T')))) AS SpecializareCurata
+    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+    INNER JOIN [agsis_dw].[dbo].[Post_Profesor_Materie] ppm 
+        ON sf.ID_Post_Profesor_Materie = ppm.ID_Post_Profesor_Materie
+)
+SELECT 
+    NumeIntreg AS Profesor,
+    DenumireMaterie AS Materie,
+    SpecializareCurata,
+    Semestru,
+    TitularSauSuplinitor,
+    SUM(ISNULL(Nr_Ore_Curs, 0) + ISNULL(Nr_Ore_Seminar, 0) + ISNULL(Nr_Ore_Laborator, 0)) AS Norma
+FROM DateNormalizate
+WHERE 
+    -- ACEASTA ESTE FILTRAREA CORECTĂ
+    (N'Toti' IN (@Specializare) OR SpecializareCurata IN (@Specializare))
+    AND 
+    (N'Toti' IN (@Profesor) OR NumeIntreg IN (@Profesor))
+GROUP BY 
+    NumeIntreg, 
+    DenumireMaterie, 
+    SpecializareCurata, 
+    Semestru, 
+    TitularSauSuplinitor
+ORDER BY Profesor ASC</CommandText>
+        <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
+      </Query>
+      <Fields>
+        <Field Name="Profesor">
+          <DataField>Profesor</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="Materie">
+          <DataField>Materie</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="SpecializareCurata">
+          <DataField>SpecializareCurata</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="Semestru">
+          <DataField>Semestru</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="Norma">
+          <DataField>Norma</DataField>
+          <rd:TypeName>System.Decimal</rd:TypeName>
+        </Field>
+        <Field Name="TitularSauSuplinitor">
+          <DataField>TitularSauSuplinitor</DataField>
+          <rd:TypeName>System.Byte</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DataSet_Facultati">
+      <Query>
+        <DataSourceName>NormaCadreDidactice</DataSourceName>
+        <CommandText>SELECT 'Toti' AS FacultateCurata, 0 AS Ordine
+UNION ALL
+SELECT DISTINCT 
+    UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(DenumireFacultate, 'Facultatea de ', ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata,
+    1 AS Ordine
+FROM [agsis_dw].[dbo].[Post_Profesor_Materie]
+ORDER BY Ordine, FacultateCurata ASC</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="FacultateCurata">
+          <DataField>FacultateCurata</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="Ordine">
+          <DataField>Ordine</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DataSet_Specializari">
+      <Query>
+        <DataSourceName>NormaCadreDidactice</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@facultate">
+            <Value>=Parameters!facultate.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT 'Toti' AS SpecializareCurata, 0 AS Ordine
+UNION ALL
+SELECT DISTINCT 
+    UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
+        CASE 
+            WHEN CHARINDEX('+', DenumireSpecializare) &gt; 0 
+            THEN LEFT(DenumireSpecializare, CHARINDEX('+', DenumireSpecializare) - 1)
+            ELSE DenumireSpecializare 
+        END, 
+    'Ș', 'S'), 'Ț', 'T')))) AS SpecializareCurata, 
+    1 AS Ordine
+FROM [agsis_dw].[dbo].[Post_Profesor_Materie]
+WHERE (@facultate = 'Toti' OR DenumireFacultate LIKE '%' + @facultate + '%')
+ORDER BY Ordine, SpecializareCurata ASC</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="SpecializareCurata">
+          <DataField>SpecializareCurata</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="Ordine">
+          <DataField>Ordine</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DataSet_Profesori">
+      <Query>
+        <DataSourceName>NormaCadreDidactice</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@Specializare">
+            <Value>=Parameters!specializare.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT 'Toti' AS NumeIntreg, 0 AS Ordine
+UNION ALL
+SELECT DISTINCT ppm.NumeIntreg, 1 AS Ordine
+FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+INNER JOIN [agsis_dw].[dbo].[Post_Profesor_Materie] ppm 
+    ON sf.ID_Post_Profesor_Materie = ppm.ID_Post_Profesor_Materie
+WHERE 
+   -- AICI ERA PROBLEMA: Folosim IN acum, compatibil cu selecția multiplă
+   (N'Toti' IN (@Specializare) OR 
+    UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
+        CASE 
+            WHEN CHARINDEX('+', sf.DenumireSpecializare) &gt; 0 
+            THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
+            ELSE sf.DenumireSpecializare 
+        END, 
+    'Ș', 'S'), 'Ț', 'T')))) IN (@Specializare)
+   )
+ORDER BY Ordine, NumeIntreg ASC</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="NumeIntreg">
+          <DataField>NumeIntreg</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="Ordine">
+          <DataField>Ordine</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="Dataset_AniUniv">
+      <Query>
+        <DataSourceName>NormaCadreDidactice</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@AnUniv">
+            <Value>@AnUniv</Value>
+            <rd:UserDefined>true</rd:UserDefined>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT DISTINCT 
+    UPPER(LTRIM(RTRIM(REPLACE(DenumireAnUniv, CHAR(9), '')))) AS DenumireAnUniv
+FROM [agsis_dw].[dbo].[Cazare]
+WHERE DenumireAnUniv IS NOT NULL
+
+UNION
+
+SELECT 'AN UNIVERSITAR 2025-2026'
+ORDER BY DenumireAnUniv DESC</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="DenumireAnUniv">
+          <DataField>DenumireAnUniv</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+          <Tablix Name="Tablix1">
+            <TablixCorner>
+              <TablixCornerRows>
+                <TablixCornerRow>
+                  <TablixCornerCell>
+                    <CellContents>
+                      <Textbox Name="Textbox4">
+                        <CanGrow>true</CanGrow>
+                        <KeepTogether>true</KeepTogether>
+                        <Paragraphs>
+                          <Paragraph>
+                            <TextRuns>
+                              <TextRun>
+                                <Value />
+                                <Style />
+                              </TextRun>
+                            </TextRuns>
+                            <Style />
+                          </Paragraph>
+                        </Paragraphs>
+                        <rd:DefaultName>Textbox4</rd:DefaultName>
+                        <Style>
+                          <Border>
+                            <Color>LightGrey</Color>
+                            <Style>Solid</Style>
+                          </Border>
+                          <PaddingLeft>2pt</PaddingLeft>
+                          <PaddingRight>2pt</PaddingRight>
+                          <PaddingTop>2pt</PaddingTop>
+                          <PaddingBottom>2pt</PaddingBottom>
+                        </Style>
+                      </Textbox>
+                    </CellContents>
+                  </TablixCornerCell>
+                </TablixCornerRow>
+                <TablixCornerRow>
+                  <TablixCornerCell>
+                    <CellContents>
+                      <Textbox Name="Textbox7">
+                        <CanGrow>true</CanGrow>
+                        <KeepTogether>true</KeepTogether>
+                        <Paragraphs>
+                          <Paragraph>
+                            <TextRuns>
+                              <TextRun>
+                                <Value>Profesor</Value>
+                                <Style>
+                                  <FontFamily>Arial</FontFamily>
+                                </Style>
+                              </TextRun>
+                            </TextRuns>
+                            <Style />
+                          </Paragraph>
+                          <Paragraph>
+                            <TextRuns>
+                              <TextRun>
+                                <Value />
+                                <Style>
+                                  <FontFamily>Arial</FontFamily>
+                                </Style>
+                              </TextRun>
+                            </TextRuns>
+                            <Style />
+                          </Paragraph>
+                        </Paragraphs>
+                        <rd:DefaultName>Textbox7</rd:DefaultName>
+                        <Style>
+                          <Border>
+                            <Color>LightGrey</Color>
+                            <Style>Solid</Style>
+                          </Border>
+                          <PaddingLeft>2pt</PaddingLeft>
+                          <PaddingRight>2pt</PaddingRight>
+                          <PaddingTop>2pt</PaddingTop>
+                          <PaddingBottom>2pt</PaddingBottom>
+                        </Style>
+                      </Textbox>
+                    </CellContents>
+                  </TablixCornerCell>
+                </TablixCornerRow>
+              </TablixCornerRows>
+            </TablixCorner>
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1.93072in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>1.13072in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>1.13072in</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.58333in</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Norma">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Sum(Fields!Norma.Value)</Value>
+                                  <Style />
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Norma</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Textbox26">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Sum(Fields!Norma.Value) / Sum(Fields!Norma.Value, "Specializare")</Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Textbox26</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Textbox33">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>="Sem. 1: " &amp; Sum(IIF(CInt(Fields!Semestru.Value) = 1 AND CInt(Fields!TitularSauSuplinitor.Value) = 1, CDbl(Fields!Norma.Value), 0.0)) &amp; " h Titular | " &amp;
+ Sum(IIF(CInt(Fields!Semestru.Value) = 1 AND CInt(Fields!TitularSauSuplinitor.Value) = 0, CDbl(Fields!Norma.Value), 0.0)) &amp; " h P/O" &amp; vbCrLf &amp;
+ "Sem. 2: " &amp; Sum(IIF(CInt(Fields!Semestru.Value) = 2 AND CInt(Fields!TitularSauSuplinitor.Value) = 1, CDbl(Fields!Norma.Value), 0.0)) &amp; " h Titular | " &amp;
+ Sum(IIF(CInt(Fields!Semestru.Value) = 2 AND CInt(Fields!TitularSauSuplinitor.Value) = 0, CDbl(Fields!Norma.Value), 0.0)) &amp; " h P/O"</Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Textbox33</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="Specializare">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!SpecializareCurata.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!SpecializareCurata.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <TablixMembers>
+                    <TablixMember>
+                      <TablixHeader>
+                        <Size>0.58333in</Size>
+                        <CellContents>
+                          <Textbox Name="SpecializareCurata">
+                            <CanGrow>true</CanGrow>
+                            <KeepTogether>true</KeepTogether>
+                            <Paragraphs>
+                              <Paragraph>
+                                <TextRuns>
+                                  <TextRun>
+                                    <Value>=Fields!SpecializareCurata.Value</Value>
+                                    <Style>
+                                      <FontStyle>Normal</FontStyle>
+                                      <FontFamily>Times New Roman</FontFamily>
+                                      <FontSize>12pt</FontSize>
+                                      <FontWeight>Normal</FontWeight>
+                                      <TextDecoration>None</TextDecoration>
+                                      <Color>#000000</Color>
+                                    </Style>
+                                  </TextRun>
+                                </TextRuns>
+                                <Style />
+                              </Paragraph>
+                            </Paragraphs>
+                            <rd:DefaultName>SpecializareCurata</rd:DefaultName>
+                            <Style>
+                              <Border>
+                                <Color>LightGrey</Color>
+                                <Style>Solid</Style>
+                              </Border>
+                              <PaddingLeft>2pt</PaddingLeft>
+                              <PaddingRight>2pt</PaddingRight>
+                              <PaddingTop>2pt</PaddingTop>
+                              <PaddingBottom>2pt</PaddingBottom>
+                            </Style>
+                          </Textbox>
+                        </CellContents>
+                      </TablixHeader>
+                      <TablixMembers>
+                        <TablixMember>
+                          <Group Name="Group1">
+                            <GroupExpressions>
+                              <GroupExpression>=Fields!Materie.Value</GroupExpression>
+                            </GroupExpressions>
+                          </Group>
+                          <SortExpressions>
+                            <SortExpression>
+                              <Value>=Fields!Materie.Value</Value>
+                            </SortExpression>
+                          </SortExpressions>
+                          <TablixMembers>
+                            <TablixMember>
+                              <TablixHeader>
+                                <Size>0.25in</Size>
+                                <CellContents>
+                                  <Textbox Name="Materie">
+                                    <CanGrow>true</CanGrow>
+                                    <KeepTogether>true</KeepTogether>
+                                    <Paragraphs>
+                                      <Paragraph>
+                                        <TextRuns>
+                                          <TextRun>
+                                            <Value>=Fields!Materie.Value</Value>
+                                            <Style>
+                                              <FontFamily>Arial</FontFamily>
+                                            </Style>
+                                          </TextRun>
+                                        </TextRuns>
+                                        <Style />
+                                      </Paragraph>
+                                    </Paragraphs>
+                                    <rd:DefaultName>Materie</rd:DefaultName>
+                                    <Style>
+                                      <Border>
+                                        <Color>LightGrey</Color>
+                                        <Style>Solid</Style>
+                                      </Border>
+                                      <PaddingLeft>2pt</PaddingLeft>
+                                      <PaddingRight>2pt</PaddingRight>
+                                      <PaddingTop>2pt</PaddingTop>
+                                      <PaddingBottom>2pt</PaddingBottom>
+                                    </Style>
+                                  </Textbox>
+                                </CellContents>
+                              </TablixHeader>
+                              <TablixMembers>
+                                <TablixMember />
+                              </TablixMembers>
+                            </TablixMember>
+                            <TablixMember>
+                              <TablixHeader>
+                                <Size>0.25in</Size>
+                                <CellContents>
+                                  <Textbox Name="Textbox27">
+                                    <CanGrow>true</CanGrow>
+                                    <KeepTogether>true</KeepTogether>
+                                    <Paragraphs>
+                                      <Paragraph>
+                                        <TextRuns>
+                                          <TextRun>
+                                            <Value>Pondere</Value>
+                                            <Style>
+                                              <FontFamily>Arial</FontFamily>
+                                            </Style>
+                                          </TextRun>
+                                        </TextRuns>
+                                        <Style />
+                                      </Paragraph>
+                                    </Paragraphs>
+                                    <rd:DefaultName>Textbox27</rd:DefaultName>
+                                    <Style>
+                                      <Border>
+                                        <Color>LightGrey</Color>
+                                        <Style>Solid</Style>
+                                      </Border>
+                                      <PaddingLeft>2pt</PaddingLeft>
+                                      <PaddingRight>2pt</PaddingRight>
+                                      <PaddingTop>2pt</PaddingTop>
+                                      <PaddingBottom>2pt</PaddingBottom>
+                                    </Style>
+                                  </Textbox>
+                                </CellContents>
+                              </TablixHeader>
+                              <TablixMembers>
+                                <TablixMember />
+                              </TablixMembers>
+                            </TablixMember>
+                          </TablixMembers>
+                        </TablixMember>
+                      </TablixMembers>
+                    </TablixMember>
+                    <TablixMember>
+                      <TablixHeader>
+                        <Size>0.83333in</Size>
+                        <CellContents>
+                          <Textbox Name="Textbox34">
+                            <CanGrow>true</CanGrow>
+                            <KeepTogether>true</KeepTogether>
+                            <Paragraphs>
+                              <Paragraph>
+                                <TextRuns>
+                                  <TextRun>
+                                    <Value>DETALIERE SEMSTRIALA</Value>
+                                    <Style>
+                                      <FontStyle>Normal</FontStyle>
+                                      <FontFamily>Times New Roman</FontFamily>
+                                      <FontSize>12pt</FontSize>
+                                      <FontWeight>Normal</FontWeight>
+                                      <TextDecoration>None</TextDecoration>
+                                      <Color>#000000</Color>
+                                    </Style>
+                                  </TextRun>
+                                </TextRuns>
+                                <Style />
+                              </Paragraph>
+                            </Paragraphs>
+                            <rd:DefaultName>Textbox34</rd:DefaultName>
+                            <Style>
+                              <Border>
+                                <Color>LightGrey</Color>
+                                <Style>Solid</Style>
+                              </Border>
+                              <PaddingLeft>2pt</PaddingLeft>
+                              <PaddingRight>2pt</PaddingRight>
+                              <PaddingTop>2pt</PaddingTop>
+                              <PaddingBottom>2pt</PaddingBottom>
+                            </Style>
+                          </Textbox>
+                        </CellContents>
+                      </TablixHeader>
+                    </TablixMember>
+                  </TablixMembers>
+                </TablixMember>
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="NumeIntreg">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!Profesor.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!Profesor.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <TablixHeader>
+                    <Size>1.93072in</Size>
+                    <CellContents>
+                      <Textbox Name="NumeIntreg">
+                        <CanGrow>true</CanGrow>
+                        <KeepTogether>true</KeepTogether>
+                        <Paragraphs>
+                          <Paragraph>
+                            <TextRuns>
+                              <TextRun>
+                                <Value>=First(Fields!NumeIntreg.Value, "DataSet_Profesori")</Value>
+                                <Style />
+                              </TextRun>
+                            </TextRuns>
+                            <Style />
+                          </Paragraph>
+                        </Paragraphs>
+                        <rd:DefaultName>NumeIntreg</rd:DefaultName>
+                        <Style>
+                          <Border>
+                            <Color>LightGrey</Color>
+                            <Style>Solid</Style>
+                          </Border>
+                          <PaddingLeft>2pt</PaddingLeft>
+                          <PaddingRight>2pt</PaddingRight>
+                          <PaddingTop>2pt</PaddingTop>
+                          <PaddingBottom>2pt</PaddingBottom>
+                        </Style>
+                      </Textbox>
+                    </CellContents>
+                  </TablixHeader>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>DataSet_Norma</DataSetName>
+            <Top>0.32167in</Top>
+            <Left>0.43in</Left>
+            <Height>1.41667in</Height>
+            <Width>6.12288in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Tablix>
+        </ReportItems>
+        <Height>3.56667in</Height>
+        <Style />
+      </Body>
+      <Width>10.35833in</Width>
+      <Page>
+        <LeftMargin>1in</LeftMargin>
+        <RightMargin>1in</RightMargin>
+        <TopMargin>1in</TopMargin>
+        <BottomMargin>1in</BottomMargin>
+        <Style />
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <ReportParameters>
+    <ReportParameter Name="AnUniv">
+      <DataType>String</DataType>
+      <DefaultValue>
+        <DataSetReference>
+          <DataSetName>Dataset_AniUniv</DataSetName>
+          <ValueField>DenumireAnUniv</ValueField>
+        </DataSetReference>
+      </DefaultValue>
+      <Prompt>Selecteaza An Universitar</Prompt>
+      <ValidValues>
+        <DataSetReference>
+          <DataSetName>Dataset_AniUniv</DataSetName>
+          <ValueField>DenumireAnUniv</ValueField>
+          <LabelField>DenumireAnUniv</LabelField>
+        </DataSetReference>
+      </ValidValues>
+    </ReportParameter>
+    <ReportParameter Name="facultate">
+      <DataType>String</DataType>
+      <DefaultValue>
+        <DataSetReference>
+          <DataSetName>DataSet_Facultati</DataSetName>
+          <ValueField>FacultateCurata</ValueField>
+        </DataSetReference>
+      </DefaultValue>
+      <Prompt>facultate</Prompt>
+      <ValidValues>
+        <DataSetReference>
+          <DataSetName>DataSet_Facultati</DataSetName>
+          <ValueField>FacultateCurata</ValueField>
+          <LabelField>FacultateCurata</LabelField>
+        </DataSetReference>
+      </ValidValues>
+    </ReportParameter>
+    <ReportParameter Name="specializare">
+      <DataType>String</DataType>
+      <DefaultValue>
+        <DataSetReference>
+          <DataSetName>DataSet_Specializari</DataSetName>
+          <ValueField>SpecializareCurata</ValueField>
+        </DataSetReference>
+      </DefaultValue>
+      <Prompt>specializare</Prompt>
+      <ValidValues>
+        <DataSetReference>
+          <DataSetName>DataSet_Specializari</DataSetName>
+          <ValueField>SpecializareCurata</ValueField>
+          <LabelField>SpecializareCurata</LabelField>
+        </DataSetReference>
+      </ValidValues>
+      <MultiValue>true</MultiValue>
+    </ReportParameter>
+    <ReportParameter Name="profesor">
+      <DataType>String</DataType>
+      <Nullable>true</Nullable>
+      <DefaultValue>
+        <DataSetReference>
+          <DataSetName>DataSet_Profesori</DataSetName>
+          <ValueField>NumeIntreg</ValueField>
+        </DataSetReference>
+      </DefaultValue>
+      <AllowBlank>true</AllowBlank>
+      <Prompt>profesor</Prompt>
+      <ValidValues>
+        <DataSetReference>
+          <DataSetName>DataSet_Profesori</DataSetName>
+          <ValueField>NumeIntreg</ValueField>
+          <LabelField>NumeIntreg</LabelField>
+        </DataSetReference>
+      </ValidValues>
+    </ReportParameter>
+    <ReportParameter Name="materie">
+      <DataType>String</DataType>
+      <Nullable>true</Nullable>
+      <AllowBlank>true</AllowBlank>
+      <Prompt>materie</Prompt>
+      <Hidden>true</Hidden>
+    </ReportParameter>
+  </ReportParameters>
+  <ReportParametersLayout>
+    <GridLayoutDefinition>
+      <NumberOfColumns>1</NumberOfColumns>
+      <NumberOfRows>5</NumberOfRows>
+      <CellDefinitions>
+        <CellDefinition>
+          <ColumnIndex>0</ColumnIndex>
+          <RowIndex>0</RowIndex>
+          <ParameterName>AnUniv</ParameterName>
+        </CellDefinition>
+        <CellDefinition>
+          <ColumnIndex>0</ColumnIndex>
+          <RowIndex>1</RowIndex>
+          <ParameterName>facultate</ParameterName>
+        </CellDefinition>
+        <CellDefinition>
+          <ColumnIndex>0</ColumnIndex>
+          <RowIndex>2</RowIndex>
+          <ParameterName>specializare</ParameterName>
+        </CellDefinition>
+        <CellDefinition>
+          <ColumnIndex>0</ColumnIndex>
+          <RowIndex>3</RowIndex>
+          <ParameterName>profesor</ParameterName>
+        </CellDefinition>
+        <CellDefinition>
+          <ColumnIndex>0</ColumnIndex>
+          <RowIndex>4</RowIndex>
+          <ParameterName>materie</ParameterName>
+        </CellDefinition>
+      </CellDefinitions>
+    </GridLayoutDefinition>
+  </ReportParametersLayout>
+  <Language>en-US</Language>
+  <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>
+  <rd:ReportUnitType>Inch</rd:ReportUnitType>
+  <rd:ReportID>4a749c96-31a5-4737-9612-28ed6551e435</rd:ReportID>
+</Report>
