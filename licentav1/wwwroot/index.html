@@ -64,13 +64,22 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
 
-        /* Cerința: Dropdown specializare mai lat */
+        /* Ajustări Select2 pentru a arăta bine cu Bootstrap */
         #specializareSelect + .select2-container {
             min-width: 600px !important;
         }
 
         .select2-selection--multiple {
             min-height: 38px !important;
+            border: 1px solid #dee2e6 !important;
+            border-radius: 0.375rem !important;
+        }
+
+        .select2-container--default .select2-selection--single {
+            height: 38px !important;
+            border: 1px solid #dee2e6 !important;
+            border-radius: 0.375rem !important;
+            padding-top: 5px;
         }
     </style>
 </head>
@@ -109,34 +118,19 @@
         </div>
 
         <div class="card p-4">
-            <h5 class="text-muted mb-3 text-uppercase small fw-bold">Staffing Summary Matrix</h5>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>Tip Post</th>
-                            <th class="text-center">Titular Ocupate</th>
-                            <th class="text-center">Plata Ora</th>
-                            <th class="text-center">Vacante</th>
-                            <th class="text-center">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="statTableBody">
-                        <tr><td colspan="5" class="text-center text-muted">Selectați filtrele...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="card p-4">
             <h5 class="text-muted mb-3 text-uppercase small fw-bold">Detaliere Norme Profesori</h5>
             <div class="table-responsive">
                 <table class="table table-hover table-bordered align-middle">
                     <thead class="table-light">
-                        <tr><th>Profesor</th><th>Specializare</th><th>Materie</th><th class="text-center">Norma</th></tr>
+                        <tr>
+                            <th>Profesor</th>
+                            <th>Specializare</th>
+                            <th>Materie</th>
+                            <th class="text-center">Norma</th>
+                        </tr>
                     </thead>
                     <tbody id="normeTableBody">
-                        <tr><td colspan="4" class="text-center text-muted">Nicio normă încărcată.</td></tr>
+                        <tr><td colspan="4" class="text-center text-muted">Selectați filtrele și apăsați "View Report".</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -145,71 +139,127 @@
 
     <script>
         $(document).ready(function () {
+            // Inițializare Select2
             $('#specializareSelect').select2({ placeholder: "Alege specializări", allowClear: true });
             $('#profesorSelect').select2({ placeholder: "Caută profesor", allowClear: true });
 
-            // Încărcare inițială Ani și Facultăți
+            // 1. Încărcare Inițială: Ani Universitari
             fetch('/api/Rapoarte/liste/ani-universitari').then(res => res.json()).then(data => {
                 const s = document.getElementById('anUnivSelect');
                 data.forEach(an => s.innerHTML += `<option value="${an.id}">${an.nume}</option>`);
             });
 
+            // 2. Încărcare Inițială: Facultăți
             fetch('/api/Rapoarte/liste/facultati').then(res => res.json()).then(data => {
                 const s = document.getElementById('facultateSelect');
                 data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
             });
-        });
 
-        // 1. Când se schimbă facultatea -> Încărcăm Specializările
-        document.getElementById('facultateSelect').addEventListener('change', (e) => {
-            const fac = encodeURIComponent(e.target.value);
-            fetch(`/api/Rapoarte/liste/specializari-per-facultate?numeFacultate=${fac}`)
-                .then(res => res.json())
-                .then(data => {
-                    const $s = $('#specializareSelect').empty();
-                    data.forEach(u => $s.append(new Option(u, u)));
-                    $s.trigger('change');
+            // =========================================================
+            //  LOGICA DE CASCADĂ (Evenimente)
+            // =========================================================
+
+            // A. Când se schimbă ANUL -> Trigger pe Facultate (ca să reîncarce downstream)
+            $('#anUnivSelect').on('change', function () {
+                $('#facultateSelect').trigger('change');
+            });
+
+            // B. Când se schimbă FACULTATEA -> Încărcăm Specializările (Filtrate de An și Fac)
+            $('#facultateSelect').on('change', function () {
+                const anUniv = $('#anUnivSelect').val() || 'Toti';
+                const fac = $(this).val() || 'Toti';
+
+                // Resetăm dropdown-ul de specializări
+                $('#specializareSelect').empty();
+
+                // Apelăm API-ul cu AMBELE filtre
+                const params = new URLSearchParams({
+                    anUniv: anUniv,
+                    numeFacultate: fac
                 });
-        });
 
-        // 2. Când se schimbă specializarea -> Încărcăm DOAR profesorii activi acolo
-        $('#specializareSelect').on('change', function () {
-            const specs = $(this).val();
-            const querySpecs = (specs && specs.length > 0) ? specs.join(',') : 'Toti';
+                fetch(`/api/Rapoarte/liste/specializari-per-facultate?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const $s = $('#specializareSelect');
+                        data.forEach(u => $s.append(new Option(u, u)));
+                        // Declanșăm schimbarea pentru a actualiza și profesorii
+                        $s.trigger('change');
+                    });
+            });
 
-            fetch(`/api/Rapoarte/liste/profesori-per-specializari?specializari=${encodeURIComponent(querySpecs)}`)
-                .then(res => res.json())
-                .then(data => {
-                    const $p = $('#profesorSelect').empty();
-                    // IMPORTANT: Verifică dacă 'p' este numele omului. 
-                    // Dacă API-ul trimite obiecte, folosește p.numeIntreg
-                    data.forEach(p => $p.append(new Option(p, p)));
-                    $p.trigger('change');
+            // C. Când se schimbă SPECIALIZAREA -> Încărcăm Profesorii (Filtrați de An, Fac și Spec)
+            $('#specializareSelect').on('change', function () {
+                const anUniv = $('#anUnivSelect').val() || 'Toti';
+                const facultate = $('#facultateSelect').val() || 'Toti';
+                const specs = $(this).val();
+
+                // Procesăm lista de specializări pentru URL
+                const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
+
+                const params = new URLSearchParams({
+                    anUniv: anUniv,
+                    facultate: facultate,
+                    specializari: querySpecs
                 });
+
+                fetch(`/api/Rapoarte/liste/profesori-per-specializari?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const $p = $('#profesorSelect').empty();
+                        data.forEach(p => $p.append(new Option(p, p)));
+                        // Nu mai declanșăm nimic automat aici pentru a nu face loop infinit
+                    });
+            });
         });
 
+        // =========================================================
+        //  LOGICA DE RAPORT (View Report)
+        // =========================================================
         async function incarcaDate() {
+            // 1. Preluam valorile pentru An si Facultate
+            const anUniv = $('#anUnivSelect').val() || 'Toti';
+            const facultate = $('#facultateSelect').val() || 'Toti';
+
+            // 2. Preluam specializarile si profesorul
             const specs = $('#specializareSelect').val();
             const prof = $('#profesorSelect').val() || 'Toti';
-            if (!specs || specs.length === 0) return alert("Selectați specializarea!");
-            const querySpecs = specs.join(',');
+            const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
+
+            // Afisam in consola pentru debugging
+            console.log("Filtre aplicate:", { anUniv, facultate, querySpecs, prof });
 
             try {
-                const resNorme = await fetch(`/api/Rapoarte/norma-profesori?specializari=${encodeURIComponent(querySpecs)}&profesor=${encodeURIComponent(prof)}`);
+                // 3. Construim URL-ul incluzand TOTI parametrii
+                const params = new URLSearchParams({
+                    anUniv: anUniv,
+                    facultate: facultate,
+                    specializari: querySpecs,
+                    profesor: prof
+                });
+
+                const resNorme = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
+
+                if (!resNorme.ok) {
+                    throw new Error(`HTTP error! status: ${resNorme.status}`);
+                }
+
                 const dataNorme = await resNorme.json();
 
                 let htmlNorme = '';
                 dataNorme.forEach(n => {
-                    // AICI ESTE CORECTIA: Folosim litera MARE la inceput (Profesor, Specializare, etc.)
                     htmlNorme += `<tr>
-                <td>${n.Profesor || 'N/A'}</td>
-                <td>${n.Specializare || 'N/A'}</td>
-                <td>${n.Materie || 'N/A'}</td>
-                <td class="text-center">${n.Norma || '0'}</td>
-            </tr>`;
+                            <td>${n.profesor || n.Profesor || 'N/A'}</td>
+                            <td>${n.specializare || n.Specializare || 'N/A'}</td>
+                            <td>${n.materie || n.Materie || 'N/A'}</td>
+                            <td class="text-center fw-bold">${n.norma || n.Norma || '0'}</td>
+                        </tr>`;
                 });
-                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="4" class="text-center">Fără date.</td></tr>';
-            } catch (err) { console.error("Eroare:", err); }
+                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="4" class="text-center">Fără date pentru filtrele selectate.</td></tr>';
+            } catch (err) {
+                console.error("Eroare la incarcare:", err);
+                document.getElementById('normeTableBody').innerHTML = `<tr><td colspan="4" class="text-center text-danger">Eroare la încărcarea datelor: ${err.message}</td></tr>`;
+            }
         }
     </script>
 </body>
