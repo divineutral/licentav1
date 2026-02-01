@@ -126,11 +126,12 @@
                             <th>Profesor</th>
                             <th>Specializare</th>
                             <th>Materie</th>
+                            <th>Tip Post</th>
                             <th class="text-center">Norma</th>
                         </tr>
                     </thead>
                     <tbody id="normeTableBody">
-                        <tr><td colspan="4" class="text-center text-muted">Selectați filtrele și apăsați "View Report".</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted">Selectați filtrele și apăsați "View Report".</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -249,16 +250,16 @@
                 let htmlNorme = '';
                 dataNorme.forEach(n => {
                     htmlNorme += `<tr>
-                            <td>${n.profesor || n.Profesor || 'N/A'}</td>
-                            <td>${n.specializare || n.Specializare || 'N/A'}</td>
-                            <td>${n.materie || n.Materie || 'N/A'}</td>
-                            <td class="text-center fw-bold">${n.norma || n.Norma || '0'}</td>
-                        </tr>`;
+                                <td>${n.profesor || n.Profesor || 'N/A'}</td>
+                                <td>${n.specializare || n.Specializare || 'N/A'}</td>
+                                <td>${n.materie || n.Materie || 'N/A'}</td>
+                                <td><span class="badge bg-secondary">${n.status || n.Status || 'N/A'}</span></td> <td class="text-center fw-bold">${n.norma || n.Norma || '0'}</td>
+                            </tr>`;
                 });
-                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="4" class="text-center">Fără date pentru filtrele selectate.</td></tr>';
+                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="5" class="text-center">Fără date pentru filtrele selectate.</td></tr>';
             } catch (err) {
                 console.error("Eroare la incarcare:", err);
-                document.getElementById('normeTableBody').innerHTML = `<tr><td colspan="4" class="text-center text-danger">Eroare la încărcarea datelor: ${err.message}</td></tr>`;
+                document.getElementById('normeTableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare la încărcarea datelor: ${err.message}</td></tr>`;
             }
         }
     </script>
