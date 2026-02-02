@@ -132,11 +132,32 @@
                         </tr>
                     </thead>
                     <tbody id="normeTableBody">
-                        <tr><td colspan="5" class="text-center text-muted">Selectați filtrele și apăsați "View Report".</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted">Selectați filtrele și apăsați "View Report".</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
+
+        <div class="card p-4 mt-4 shadow-sm">
+            <h5 class="text-muted mb-3 text-uppercase small fw-bold">Distribuție Ore Profesor pe Programe de Studiu</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Profesor</th>
+                            <th>Program Studiu</th>
+                            <th class="text-center">Ore Alocate</th>
+                            <th class="text-center">Procent</th>
+                            <th class="text-center table-primary">Total Ore Profesor</th>
+                        </tr>
+                    </thead>
+                    <tbody id="oreProgramTableBody">
+                        <tr><td colspan="5" class="text-center text-muted">Așteptare date...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -210,28 +231,18 @@
                     .then(data => {
                         const $p = $('#profesorSelect').empty();
                         data.forEach(p => $p.append(new Option(p, p)));
-                        // Nu mai declanșăm nimic automat aici pentru a nu face loop infinit
                     });
             });
         });
-        // Funcție nouă pentru colorare (pune-o oriunde în script sau direct înainte de incarcaDate)
+
+        // Funcție pentru colorare status
         function getBadgeStatus(statusText) {
             if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
 
-            // Verificăm dacă conține cuvântul "Titular"
-            // (convertim la litere mici ca să nu conteze cum e scris în bază)
             if (statusText.toLowerCase().includes('titular')) {
-                return `<span class="badge bg-success">Titular</span>`; // Verde
+                return `<span class="badge bg-success">Titular</span>`;
             } else {
-                // Dacă nu e titular, presupunem că e Plata cu Ora (Suplinitor, Asociat, Vacant etc.)
-                // Afișăm textul original din bază (ex: Suplinitor), dar cu galben, SAU textul "Plata cu Ora"
-                // Alege varianta preferată de mai jos:
-
-                // Varianta A: Afișează exact ce e în bază (ex: Suplinitor), dar colorat de avertisment
                 return `<span class="badge bg-warning text-dark">${statusText}</span>`;
-
-                // Varianta B (Dacă vrei să scrie forțat "Plata cu Ora"):
-                // return `<span class="badge bg-warning text-dark">Plata cu Ora</span>`;
             }
         }
 
@@ -245,38 +256,74 @@
             const prof = $('#profesorSelect').val() || 'Toti';
             const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
 
+            const params = new URLSearchParams({
+                anUniv: anUniv,
+                facultate: facultate,
+                specializari: querySpecs,
+                profesor: prof
+            });
+
             try {
-                const params = new URLSearchParams({
-                    anUniv: anUniv,
-                    facultate: facultate,
-                    specializari: querySpecs,
-                    profesor: prof
-                });
-
+                // 1. Încarcă NORME PROFESORI (Tabelul 1)
                 const resNorme = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
-
-                if (!resNorme.ok) throw new Error(`HTTP error! status: ${resNorme.status}`);
+                if (!resNorme.ok) throw new Error(`HTTP error la norme! status: ${resNorme.status}`);
 
                 const dataNorme = await resNorme.json();
-
                 let htmlNorme = '';
                 dataNorme.forEach(n => {
                     const statusHtml = getBadgeStatus(n.status || n.Status);
-
                     htmlNorme += `<tr>
-                            <td>${n.profesor || n.Profesor || 'N/A'}</td>
-                            <td>${n.specializare || n.Specializare || 'N/A'}</td>
-                            <td>${n.materie || n.Materie || 'N/A'}</td>
-                            <td class="text-center">${statusHtml}</td>
-                            
-                            <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt || '0'}</td>
-                            <td class="text-center fw-bold text-primary table-primary">${n.normaSem || n.NormaSem || '0'}</td>
-                        </tr>`;
+                                <td>${n.profesor || n.Profesor || 'N/A'}</td>
+                                <td>${n.specializare || n.Specializare || 'N/A'}</td>
+                                <td>${n.materie || n.Materie || 'N/A'}</td>
+                                <td class="text-center">${statusHtml}</td>
+                                <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt || '0'}</td>
+                                <td class="text-center fw-bold text-primary table-primary">${n.normaSem || n.NormaSem || '0'}</td>
+                            </tr>`;
                 });
-                // ATENTIE: colspan acum este 6 pentru ca avem o coloana in plus
-                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="6" class="text-center">Fără date pentru filtrele selectate.</td></tr>';  } catch (err) {
-                console.error("Eroare la incarcare:", err);
-                document.getElementById('normeTableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare la încărcarea datelor: ${err.message}</td></tr>`;
+                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="6" class="text-center">Fără date pentru filtrele selectate.</td></tr>';
+
+                // 2. Încarcă ORE PROFESOR PER PROGRAM (Tabelul 2)
+                const resOre = await fetch(`/api/Rapoarte/ore-profesor-program?${params.toString()}`);
+                if (resOre.ok) {
+                    const dataOre = await resOre.json();
+                    let htmlOre = '';
+
+                    if (dataOre.length === 0) {
+                        htmlOre = '<tr><td colspan="5" class="text-center">Nu există date conform filtrelor.</td></tr>';
+                    } else {
+                        dataOre.forEach(item => {
+                            // Determină culoarea bării de progres în funcție de procent
+                            let colorClass = 'bg-info';
+                            if (item.procent > 50) colorClass = 'bg-success';
+                            if (item.procent < 10) colorClass = 'bg-warning';
+
+                            htmlOre += `
+                                <tr>
+                                    <td class="fw-bold">${item.profesor || item.Profesor}</td>
+                                    <td>${item.programStudiu || item.ProgramStudiu}</td>
+                                    <td class="text-center">${item.ore || item.Ore}</td>
+                                    <td class="text-center" style="width: 20%;">
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2">${item.procent || item.Procent}%</span>
+                                            <div class="progress flex-grow-1" style="height: 6px;">
+                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procent || item.Procent}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center fw-bold table-primary">${item.total || item.Total}</td>
+                                </tr>`;
+                        });
+                    }
+                    document.getElementById('oreProgramTableBody').innerHTML = htmlOre;
+                } else {
+                    console.error("Eroare la preluarea datelor ore-profesor");
+                    document.getElementById('oreProgramTableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare la încărcarea datelor.</td></tr>`;
+                }
+
+            } catch (err) {
+                console.error("Eroare generală la incarcare:", err);
+                document.getElementById('normeTableBody').innerHTML = `<tr><td colspan="6" class="text-center text-danger">Eroare: ${err.message}</td></tr>`;
             }
         }
     </script>

@@ -347,5 +347,89 @@ namespace LicentaV1.Controllers
             }
             return Ok(listaResult);
         }
+        // =========================================================================
+        // 4. RAPORT NOU: ORE PROFESOR PROGRAM 
+        // =========================================================================
+
+        [HttpGet("ore-profesor-program")]
+        public async Task<IActionResult> GetOreProfProgram(
+     string anUniv = "Toti",
+     string facultate = "Toti",
+     string specializari = "Toti",
+     string profesor = "Toti")
+        {
+            var listaResult = new List<object>();
+
+            string query = @"
+    WITH DateBase AS (
+        SELECT 
+            ppm.NumeIntreg AS Profesor,
+            ISNULL(ppm.DenumireSpecializare, 'Nespecificat') AS ProgramStudiu,
+            (ISNULL(ppm.Nr_Ore_Curs, 0) + ISNULL(ppm.Nr_Ore_Seminar, 0) + 
+             ISNULL(ppm.Nr_Ore_Laborator, 0) + ISNULL(ppm.Nr_Ore_Proiect, 0) + 
+             ISNULL(ppm.Nr_Ore_Practica, 0)) AS OreFizice,
+            ppm.DenumireFacultate
+        FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
+        LEFT JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
+        WHERE 
+            (@AnUniv = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) = @AnUniv)
+            AND (@Facultate = 'Toti' OR ppm.DenumireFacultate = @Facultate)
+            AND (@Profesor = 'Toti' OR ppm.NumeIntreg LIKE '%' + @Profesor + '%')
+    ),
+    ProfTotal AS (
+        SELECT 
+            Profesor,
+            SUM(OreFizice) AS TotalOre
+        FROM DateBase
+        GROUP BY Profesor
+    )
+    SELECT 
+        db.Profesor,
+        db.ProgramStudiu,
+        SUM(db.OreFizice) AS Ore,
+        pt.TotalOre AS Total
+    FROM DateBase db
+    INNER JOIN ProfTotal pt ON db.Profesor = pt.Profesor
+    WHERE 
+        (@Specializari = 'Toti' OR db.ProgramStudiu IN (SELECT value FROM STRING_SPLIT(@Specializari, ',')))
+    GROUP BY db.Profesor, db.ProgramStudiu, pt.TotalOre
+    HAVING SUM(db.OreFizice) > 0
+    ORDER BY db.Profesor, Ore DESC";
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@AnUniv", anUniv ?? "Toti");
+                    command.Parameters.AddWithValue("@Facultate", facultate ?? "Toti");
+                    command.Parameters.AddWithValue("@Specializari", specializari ?? "Toti");
+                    command.Parameters.AddWithValue("@Profesor", profesor ?? "Toti");
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            double ore = Convert.ToDouble(reader["Ore"]);
+                            double total = Convert.ToDouble(reader["Total"]);
+                            // Calcul procent în C# pentru precizie
+                            double procent = total > 0 ? Math.Round((ore / total) * 100, 2) : 0;
+
+                            listaResult.Add(new
+                            {
+                                Profesor = reader["Profesor"].ToString(),
+                                ProgramStudiu = reader["ProgramStudiu"].ToString(),
+                                Ore = ore,
+                                Total = total,
+                                Procent = procent
+                            });
+                        }
+                    }
+                }
+            }
+
+            return Ok(listaResult);
+        }
     }
 }
