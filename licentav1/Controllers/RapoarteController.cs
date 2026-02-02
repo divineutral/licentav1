@@ -81,7 +81,6 @@ namespace LicentaV1.Controllers
                 return lista;
             }));
         }
-
         [HttpGet("liste/specializari-per-facultate")]
         public ActionResult GetSpecializari(string anUniv, string numeFacultate)
         {
@@ -91,26 +90,30 @@ namespace LicentaV1.Controllers
             {
                 string sql;
 
-                // LOGICA NOUĂ VALIDATĂ: Folosim ID-ul "dominant" pentru a filtra
+                // Dacă e selectată o facultate, folosim logica "inteligentă" cu ID-ul
                 if (!string.IsNullOrEmpty(numeFacultate) && numeFacultate != "Toti")
                 {
                     sql = @"
                     DECLARE @TargetFacId INT;
                     
-                    -- Pas 1: Găsim ID-ul facultății (cel mai frecvent asociat cu numele)
                     SELECT TOP 1 @TargetFacId = ID_FacultateSpecializare
                     FROM [agsis_dw].[dbo].[Post_Profesor_Materie]
                     WHERE UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) = @fac
                     GROUP BY ID_FacultateSpecializare
                     ORDER BY COUNT(*) DESC;
 
-                    -- Pas 2: Selectăm specializările curate din SF folosind acel ID
+                    -- LOGICA DE CURĂȚARE EXTINSĂ
                     SELECT DISTINCT 
-                        UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
-                            CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
-                                 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
-                                 ELSE sf.DenumireSpecializare END, 
-                        'Ș', 'S'), 'Ț', 'T')))) as SpecCurata
+                        UPPER(LTRIM(RTRIM(
+                            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                                CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
+                                     THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
+                                     ELSE sf.DenumireSpecializare END, 
+                            ' - CORECT', ''),   -- Stergem ' - CORECT'
+                            ' CORECT', ''),     -- Stergem ' CORECT'
+                            ' - COPIE', ''),    -- Stergem ' - COPIE'
+                            'Ș', 'S'), 'Ț', 'T')
+                        ))) as SpecCurata
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
                     WHERE sf.ID_Facultate = @TargetFacId 
                       AND sf.DenumireSpecializare IS NOT NULL
@@ -118,14 +121,19 @@ namespace LicentaV1.Controllers
                 }
                 else
                 {
-                    // Fallback pentru "Toti"
+                    // Logică pentru "Toti"
                     sql = @"
                     SELECT DISTINCT 
-                        UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
-                            CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
-                                 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
-                                 ELSE sf.DenumireSpecializare END, 
-                        'Ș', 'S'), 'Ț', 'T')))) as SpecCurata
+                        UPPER(LTRIM(RTRIM(
+                            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                                CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
+                                     THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
+                                     ELSE sf.DenumireSpecializare END, 
+                            ' - CORECT', ''),
+                            ' CORECT', ''),
+                            ' - COPIE', ''),
+                            'Ș', 'S'), 'Ț', 'T')
+                        ))) as SpecCurata
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
                     WHERE sf.DenumireSpecializare IS NOT NULL
                     ORDER BY SpecCurata";
@@ -142,7 +150,9 @@ namespace LicentaV1.Controllers
                 while (reader.Read())
                 {
                     string val = reader["SpecCurata"].ToString()!;
-                    if (!string.IsNullOrWhiteSpace(val)) lista.Add(val);
+                    // Un ultim filtru de siguranță: nu adăugăm duplicate sau goale
+                    if (!string.IsNullOrWhiteSpace(val) && !lista.Contains(val))
+                        lista.Add(val);
                 }
             }
             return Ok(lista);
@@ -200,6 +210,10 @@ namespace LicentaV1.Controllers
         {
             var result = new List<object>();
 
+            // AICI E SCHIMBAREA: Definim numărul de săptămâni ca variabilă
+            // Dacă profesoara zice că sunt 15, modifici doar aici.
+            int nrSaptamani = 14;
+
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 string sql = @"
@@ -232,7 +246,8 @@ namespace LicentaV1.Controllers
                     DenumireMaterie as Materie,
                     TipPost,
                     SUM(TotalOre) as NormaSaptamana,
-                    SUM(TotalOre * 14) as NormaSemestru
+                    -- AICI FOLOSIM PARAMETRUL @saptamani
+                    SUM(TotalOre * @saptamani) as NormaSemestru 
                 FROM BaseData
                 WHERE 
                     (@an = 'Toti' OR AnCurat = @an)
@@ -253,6 +268,9 @@ namespace LicentaV1.Controllers
                 cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
                 string specsParam = string.IsNullOrWhiteSpace(specializari) ? "Toti" : specializari;
                 cmd.Parameters.AddWithValue("@specs", specsParam);
+
+                // Trimitem parametrul în SQL
+                cmd.Parameters.AddWithValue("@saptamani", nrSaptamani);
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
