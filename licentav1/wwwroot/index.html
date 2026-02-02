@@ -127,7 +127,8 @@
                             <th>Specializare</th>
                             <th>Materie</th>
                             <th>Tip Post</th>
-                            <th class="text-center">Norma</th>
+                            <th class="text-center">Ore/Săpt</th>
+                            <th class="text-center table-primary">Total Sem.</th>
                         </tr>
                     </thead>
                     <tbody id="normeTableBody">
@@ -213,25 +214,38 @@
                     });
             });
         });
+        // Funcție nouă pentru colorare (pune-o oriunde în script sau direct înainte de incarcaDate)
+        function getBadgeStatus(statusText) {
+            if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
+
+            // Verificăm dacă conține cuvântul "Titular"
+            // (convertim la litere mici ca să nu conteze cum e scris în bază)
+            if (statusText.toLowerCase().includes('titular')) {
+                return `<span class="badge bg-success">Titular</span>`; // Verde
+            } else {
+                // Dacă nu e titular, presupunem că e Plata cu Ora (Suplinitor, Asociat, Vacant etc.)
+                // Afișăm textul original din bază (ex: Suplinitor), dar cu galben, SAU textul "Plata cu Ora"
+                // Alege varianta preferată de mai jos:
+
+                // Varianta A: Afișează exact ce e în bază (ex: Suplinitor), dar colorat de avertisment
+                return `<span class="badge bg-warning text-dark">${statusText}</span>`;
+
+                // Varianta B (Dacă vrei să scrie forțat "Plata cu Ora"):
+                // return `<span class="badge bg-warning text-dark">Plata cu Ora</span>`;
+            }
+        }
 
         // =========================================================
         //  LOGICA DE RAPORT (View Report)
         // =========================================================
         async function incarcaDate() {
-            // 1. Preluam valorile pentru An si Facultate
             const anUniv = $('#anUnivSelect').val() || 'Toti';
             const facultate = $('#facultateSelect').val() || 'Toti';
-
-            // 2. Preluam specializarile si profesorul
             const specs = $('#specializareSelect').val();
             const prof = $('#profesorSelect').val() || 'Toti';
             const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
 
-            // Afisam in consola pentru debugging
-            console.log("Filtre aplicate:", { anUniv, facultate, querySpecs, prof });
-
             try {
-                // 3. Construim URL-ul incluzand TOTI parametrii
                 const params = new URLSearchParams({
                     anUniv: anUniv,
                     facultate: facultate,
@@ -241,23 +255,26 @@
 
                 const resNorme = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
 
-                if (!resNorme.ok) {
-                    throw new Error(`HTTP error! status: ${resNorme.status}`);
-                }
+                if (!resNorme.ok) throw new Error(`HTTP error! status: ${resNorme.status}`);
 
                 const dataNorme = await resNorme.json();
 
                 let htmlNorme = '';
                 dataNorme.forEach(n => {
+                    const statusHtml = getBadgeStatus(n.status || n.Status);
+
                     htmlNorme += `<tr>
-                                <td>${n.profesor || n.Profesor || 'N/A'}</td>
-                                <td>${n.specializare || n.Specializare || 'N/A'}</td>
-                                <td>${n.materie || n.Materie || 'N/A'}</td>
-                                <td><span class="badge bg-secondary">${n.status || n.Status || 'N/A'}</span></td> <td class="text-center fw-bold">${n.norma || n.Norma || '0'}</td>
-                            </tr>`;
+                            <td>${n.profesor || n.Profesor || 'N/A'}</td>
+                            <td>${n.specializare || n.Specializare || 'N/A'}</td>
+                            <td>${n.materie || n.Materie || 'N/A'}</td>
+                            <td class="text-center">${statusHtml}</td>
+                            
+                            <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt || '0'}</td>
+                            <td class="text-center fw-bold text-primary table-primary">${n.normaSem || n.NormaSem || '0'}</td>
+                        </tr>`;
                 });
-                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="5" class="text-center">Fără date pentru filtrele selectate.</td></tr>';
-            } catch (err) {
+                // ATENTIE: colspan acum este 6 pentru ca avem o coloana in plus
+                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="6" class="text-center">Fără date pentru filtrele selectate.</td></tr>';  } catch (err) {
                 console.error("Eroare la incarcare:", err);
                 document.getElementById('normeTableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare la încărcarea datelor: ${err.message}</td></tr>`;
             }

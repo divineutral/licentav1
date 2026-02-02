@@ -2,7 +2,6 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Caching.Memory;
 using System.Data;
-using System.Text.RegularExpressions;
 
 namespace LicentaV1.Controllers
 {
@@ -21,9 +20,9 @@ namespace LicentaV1.Controllers
             _cache = cache;
         }
 
-        // ==========================================
-        // ENDPOINT-URI PENTRU FILTRE (CASCADĂ)
-        // ==========================================
+        // =========================================================================
+        // 1. ENDPOINT-URI PENTRU LISTE (FILTRE) - LOGICĂ VALIDATĂ
+        // =========================================================================
 
         [HttpGet("liste/ani-universitari")]
         public ActionResult GetAni()
@@ -33,7 +32,6 @@ namespace LicentaV1.Controllers
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60);
                 var lista = new List<object>();
 
-                // Adăugare manuală opțională
                 lista.Add(new { id = "AN UNIVERSITAR 2025-2026", nume = "AN UNIVERSITAR 2025-2026" });
 
                 using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -70,9 +68,9 @@ namespace LicentaV1.Controllers
                 {
                     string sql = @"
                         SELECT DISTINCT 
-                            UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) COLLATE DATABASE_DEFAULT as FacCurata
-                        FROM [agsis_dw].[dbo].[Post_Profesor_Materie]
-                        WHERE DenumireFacultate IS NOT NULL
+                            UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) COLLATE DATABASE_DEFAULT as FacCurata
+                        FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
+                        WHERE ppm.DenumireFacultate IS NOT NULL
                         ORDER BY FacCurata ASC";
 
                     conn.Open();
@@ -91,25 +89,54 @@ namespace LicentaV1.Controllers
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                // SQL Curat care taie tot ce e dupa '+'
-                string sql = @"
-                SELECT DISTINCT 
-                    UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
-                        CASE WHEN CHARINDEX('+', ppm.DenumireSpecializare) > 0 
-                             THEN LEFT(ppm.DenumireSpecializare, CHARINDEX('+', ppm.DenumireSpecializare) - 1)
-                             ELSE ppm.DenumireSpecializare END, 
-                    'Ș', 'S'), 'Ț', 'T')))) as SpecCurata
-                FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
-                INNER JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
-                WHERE ppm.DenumireSpecializare IS NOT NULL 
-                  AND (@fac = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) = @fac)
-                  AND (@an = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) = @an)
-                ORDER BY SpecCurata";
+                string sql;
+
+                // LOGICA NOUĂ VALIDATĂ: Folosim ID-ul "dominant" pentru a filtra
+                if (!string.IsNullOrEmpty(numeFacultate) && numeFacultate != "Toti")
+                {
+                    sql = @"
+                    DECLARE @TargetFacId INT;
+                    
+                    -- Pas 1: Găsim ID-ul facultății (cel mai frecvent asociat cu numele)
+                    SELECT TOP 1 @TargetFacId = ID_FacultateSpecializare
+                    FROM [agsis_dw].[dbo].[Post_Profesor_Materie]
+                    WHERE UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) = @fac
+                    GROUP BY ID_FacultateSpecializare
+                    ORDER BY COUNT(*) DESC;
+
+                    -- Pas 2: Selectăm specializările curate din SF folosind acel ID
+                    SELECT DISTINCT 
+                        UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
+                            CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
+                                 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
+                                 ELSE sf.DenumireSpecializare END, 
+                        'Ș', 'S'), 'Ț', 'T')))) as SpecCurata
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                    WHERE sf.ID_Facultate = @TargetFacId 
+                      AND sf.DenumireSpecializare IS NOT NULL
+                    ORDER BY SpecCurata";
+                }
+                else
+                {
+                    // Fallback pentru "Toti"
+                    sql = @"
+                    SELECT DISTINCT 
+                        UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
+                            CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
+                                 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
+                                 ELSE sf.DenumireSpecializare END, 
+                        'Ș', 'S'), 'Ț', 'T')))) as SpecCurata
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                    WHERE sf.DenumireSpecializare IS NOT NULL
+                    ORDER BY SpecCurata";
+                }
 
                 conn.Open();
                 using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("@fac", numeFacultate ?? "Toti");
-                cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
+                if (!string.IsNullOrEmpty(numeFacultate) && numeFacultate != "Toti")
+                {
+                    cmd.Parameters.AddWithValue("@fac", numeFacultate);
+                }
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -125,27 +152,23 @@ namespace LicentaV1.Controllers
         public ActionResult GetProfesori(string anUniv, string facultate, string specializari)
         {
             var lista = new List<string> { "Toti" };
-
-            // Dacă userul a selectat "Toti", trimitem un flag SQL
             bool toateSpecializarile = (string.IsNullOrEmpty(specializari) || specializari == "Toti");
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
+                // La profesori păstrăm logica veche (unde predau ei), dar e ok acum că specializările sunt filtrate corect
                 string sql = @"
                 SELECT DISTINCT ppm.NumeIntreg
                 FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
                 INNER JOIN [agsis_dw].[dbo].[Post_Profesor_Materie] ppm ON sf.ID_Post_Profesor_Materie = ppm.ID_Post_Profesor_Materie
-                INNER JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
+                INNER JOIN (
+                    SELECT DISTINCT ID_AnUniv, DenumireAnUniv FROM [agsis_dw].[dbo].[Cazare]
+                ) cz ON ppm.ID_AnUniv = cz.ID_AnUniv
                 WHERE 
-                   -- 1. Filtru AN
                    (@an = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) = @an)
-                   
                    AND
-                   -- 2. Filtru FACULTATE (ESENȚIAL: Profesori doar din facultatea selectată)
                    (@fac = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) = @fac)
-                   
                    AND
-                   -- 3. Filtru SPECIALIZĂRI
                    (@allSpecs = 1 OR 
                     UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
                         CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
@@ -168,9 +191,10 @@ namespace LicentaV1.Controllers
             return Ok(lista);
         }
 
-        // ==========================================
-        // 3. RAPORT PRINCIPAL (NORMA)
-        // ==========================================
+        // =========================================================================
+        // 2. RAPORTUL PRINCIPAL (NORMA) - Păstrat intact
+        // =========================================================================
+
         [HttpGet("norma-profesori")]
         public ActionResult GetNormaProfesori(string anUniv, string facultate, string specializari, string profesor)
         {
@@ -183,30 +207,32 @@ namespace LicentaV1.Controllers
                     SELECT 
                         ppm.NumeIntreg,
                         sf.DenumireMaterie,
+                        ISNULL(sf.DenTitularSauSuplinitor, 'Nespecificat') as TipPost, 
                         ISNULL(sf.Nr_Ore_Curs, 0) + ISNULL(sf.Nr_Ore_Seminar, 0) + ISNULL(sf.Nr_Ore_Laborator, 0) as TotalOre,
                         
-                        -- CURATARE SPECIALIZARE EXACT CA LA FILTRE
                         UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
                             CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
                                  THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
                                  ELSE sf.DenumireSpecializare END, 
                         'Ș', 'S'), 'Ț', 'T')))) AS SpecializareCurata,
 
-                        -- CURATARE FACULTATE PENTRU FILTRU INTERN
                         UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata,
                         
-                        -- CURATARE AN PENTRU FILTRU INTERN
                         UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) AS AnCurat
 
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
                     INNER JOIN [agsis_dw].[dbo].[Post_Profesor_Materie] ppm ON sf.ID_Post_Profesor_Materie = ppm.ID_Post_Profesor_Materie
-                    INNER JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
+                    INNER JOIN (
+                        SELECT DISTINCT ID_AnUniv, DenumireAnUniv FROM [agsis_dw].[dbo].[Cazare]
+                    ) cz ON ppm.ID_AnUniv = cz.ID_AnUniv
                 )
                 SELECT 
                     NumeIntreg as Profesor,
                     SpecializareCurata as Specializare,
                     DenumireMaterie as Materie,
-                    SUM(TotalOre) as Norma
+                    TipPost,
+                    SUM(TotalOre) as NormaSaptamana,
+                    SUM(TotalOre * 14) as NormaSemestru
                 FROM BaseData
                 WHERE 
                     (@an = 'Toti' OR AnCurat = @an)
@@ -216,17 +242,15 @@ namespace LicentaV1.Controllers
                     (@prof = 'Toti' OR NumeIntreg = @prof)
                     AND
                     (@specs = 'Toti' OR SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs, ',')))
-                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost
                 ORDER BY NumeIntreg, Materie";
 
                 conn.Open();
                 using var cmd = new SqlCommand(sql, conn);
 
-                // Parametrii sunt trimiși direct, curățarea se face în SQL
                 cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
                 cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
                 cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
-                // Dacă specializari e null sau gol, îl facem "Toti"
                 string specsParam = string.IsNullOrWhiteSpace(specializari) ? "Toti" : specializari;
                 cmd.Parameters.AddWithValue("@specs", specsParam);
 
@@ -238,18 +262,19 @@ namespace LicentaV1.Controllers
                         Profesor = reader["Profesor"],
                         Specializare = reader["Specializare"],
                         Materie = reader["Materie"],
-                        Norma = reader["Norma"]
+                        Status = reader["TipPost"],
+                        NormaSapt = reader["NormaSaptamana"],
+                        NormaSem = reader["NormaSemestru"]
                     });
                 }
             }
-
-            // Fallback: Dacă nu sunt date, întoarcem listă goală, nu 404, ca să nu crape UI-ul
             return Ok(result);
         }
 
-        // ==========================================
-        // 4. RAPORT SECUNDAR (STAT FUNCTII)
-        // ==========================================
+        // =========================================================================
+        // 3. RAPORT SECUNDAR (STAT FUNCTII) - Păstrat intact
+        // =========================================================================
+
         [HttpGet("stat-functii-multi")]
         public ActionResult GetStatFunctiiMulti(string specializari, string profesor)
         {
