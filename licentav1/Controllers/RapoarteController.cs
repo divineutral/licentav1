@@ -17,6 +17,9 @@ namespace LicentaV1.Controllers
         private readonly string _connectionString;
         private readonly IMemoryCache _cache;
 
+        // CULOAREA TA DE BRANDING
+        private const string BrandColorHex = "#56723e";
+
         public RapoarteController(IConfiguration configuration, IMemoryCache cache)
         {
             _configuration = configuration;
@@ -395,7 +398,7 @@ namespace LicentaV1.Controllers
         }
 
         // =========================================================================
-        // 5. EXPORT EXCEL
+        // 5. EXPORT EXCEL (MODIFICAT: Design #56723e)
         // =========================================================================
 
         [HttpGet("export/norma")]
@@ -464,6 +467,7 @@ namespace LicentaV1.Controllers
                 }
             }
 
+            // Denumire Fișier
             string fileName = "NormaProfesori_General.xlsx";
             if (!string.IsNullOrEmpty(profesor) && profesor != "Toti")
             {
@@ -475,6 +479,20 @@ namespace LicentaV1.Controllers
             {
                 var ws = wb.Worksheets.Add(result);
                 ws.Columns().AdjustToContents();
+
+                // === STILIZARE EXCEL (NOU) ===
+                var brandColor = XLColor.FromHtml(BrandColorHex);
+
+                // Header
+                var headerRange = ws.Range(1, 1, 1, result.Columns.Count);
+                headerRange.Style.Fill.BackgroundColor = brandColor;
+                headerRange.Style.Font.FontColor = XLColor.White;
+                headerRange.Style.Font.Bold = true;
+
+                // Borders
+                ws.RangeUsed().Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                ws.RangeUsed().Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
                 using (var stream = new MemoryStream())
                 {
                     wb.SaveAs(stream);
@@ -537,20 +555,40 @@ namespace LicentaV1.Controllers
                 }
             }
 
+            // Denumire Fișier
+            string fileName = "StatisticaOre_General.xlsx";
+            if (!string.IsNullOrEmpty(profesor) && profesor != "Toti")
+            {
+                string numeSafe = string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()));
+                fileName = $"StatisticaOre_{numeSafe}.xlsx";
+            }
+
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.Worksheets.Add(result);
                 ws.Columns().AdjustToContents();
+
+                // === STILIZARE EXCEL (NOU) ===
+                var brandColor = XLColor.FromHtml(BrandColorHex);
+
+                var headerRange = ws.Range(1, 1, 1, result.Columns.Count);
+                headerRange.Style.Fill.BackgroundColor = brandColor;
+                headerRange.Style.Font.FontColor = XLColor.White;
+                headerRange.Style.Font.Bold = true;
+
+                ws.RangeUsed().Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                ws.RangeUsed().Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
                 using (var stream = new MemoryStream())
                 {
                     wb.SaveAs(stream);
-                    return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "StatisticaOreProgram.xlsx");
+                    return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
                 }
             }
         }
 
         // =========================================================================
-        // 6. EXPORT PDF (QuestPDF) - VERSIUNE CORECTATĂ
+        // 6. EXPORT PDF (MODIFICAT: Design #56723e + Zebra Striping)
         // =========================================================================
 
         private class PdfNormaData
@@ -640,8 +678,12 @@ namespace LicentaV1.Controllers
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10));
 
-                    page.Header().Text($"Raport Norme Profesori - {DateTime.Now:dd/MM/yyyy}")
-                        .SemiBold().FontSize(14).FontColor(Colors.Blue.Medium);
+                    page.Header().Row(row => {
+                        row.RelativeItem().Column(col => {
+                            col.Item().Text($"Raport Norme Profesori").SemiBold().FontSize(18).FontColor(Color.FromHex(BrandColorHex));
+                            col.Item().Text($"Generat la: {DateTime.Now:dd/MM/yyyy}").FontSize(10).FontColor(Colors.Grey.Medium);
+                        });
+                    });
 
                     page.Content().PaddingVertical(1, Unit.Centimetre).Table(table =>
                     {
@@ -657,31 +699,37 @@ namespace LicentaV1.Controllers
 
                         table.Header(header =>
                         {
-                            header.Cell().Element(CellStyle).Text("Profesor");
-                            header.Cell().Element(CellStyle).Text("Specializare");
-                            header.Cell().Element(CellStyle).Text("Materie");
-                            header.Cell().Element(CellStyle).Text("Tip Post");
-                            header.Cell().Element(CellStyle).Text("Săpt");
-                            header.Cell().Element(CellStyle).Text("Sem");
+                            header.Cell().Element(HeaderStyle).Text("Profesor");
+                            header.Cell().Element(HeaderStyle).Text("Specializare");
+                            header.Cell().Element(HeaderStyle).Text("Materie");
+                            header.Cell().Element(HeaderStyle).Text("Tip Post");
+                            header.Cell().Element(HeaderStyle).Text("Săpt");
+                            header.Cell().Element(HeaderStyle).Text("Sem");
 
-                            static IContainer CellStyle(IContainer container)
+                            static IContainer HeaderStyle(IContainer container)
                             {
-                                // CORECT: Stilurile se aplică prin DefaultTextStyle pe container
-                                return container.DefaultTextStyle(x => x.SemiBold()).PaddingVertical(5).BorderBottom(1).BorderColor(Colors.Black);
+                                // STILIZARE HEADER TABEL: Fundal Verde, Text Alb
+                                return container.DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White))
+                                                .Background(Color.FromHex(BrandColorHex))
+                                                .PaddingVertical(5).PaddingHorizontal(2);
                             }
                         });
 
-                        foreach (var item in data)
+                        for (int i = 0; i < data.Count; i++)
                         {
-                            // CORECT: FontColor și AlignCenter aplicate pe TextDescriptor sau Container corect
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(2).Text(item.Profesor);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(2).Text(item.Specializare);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(2).Text(item.Materie);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(2).Text(item.Tip);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(2).AlignCenter().Text(item.OreSapt);
-                            // AICI ERA EROAREA: FontColor mutat DUPĂ .Text()
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(2).AlignCenter().Text(item.OreSem).FontColor(Colors.Blue.Medium);
+                            var item = data[i];
+                            // ZEBRA STRIPING
+                            var bgColor = i % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+
+                            table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.Profesor);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.Specializare);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.Materie);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.Tip);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).AlignCenter().Text(item.OreSapt);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).AlignCenter().Text(item.OreSem).Bold().FontColor(Color.FromHex(BrandColorHex));
                         }
+
+                        static IContainer CellStyle(IContainer container, string bgColor) => container.Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(4);
                     });
 
                     page.Footer().AlignCenter().Text(x =>
@@ -692,8 +740,15 @@ namespace LicentaV1.Controllers
                 });
             });
 
+            string fileName = "NormaProfesori_General.pdf";
+            if (!string.IsNullOrEmpty(profesor) && profesor != "Toti")
+            {
+                string numeSafe = string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()));
+                fileName = $"NormaProfesori_{numeSafe}.pdf";
+            }
+
             var stream = new MemoryStream(document.GeneratePdf());
-            return File(stream.ToArray(), "application/pdf", "NormaProfesori.pdf");
+            return File(stream.ToArray(), "application/pdf", fileName);
         }
 
         [HttpGet("export/pdf/ore-program")]
@@ -702,7 +757,10 @@ namespace LicentaV1.Controllers
             QuestPDF.Settings.License = LicenseType.Community;
             var data = new List<PdfOreData>();
 
-            string query = @"
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                string query = @"
             WITH DateBase AS (
                 SELECT 
                     ppm.NumeIntreg AS Profesor,
@@ -725,9 +783,6 @@ namespace LicentaV1.Controllers
             HAVING SUM(db.OreFizice) > 0
             ORDER BY db.Profesor, Ore DESC";
 
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                await conn.OpenAsync();
                 using var cmd = new SqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@AnUniv", anUniv ?? "Toti");
                 cmd.Parameters.AddWithValue("@Facultate", facultate ?? "Toti");
@@ -761,7 +816,12 @@ namespace LicentaV1.Controllers
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10));
 
-                    page.Header().Text("Statistica Ore pe Programe").SemiBold().FontSize(14).FontColor(Colors.Green.Medium);
+                    page.Header().Row(row => {
+                        row.RelativeItem().Column(col => {
+                            col.Item().Text("Statistica Ore pe Programe").SemiBold().FontSize(18).FontColor(Color.FromHex(BrandColorHex));
+                            col.Item().Text($"Generat la: {DateTime.Now:dd/MM/yyyy}").FontSize(10).FontColor(Colors.Grey.Medium);
+                        });
+                    });
 
                     page.Content().PaddingVertical(1, Unit.Centimetre).Table(table =>
                     {
@@ -774,24 +834,34 @@ namespace LicentaV1.Controllers
                             h.Cell().Element(HeaderStyle).Text("%");
                             h.Cell().Element(HeaderStyle).Text("Total");
 
-                            // CORECT: Folosim DefaultTextStyle pentru a aplica stilul SemiBold pe container
-                            static IContainer HeaderStyle(IContainer c) => c.DefaultTextStyle(x => x.SemiBold()).BorderBottom(1).Padding(5);
+                            static IContainer HeaderStyle(IContainer c) => c.DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White)).Background(Color.FromHex(BrandColorHex)).Padding(5);
                         });
 
-                        foreach (var item in data)
+                        for (int i = 0; i < data.Count; i++)
                         {
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(5).Text(item.Profesor);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(5).Text(item.Program);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(5).AlignCenter().Text(item.Ore);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(5).AlignCenter().Text($"{item.Procent}%");
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(5).AlignCenter().Text(item.Total);
+                            var item = data[i];
+                            var bgColor = i % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+
+                            table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.Profesor);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.Program);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).AlignCenter().Text(item.Ore);
+                            table.Cell().Element(c => CellStyle(c, bgColor)).AlignCenter().Text($"{item.Procent}%");
+                            table.Cell().Element(c => CellStyle(c, bgColor)).AlignCenter().Text(item.Total).Bold().FontColor(Color.FromHex(BrandColorHex));
                         }
+                        static IContainer CellStyle(IContainer container, string bgColor) => container.Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(5);
                     });
                 });
             });
 
+            string fileName = "StatisticaOre_General.pdf";
+            if (!string.IsNullOrEmpty(profesor) && profesor != "Toti")
+            {
+                string numeSafe = string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()));
+                fileName = $"StatisticaOre_{numeSafe}.pdf";
+            }
+
             var stream = new MemoryStream(document.GeneratePdf());
-            return File(stream.ToArray(), "application/pdf", "StatisticaOre.pdf");
+            return File(stream.ToArray(), "application/pdf", fileName);
         }
     }
 }

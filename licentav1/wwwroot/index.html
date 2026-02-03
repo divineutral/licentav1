@@ -13,7 +13,8 @@
             --sidebar-width: 250px;
             --bg-light: #f8f9fa;
             --sidebar-dark: #212529;
-            --accent-color: #94a348;
+            /* CULOAREA TA VERDE */
+            --accent-color: #56723e;
         }
 
         body {
@@ -40,6 +41,7 @@
                 .sidebar .nav-link.active {
                     background: var(--accent-color);
                     color: white;
+                    font-weight: bold;
                 }
 
         .main-content {
@@ -53,9 +55,9 @@
             border-radius: 15px;
             margin-bottom: 25px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-top: 5px solid var(--accent-color); /* Accent vizual */
         }
 
-        /* Stiluri Accordion pentru rapoarte */
         .accordion-item {
             border: none;
             border-radius: 15px;
@@ -71,7 +73,7 @@
         }
 
             .accordion-button:not(.collapsed) {
-                background-color: #e9ecef;
+                background-color: #f1f3ee; /* Un verde foarte palid */
                 color: var(--accent-color);
                 box-shadow: none;
             }
@@ -97,13 +99,23 @@
             border: 1px solid #dee2e6 !important;
             min-height: 38px;
         }
+
+        /* Branding logo */
+        .logo-container {
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="sidebar d-flex flex-column p-3">
-        <div class="text-center mb-4">
-            <img src="https://www.unitbv.ro/images/logo_unitbv.png" alt="Logo" style="width: 80%; filter: brightness(0) invert(1);">
+        <div class="text-center mb-4 logo-container">
+            <img src="images/logo.png" alt="Logo" style="width: 100%; max-width: 180px; object-fit: contain;"
+                 onerror="this.style.display='none'; this.parentElement.innerHTML='<h3 class=\'text-white\'>LICENȚĂ</h3>'">
         </div>
+
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item"><a href="#" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a></li>
         </ul>
@@ -111,7 +123,9 @@
     </div>
 
     <div class="main-content">
-        <h2 id="dashboardTitle" class="mb-4">Academic Year Overview</h2>
+        <h2 id="dashboardTitle" class="mb-4 text-dark fw-bold" style="border-left: 5px solid var(--accent-color); padding-left: 15px;">
+            Academic Year Overview
+        </h2>
 
         <div class="filter-section row g-3 align-items-end">
             <div class="col-md-auto">
@@ -158,14 +172,14 @@
 
                         <div class="table-responsive">
                             <table class="table table-hover table-bordered align-middle">
-                                <thead class="table-light">
+                                <thead style="background-color: #56723e; color: white;">
                                     <tr>
                                         <th>Profesor</th>
                                         <th>Specializare</th>
                                         <th>Materie</th>
                                         <th>Tip Post</th>
                                         <th class="text-center">Ore/Săpt</th>
-                                        <th class="text-center table-primary">Total Sem.</th>
+                                        <th class="text-center">Total Sem.</th>
                                     </tr>
                                 </thead>
                                 <tbody id="normeTableBody">
@@ -196,13 +210,13 @@
 
                         <div class="table-responsive">
                             <table class="table table-hover table-bordered align-middle">
-                                <thead class="table-light">
+                                <thead style="background-color: #56723e; color: white;">
                                     <tr>
                                         <th>Profesor</th>
                                         <th>Program Studiu</th>
                                         <th class="text-center">Ore Alocate</th>
                                         <th class="text-center">Procent</th>
-                                        <th class="text-center table-primary" id="headerTotal">Total Ore Profesor</th>
+                                        <th class="text-center" id="headerTotal">Total Ore Profesor</th>
                                     </tr>
                                 </thead>
                                 <tbody id="oreProgramTableBody">
@@ -222,16 +236,12 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
-        const cacheState = {
-            norme: "",
-            ore: ""
-        };
+        const cacheState = { norme: "", ore: "" };
 
         $(document).ready(function () {
             $('#specializareSelect').select2({ placeholder: "Alege specializări", allowClear: true, width: 'resolve' });
             $('#profesorSelect').select2({ placeholder: "Tastați pentru a căuta profesor...", allowClear: true, width: 'resolve', minimumInputLength: 0 });
 
-            // 1. Liste Inițiale
             fetch('/api/Rapoarte/liste/ani-universitari').then(res => res.json()).then(data => {
                 const s = document.getElementById('anUnivSelect');
                 data.forEach(an => s.innerHTML += `<option value="${an.id}">${an.nume}</option>`);
@@ -242,7 +252,6 @@
                 data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
             });
 
-            // Evenimente
             $('#anUnivSelect').on('change', function () { $('#facultateSelect').trigger('change'); invalidateCache(); });
 
             $('#facultateSelect').on('change', function () {
@@ -270,7 +279,6 @@
 
             $('#profesorSelect').on('change', function () { invalidateCache(); });
 
-            // Accordion Logic
             document.getElementById('collapseNorme').addEventListener('show.bs.collapse', function () {
                 const currentParams = getFilterParamsString();
                 if (cacheState.norme !== currentParams) { loadNormeData(); cacheState.norme = currentParams; }
@@ -282,20 +290,16 @@
             });
         });
 
-        // --- EXPORT LOGIC ---
         function downloadExcel(reportType) {
             const params = new URLSearchParams(getParamsObject());
             window.location.href = `/api/Rapoarte/export/${reportType}?${params.toString()}`;
         }
 
-        // FUNCTIA PENTRU PDF
         function downloadPdf(reportType) {
             const params = new URLSearchParams(getParamsObject());
-            // Apelăm endpoint-ul nou creat pentru PDF
             window.location.href = `/api/Rapoarte/export/pdf/${reportType}?${params.toString()}`;
         }
 
-        // --- DATA LOADERS ---
         async function loadNormeData() {
             const tbody = document.getElementById('normeTableBody');
             tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
@@ -312,7 +316,7 @@
                             <td>${n.materie || n.Materie}</td>
                             <td class="text-center">${getBadgeStatus(n.status || n.Status)}</td>
                             <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt}</td>
-                            <td class="text-center fw-bold text-primary table-primary">${n.normaSem || n.NormaSem}</td>
+                            <td class="text-center fw-bold" style="color: #56723e;">${n.normaSem || n.NormaSem}</td>
                         </tr>`;
                 });
                 tbody.innerHTML = html;
@@ -336,6 +340,7 @@
                 let html = '';
                 data.forEach(item => {
                     let colorClass = 'bg-info';
+                    // Putem personaliza și aici culorile dacă dorești, momentan lăsăm Bootstrap standard pt progress bars
                     if (item.procent > 50) colorClass = 'bg-success';
                     if (item.procent < 10) colorClass = 'bg-warning';
                     html += `<tr>
@@ -350,7 +355,7 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="text-center fw-bold table-primary">${item.total || item.Total}</td>
+                                <td class="text-center fw-bold" style="color: #56723e;">${item.total || item.Total}</td>
                             </tr>`;
                 });
                 tbody.innerHTML = html;
@@ -372,7 +377,7 @@
         function resetView() { $('.accordion-collapse').collapse('hide'); invalidateCache(); }
         function getBadgeStatus(statusText) {
             if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
-            if (statusText.toLowerCase().includes('titular')) return `<span class="badge bg-success">Titular</span>`;
+            if (statusText.toLowerCase().includes('titular')) return `<span class="badge" style="background-color: #56723e;">Titular</span>`;
             return `<span class="badge bg-warning text-dark">${statusText}</span>`;
         }
     </script>
