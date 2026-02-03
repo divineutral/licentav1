@@ -338,48 +338,49 @@ namespace LicentaV1.Controllers
 
         [HttpGet("ore-profesor-program")]
         public async Task<IActionResult> GetOreProfProgram(
-            string anUniv = "Toti",
-            string facultate = "Toti",
-            string specializari = "Toti",
-            string profesor = "Toti")
+     string anUniv = "Toti",
+     string facultate = "Toti",
+     string specializari = "Toti",
+     string profesor = "Toti")
         {
             var listaResult = new List<object>();
 
+            // AM MUTAT FILTRUL DE SPECIALIZĂRI ÎN INTERIORUL 'DateBase'
             string query = @"
-            WITH DateBase AS (
-                SELECT 
-                    ppm.NumeIntreg AS Profesor,
-                    ISNULL(ppm.DenumireSpecializare, 'Nespecificat') AS ProgramStudiu,
-                    (ISNULL(ppm.Nr_Ore_Curs, 0) + ISNULL(ppm.Nr_Ore_Seminar, 0) + 
-                     ISNULL(ppm.Nr_Ore_Laborator, 0) + ISNULL(ppm.Nr_Ore_Proiect, 0) + 
-                     ISNULL(ppm.Nr_Ore_Practica, 0)) AS OreFizice,
-                    ppm.DenumireFacultate
-                FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
-                LEFT JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
-                WHERE 
-                    (@AnUniv = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) = @AnUniv)
-                    AND (@Facultate = 'Toti' OR ppm.DenumireFacultate = @Facultate)
-                    AND (@Profesor = 'Toti' OR ppm.NumeIntreg LIKE '%' + @Profesor + '%')
-            ),
-            ProfTotal AS (
-                SELECT 
-                    Profesor,
-                    SUM(OreFizice) AS TotalOre
-                FROM DateBase
-                GROUP BY Profesor
-            )
-            SELECT 
-                db.Profesor,
-                db.ProgramStudiu,
-                SUM(db.OreFizice) AS Ore,
-                pt.TotalOre AS Total
-            FROM DateBase db
-            INNER JOIN ProfTotal pt ON db.Profesor = pt.Profesor
-            WHERE 
-                (@Specializari = 'Toti' OR db.ProgramStudiu IN (SELECT value FROM STRING_SPLIT(@Specializari, ',')))
-            GROUP BY db.Profesor, db.ProgramStudiu, pt.TotalOre
-            HAVING SUM(db.OreFizice) > 0
-            ORDER BY db.Profesor, Ore DESC";
+    WITH DateBase AS (
+        SELECT 
+            ppm.NumeIntreg AS Profesor,
+            ISNULL(ppm.DenumireSpecializare, 'Nespecificat') AS ProgramStudiu,
+            (ISNULL(ppm.Nr_Ore_Curs, 0) + ISNULL(ppm.Nr_Ore_Seminar, 0) + 
+             ISNULL(ppm.Nr_Ore_Laborator, 0) + ISNULL(ppm.Nr_Ore_Proiect, 0) + 
+             ISNULL(ppm.Nr_Ore_Practica, 0)) AS OreFizice,
+            ppm.DenumireFacultate
+        FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
+        LEFT JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
+        WHERE 
+            (@AnUniv = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) = @AnUniv)
+            AND (@Facultate = 'Toti' OR ppm.DenumireFacultate = @Facultate)
+            AND (@Profesor = 'Toti' OR ppm.NumeIntreg LIKE '%' + @Profesor + '%')
+            -- FILTRU APLICAT AICI PENTRU A RECALCULA TOTALUL DINAMIC
+            AND (@Specializari = 'Toti' OR ISNULL(ppm.DenumireSpecializare, 'Nespecificat') IN (SELECT value FROM STRING_SPLIT(@Specializari, ',')))
+    ),
+    ProfTotal AS (
+        SELECT 
+            Profesor,
+            SUM(OreFizice) AS TotalOre
+        FROM DateBase
+        GROUP BY Profesor
+    )
+    SELECT 
+        db.Profesor,
+        db.ProgramStudiu,
+        SUM(db.OreFizice) AS Ore,
+        pt.TotalOre AS Total
+    FROM DateBase db
+    INNER JOIN ProfTotal pt ON db.Profesor = pt.Profesor
+    GROUP BY db.Profesor, db.ProgramStudiu, pt.TotalOre
+    HAVING SUM(db.OreFizice) > 0
+    ORDER BY db.Profesor, Ore DESC";
 
             using (var connection = new SqlConnection(_connectionString))
             {
