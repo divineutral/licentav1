@@ -7,8 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <style>
         :root {
@@ -49,13 +47,6 @@
             padding: 30px;
         }
 
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            margin-bottom: 25px;
-        }
-
         .filter-section {
             background: white;
             padding: 20px;
@@ -64,22 +55,47 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
 
-        /* Ajustări Select2 pentru a arăta bine cu Bootstrap */
-        #specializareSelect + .select2-container {
-            min-width: 600px !important;
+        /* Stiluri Accordion pentru rapoarte */
+        .accordion-item {
+            border: none;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
-        .select2-selection--multiple {
-            min-height: 38px !important;
-            border: 1px solid #dee2e6 !important;
-            border-radius: 0.375rem !important;
+        .accordion-button {
+            background-color: white;
+            font-weight: 600;
+            color: #495057;
         }
 
-        .select2-container--default .select2-selection--single {
+            .accordion-button:not(.collapsed) {
+                background-color: #e9ecef;
+                color: var(--accent-color);
+                box-shadow: none;
+            }
+
+            .accordion-button:focus {
+                box-shadow: none;
+                border-color: rgba(0,0,0,.125);
+            }
+
+        /* Ajustări Select2 */
+        .select2-container .select2-selection--single {
             height: 38px !important;
             border: 1px solid #dee2e6 !important;
-            border-radius: 0.375rem !important;
-            padding-top: 5px;
+            display: flex;
+            align-items: center;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            top: 6px;
+        }
+
+        .select2-container--default .select2-selection--multiple {
+            border: 1px solid #dee2e6 !important;
+            min-height: 38px;
         }
     </style>
 </head>
@@ -97,74 +113,119 @@
     <div class="main-content">
         <h2 id="dashboardTitle" class="mb-4">Academic Year Overview</h2>
 
-        <div class="filter-section d-flex flex-wrap gap-3 align-items-end">
-            <div>
-                <label class="small fw-bold text-muted">An Univ</label>
-                <select id="anUnivSelect" class="form-select w-auto"></select>
+        <div class="filter-section row g-3 align-items-end">
+            <div class="col-md-auto">
+                <label class="small fw-bold text-muted d-block">An Univ</label>
+                <select id="anUnivSelect" class="form-select" style="min-width: 200px;"></select>
             </div>
-            <div>
-                <label class="small fw-bold text-muted">Facultate</label>
-                <select id="facultateSelect" class="form-select w-auto"></select>
+            <div class="col-md-auto">
+                <label class="small fw-bold text-muted d-block">Facultate</label>
+                <select id="facultateSelect" class="form-select" style="min-width: 250px;"></select>
             </div>
-            <div>
-                <label class="small fw-bold text-muted">Specializare (Multi)</label>
-                <select id="specializareSelect" class="form-select" multiple="multiple"></select>
+            <div class="col-md-4">
+                <label class="small fw-bold text-muted d-block">Specializare (Multi)</label>
+                <select id="specializareSelect" class="form-select w-100" multiple="multiple"></select>
             </div>
-            <div>
-                <label class="small fw-bold text-muted">Profesor</label>
-                <select id="profesorSelect" class="form-select" style="width: 250px;"></select>
+            <div class="col-md-3">
+                <label class="small fw-bold text-muted d-block">Profesor (Caută)</label>
+                <select id="profesorSelect" class="form-select w-100"></select>
             </div>
-            <button class="btn btn-dark" onclick="incarcaDate()">View Report</button>
-        </div>
-
-        <div class="card p-4">
-            <h5 class="text-muted mb-3 text-uppercase small fw-bold">Detaliere Norme Profesori</h5>
-            <div class="table-responsive">
-                <table class="table table-hover table-bordered align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Profesor</th>
-                            <th>Specializare</th>
-                            <th>Materie</th>
-                            <th>Tip Post</th>
-                            <th class="text-center">Ore/Săpt</th>
-                            <th class="text-center table-primary">Total Sem.</th>
-                        </tr>
-                    </thead>
-                    <tbody id="normeTableBody">
-                        <tr><td colspan="6" class="text-center text-muted">Selectați filtrele și apăsați "View Report".</td></tr>
-                    </tbody>
-                </table>
+            <div class="col-md-auto">
+                <button class="btn btn-secondary w-100" onclick="resetView()" title="Resetează vizualizarea pentru noi filtre">
+                    <i class="bi bi-arrow-counterclockwise"></i> Actualizează
+                </button>
             </div>
         </div>
 
-        <div class="card p-4 mt-4 shadow-sm">
-            <h5 class="text-muted mb-3 text-uppercase small fw-bold">Distribuție Ore Profesor pe Programe de Studiu</h5>
-            <div class="table-responsive">
-                <table class="table table-hover table-bordered align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Profesor</th>
-                            <th>Program Studiu</th>
-                            <th class="text-center">Ore Alocate</th>
-                            <th class="text-center">Procent</th>
-                            <th class="text-center table-primary">Total Ore Profesor</th>
-                        </tr>
-                    </thead>
-                    <tbody id="oreProgramTableBody">
-                        <tr><td colspan="5" class="text-center text-muted">Așteptare date...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <div class="accordion" id="accordionRapoarte">
 
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingOne">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNorme" aria-expanded="false" aria-controls="collapseNorme">
+                        <i class="bi bi-table me-2"></i> Detaliere Norme Profesori
+                    </button>
+                </h2>
+                <div id="collapseNorme" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionRapoarte">
+                    <div class="accordion-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Profesor</th>
+                                        <th>Specializare</th>
+                                        <th>Materie</th>
+                                        <th>Tip Post</th>
+                                        <th class="text-center">Ore/Săpt</th>
+                                        <th class="text-center table-primary">Total Sem.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="normeTableBody">
+                                    <tr><td colspan="6" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingTwo">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOre" aria-expanded="false" aria-controls="collapseOre">
+                        <i class="bi bi-bar-chart-fill me-2"></i> Distribuție Ore Profesor pe Programe
+                    </button>
+                </h2>
+                <div id="collapseOre" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionRapoarte">
+                    <div class="accordion-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Profesor</th>
+                                        <th>Program Studiu</th>
+                                        <th class="text-center">Ore Alocate</th>
+                                        <th class="text-center">Procent</th>
+                                        <th class="text-center table-primary">Total Ore Profesor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="oreProgramTableBody">
+                                    <tr><td colspan="5" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
     <script>
+        // Stocăm ultima configurație de filtre încărcată pentru fiecare raport
+        // ca să nu reîncărcăm dacă userul închide și deschide la loc fără să schimbe filtrele.
+        const cacheState = {
+            norme: "",
+            ore: ""
+        };
+
         $(document).ready(function () {
             // Inițializare Select2
-            $('#specializareSelect').select2({ placeholder: "Alege specializări", allowClear: true });
-            $('#profesorSelect').select2({ placeholder: "Caută profesor", allowClear: true });
+            $('#specializareSelect').select2({
+                placeholder: "Alege specializări",
+                allowClear: true,
+                width: 'resolve'
+            });
+
+            // AICI e setarea pentru căutare profesori (implicit Select2 o are activă)
+            $('#profesorSelect').select2({
+                placeholder: "Tastați pentru a căuta profesor...",
+                allowClear: true,
+                width: 'resolve',
+                minimumInputLength: 0 // Permite afișarea listei imediat, apoi filtrare prin tastare
+            });
 
             // 1. Încărcare Inițială: Ani Universitari
             fetch('/api/Rapoarte/liste/ani-universitari').then(res => res.json()).then(data => {
@@ -179,152 +240,201 @@
             });
 
             // =========================================================
-            //  LOGICA DE CASCADĂ (Evenimente)
+            //  EVENIMENTE CASCADĂ (Dropdowns)
             // =========================================================
 
-            // A. Când se schimbă ANUL -> Trigger pe Facultate (ca să reîncarce downstream)
             $('#anUnivSelect').on('change', function () {
                 $('#facultateSelect').trigger('change');
+                invalidateCache();
             });
 
-            // B. Când se schimbă FACULTATEA -> Încărcăm Specializările (Filtrate de An și Fac)
             $('#facultateSelect').on('change', function () {
+                invalidateCache();
                 const anUniv = $('#anUnivSelect').val() || 'Toti';
                 const fac = $(this).val() || 'Toti';
 
-                // Resetăm dropdown-ul de specializări
                 $('#specializareSelect').empty();
 
-                // Apelăm API-ul cu AMBELE filtre
-                const params = new URLSearchParams({
-                    anUniv: anUniv,
-                    numeFacultate: fac
-                });
-
+                const params = new URLSearchParams({ anUniv: anUniv, numeFacultate: fac });
                 fetch(`/api/Rapoarte/liste/specializari-per-facultate?${params.toString()}`)
                     .then(res => res.json())
                     .then(data => {
                         const $s = $('#specializareSelect');
                         data.forEach(u => $s.append(new Option(u, u)));
-                        // Declanșăm schimbarea pentru a actualiza și profesorii
                         $s.trigger('change');
                     });
             });
 
-            // C. Când se schimbă SPECIALIZAREA -> Încărcăm Profesorii (Filtrați de An, Fac și Spec)
             $('#specializareSelect').on('change', function () {
+                invalidateCache();
                 const anUniv = $('#anUnivSelect').val() || 'Toti';
                 const facultate = $('#facultateSelect').val() || 'Toti';
                 const specs = $(this).val();
-
-                // Procesăm lista de specializări pentru URL
                 const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
 
-                const params = new URLSearchParams({
-                    anUniv: anUniv,
-                    facultate: facultate,
-                    specializari: querySpecs
-                });
-
+                const params = new URLSearchParams({ anUniv: anUniv, facultate: facultate, specializari: querySpecs });
                 fetch(`/api/Rapoarte/liste/profesori-per-specializari?${params.toString()}`)
                     .then(res => res.json())
                     .then(data => {
                         const $p = $('#profesorSelect').empty();
-                        data.forEach(p => $p.append(new Option(p, p)));
+                        // Adaugăm opțiune goală pentru placeholder corect
+                        $p.append(new Option("", ""));
+                        data.forEach(p => {
+                            if (p !== "Toti") $p.append(new Option(p, p));
+                        });
+                        // Dacă lista conține "Toti" implicit, îl gestionăm, dar Select2 search merge pe text
                     });
+            });
+
+            $('#profesorSelect').on('change', function () {
+                invalidateCache();
+            });
+
+            // =========================================================
+            //  LAZY LOADING (Evenimente Accordion)
+            // =========================================================
+
+            // Când se deschide secțiunea NORME
+            document.getElementById('collapseNorme').addEventListener('show.bs.collapse', function () {
+                const currentParams = getFilterParamsString();
+                // Dacă parametrii s-au schimbat față de ultima încărcare
+                if (cacheState.norme !== currentParams) {
+                    loadNormeData();
+                    cacheState.norme = currentParams; // Actualizăm cache-ul
+                }
+            });
+
+            // Când se deschide secțiunea ORE
+            document.getElementById('collapseOre').addEventListener('show.bs.collapse', function () {
+                const currentParams = getFilterParamsString();
+                if (cacheState.ore !== currentParams) {
+                    loadOreData();
+                    cacheState.ore = currentParams;
+                }
             });
         });
 
-        // Funcție pentru colorare status
-        function getBadgeStatus(statusText) {
-            if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
-
-            if (statusText.toLowerCase().includes('titular')) {
-                return `<span class="badge bg-success">Titular</span>`;
-            } else {
-                return `<span class="badge bg-warning text-dark">${statusText}</span>`;
-            }
-        }
-
-        // =========================================================
-        //  LOGICA DE RAPORT (View Report)
-        // =========================================================
-        async function incarcaDate() {
+        // Funcție helper pentru a obține semnătura filtrelor curente
+        function getFilterParamsString() {
             const anUniv = $('#anUnivSelect').val() || 'Toti';
             const facultate = $('#facultateSelect').val() || 'Toti';
             const specs = $('#specializareSelect').val();
             const prof = $('#profesorSelect').val() || 'Toti';
             const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
 
-            const params = new URLSearchParams({
-                anUniv: anUniv,
-                facultate: facultate,
-                specializari: querySpecs,
-                profesor: prof
-            });
+            return `an=${anUniv}&fac=${facultate}&spec=${querySpecs}&prof=${prof}`;
+        }
+
+        // Resetează starea de "încărcat" când userul schimbă filtrele
+        function invalidateCache() {
+            cacheState.norme = "dirty";
+            cacheState.ore = "dirty";
+            // Opțional: Închidem acordeoanele dacă se schimbă filtrele drastic?
+            // Momentan le lăsăm așa, se vor reîncărca automat dacă sunt deschise și userul dă click din nou pe ele sau toggle.
+            // Pentru UX mai bun, poți adăuga un buton "Aplică" care închide tot.
+        }
+
+        function resetView() {
+            // Închide toate acordeoanele
+            $('.accordion-collapse').collapse('hide');
+            invalidateCache();
+        }
+
+        // =========================================================
+        //  FETCH DATA FUNCTIONS
+        // =========================================================
+
+        async function loadNormeData() {
+            const tbody = document.getElementById('normeTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
+
+            const params = new URLSearchParams(getParamsObject());
 
             try {
-                // 1. Încarcă NORME PROFESORI (Tabelul 1)
-                const resNorme = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
-                if (!resNorme.ok) throw new Error(`HTTP error la norme! status: ${resNorme.status}`);
+                const res = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
+                const data = await res.json();
 
-                const dataNorme = await resNorme.json();
-                let htmlNorme = '';
-                dataNorme.forEach(n => {
-                    const statusHtml = getBadgeStatus(n.status || n.Status);
-                    htmlNorme += `<tr>
-                                <td>${n.profesor || n.Profesor || 'N/A'}</td>
-                                <td>${n.specializare || n.Specializare || 'N/A'}</td>
-                                <td>${n.materie || n.Materie || 'N/A'}</td>
-                                <td class="text-center">${statusHtml}</td>
-                                <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt || '0'}</td>
-                                <td class="text-center fw-bold text-primary table-primary">${n.normaSem || n.NormaSem || '0'}</td>
-                            </tr>`;
-                });
-                document.getElementById('normeTableBody').innerHTML = htmlNorme || '<tr><td colspan="6" class="text-center">Fără date pentru filtrele selectate.</td></tr>';
-
-                // 2. Încarcă ORE PROFESOR PER PROGRAM (Tabelul 2)
-                const resOre = await fetch(`/api/Rapoarte/ore-profesor-program?${params.toString()}`);
-                if (resOre.ok) {
-                    const dataOre = await resOre.json();
-                    let htmlOre = '';
-
-                    if (dataOre.length === 0) {
-                        htmlOre = '<tr><td colspan="5" class="text-center">Nu există date conform filtrelor.</td></tr>';
-                    } else {
-                        dataOre.forEach(item => {
-                            // Determină culoarea bării de progres în funcție de procent
-                            let colorClass = 'bg-info';
-                            if (item.procent > 50) colorClass = 'bg-success';
-                            if (item.procent < 10) colorClass = 'bg-warning';
-
-                            htmlOre += `
-                                <tr>
-                                    <td class="fw-bold">${item.profesor || item.Profesor}</td>
-                                    <td>${item.programStudiu || item.ProgramStudiu}</td>
-                                    <td class="text-center">${item.ore || item.Ore}</td>
-                                    <td class="text-center" style="width: 20%;">
-                                        <div class="d-flex align-items-center">
-                                            <span class="me-2">${item.procent || item.Procent}%</span>
-                                            <div class="progress flex-grow-1" style="height: 6px;">
-                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procent || item.Procent}%"></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-center fw-bold table-primary">${item.total || item.Total}</td>
-                                </tr>`;
-                        });
-                    }
-                    document.getElementById('oreProgramTableBody').innerHTML = htmlOre;
-                } else {
-                    console.error("Eroare la preluarea datelor ore-profesor");
-                    document.getElementById('oreProgramTableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare la încărcarea datelor.</td></tr>`;
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nu există date pentru filtrele selectate.</td></tr>';
+                    return;
                 }
 
+                let html = '';
+                data.forEach(n => {
+                    const statusHtml = getBadgeStatus(n.status || n.Status);
+                    html += `<tr>
+                            <td>${n.profesor || n.Profesor}</td>
+                            <td>${n.specializare || n.Specializare}</td>
+                            <td>${n.materie || n.Materie}</td>
+                            <td class="text-center">${statusHtml}</td>
+                            <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt}</td>
+                            <td class="text-center fw-bold text-primary table-primary">${n.normaSem || n.NormaSem}</td>
+                        </tr>`;
+                });
+                tbody.innerHTML = html;
             } catch (err) {
-                console.error("Eroare generală la incarcare:", err);
-                document.getElementById('normeTableBody').innerHTML = `<tr><td colspan="6" class="text-center text-danger">Eroare: ${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Eroare: ${err.message}</td></tr>`;
             }
+        }
+
+        async function loadOreData() {
+            const tbody = document.getElementById('oreProgramTableBody');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
+
+            const params = new URLSearchParams(getParamsObject());
+
+            try {
+                const res = await fetch(`/api/Rapoarte/ore-profesor-program?${params.toString()}`);
+                const data = await res.json();
+
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nu există date.</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                data.forEach(item => {
+                    let colorClass = 'bg-info';
+                    if (item.procent > 50) colorClass = 'bg-success';
+                    if (item.procent < 10) colorClass = 'bg-warning';
+
+                    html += `
+                            <tr>
+                                <td class="fw-bold">${item.profesor || item.Profesor}</td>
+                                <td>${item.programStudiu || item.ProgramStudiu}</td>
+                                <td class="text-center">${item.ore || item.Ore}</td>
+                                <td class="text-center" style="width: 20%;">
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2 small">${item.procent || item.Procent}%</span>
+                                        <div class="progress flex-grow-1" style="height: 6px;">
+                                            <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procent || item.Procent}%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center fw-bold table-primary">${item.total || item.Total}</td>
+                            </tr>`;
+                });
+                tbody.innerHTML = html;
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`;
+            }
+        }
+
+        function getParamsObject() {
+            const specs = $('#specializareSelect').val();
+            const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
+            return {
+                anUniv: $('#anUnivSelect').val() || 'Toti',
+                facultate: $('#facultateSelect').val() || 'Toti',
+                specializari: querySpecs,
+                profesor: $('#profesorSelect').val() || 'Toti'
+            };
+        }
+
+        function getBadgeStatus(statusText) {
+            if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
+            if (statusText.toLowerCase().includes('titular')) return `<span class="badge bg-success">Titular</span>`;
+            return `<span class="badge bg-warning text-dark">${statusText}</span>`;
         }
     </script>
 </body>

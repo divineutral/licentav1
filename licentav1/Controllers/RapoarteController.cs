@@ -21,7 +21,7 @@ namespace LicentaV1.Controllers
         }
 
         // =========================================================================
-        // 1. ENDPOINT-URI PENTRU LISTE (FILTRE) - LOGICĂ VALIDATĂ
+        // 1. ENDPOINT-URI PENTRU LISTE (FILTRE)
         // =========================================================================
 
         [HttpGet("liste/ani-universitari")]
@@ -81,6 +81,7 @@ namespace LicentaV1.Controllers
                 return lista;
             }));
         }
+
         [HttpGet("liste/specializari-per-facultate")]
         public ActionResult GetSpecializari(string anUniv, string numeFacultate)
         {
@@ -90,7 +91,6 @@ namespace LicentaV1.Controllers
             {
                 string sql;
 
-                // Dacă e selectată o facultate, folosim logica "inteligentă" cu ID-ul
                 if (!string.IsNullOrEmpty(numeFacultate) && numeFacultate != "Toti")
                 {
                     sql = @"
@@ -102,17 +102,13 @@ namespace LicentaV1.Controllers
                     GROUP BY ID_FacultateSpecializare
                     ORDER BY COUNT(*) DESC;
 
-                    -- LOGICA DE CURĂȚARE EXTINSĂ
                     SELECT DISTINCT 
                         UPPER(LTRIM(RTRIM(
                             REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
                                 CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
                                      THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
                                      ELSE sf.DenumireSpecializare END, 
-                            ' - CORECT', ''),   -- Stergem ' - CORECT'
-                            ' CORECT', ''),     -- Stergem ' CORECT'
-                            ' - COPIE', ''),    -- Stergem ' - COPIE'
-                            'Ș', 'S'), 'Ț', 'T')
+                            ' - CORECT', ''), ' CORECT', ''), ' - COPIE', ''), 'Ș', 'S'), 'Ț', 'T')
                         ))) as SpecCurata
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
                     WHERE sf.ID_Facultate = @TargetFacId 
@@ -121,7 +117,6 @@ namespace LicentaV1.Controllers
                 }
                 else
                 {
-                    // Logică pentru "Toti"
                     sql = @"
                     SELECT DISTINCT 
                         UPPER(LTRIM(RTRIM(
@@ -129,10 +124,7 @@ namespace LicentaV1.Controllers
                                 CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 
                                      THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1)
                                      ELSE sf.DenumireSpecializare END, 
-                            ' - CORECT', ''),
-                            ' CORECT', ''),
-                            ' - COPIE', ''),
-                            'Ș', 'S'), 'Ț', 'T')
+                            ' - CORECT', ''), ' CORECT', ''), ' - COPIE', ''), 'Ș', 'S'), 'Ț', 'T')
                         ))) as SpecCurata
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
                     WHERE sf.DenumireSpecializare IS NOT NULL
@@ -150,7 +142,6 @@ namespace LicentaV1.Controllers
                 while (reader.Read())
                 {
                     string val = reader["SpecCurata"].ToString()!;
-                    // Un ultim filtru de siguranță: nu adăugăm duplicate sau goale
                     if (!string.IsNullOrWhiteSpace(val) && !lista.Contains(val))
                         lista.Add(val);
                 }
@@ -166,7 +157,6 @@ namespace LicentaV1.Controllers
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                // La profesori păstrăm logica veche (unde predau ei), dar e ok acum că specializările sunt filtrate corect
                 string sql = @"
                 SELECT DISTINCT ppm.NumeIntreg
                 FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
@@ -202,16 +192,13 @@ namespace LicentaV1.Controllers
         }
 
         // =========================================================================
-        // 2. RAPORTUL PRINCIPAL (NORMA) - Păstrat intact
+        // 2. RAPORTUL PRINCIPAL (NORMA)
         // =========================================================================
 
         [HttpGet("norma-profesori")]
         public ActionResult GetNormaProfesori(string anUniv, string facultate, string specializari, string profesor)
         {
             var result = new List<object>();
-
-            // AICI E SCHIMBAREA: Definim numărul de săptămâni ca variabilă
-            // Dacă profesoara zice că sunt 15, modifici doar aici.
             int nrSaptamani = 14;
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -246,7 +233,6 @@ namespace LicentaV1.Controllers
                     DenumireMaterie as Materie,
                     TipPost,
                     SUM(TotalOre) as NormaSaptamana,
-                    -- AICI FOLOSIM PARAMETRUL @saptamani
                     SUM(TotalOre * @saptamani) as NormaSemestru 
                 FROM BaseData
                 WHERE 
@@ -268,8 +254,6 @@ namespace LicentaV1.Controllers
                 cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
                 string specsParam = string.IsNullOrWhiteSpace(specializari) ? "Toti" : specializari;
                 cmd.Parameters.AddWithValue("@specs", specsParam);
-
-                // Trimitem parametrul în SQL
                 cmd.Parameters.AddWithValue("@saptamani", nrSaptamani);
 
                 using var reader = cmd.ExecuteReader();
@@ -290,7 +274,7 @@ namespace LicentaV1.Controllers
         }
 
         // =========================================================================
-        // 3. RAPORT SECUNDAR (STAT FUNCTII) - Păstrat intact
+        // 3. RAPORT SECUNDAR (STAT FUNCTII)
         // =========================================================================
 
         [HttpGet("stat-functii-multi")]
@@ -347,54 +331,55 @@ namespace LicentaV1.Controllers
             }
             return Ok(listaResult);
         }
+
         // =========================================================================
         // 4. RAPORT NOU: ORE PROFESOR PROGRAM 
         // =========================================================================
 
         [HttpGet("ore-profesor-program")]
         public async Task<IActionResult> GetOreProfProgram(
-     string anUniv = "Toti",
-     string facultate = "Toti",
-     string specializari = "Toti",
-     string profesor = "Toti")
+            string anUniv = "Toti",
+            string facultate = "Toti",
+            string specializari = "Toti",
+            string profesor = "Toti")
         {
             var listaResult = new List<object>();
 
             string query = @"
-    WITH DateBase AS (
-        SELECT 
-            ppm.NumeIntreg AS Profesor,
-            ISNULL(ppm.DenumireSpecializare, 'Nespecificat') AS ProgramStudiu,
-            (ISNULL(ppm.Nr_Ore_Curs, 0) + ISNULL(ppm.Nr_Ore_Seminar, 0) + 
-             ISNULL(ppm.Nr_Ore_Laborator, 0) + ISNULL(ppm.Nr_Ore_Proiect, 0) + 
-             ISNULL(ppm.Nr_Ore_Practica, 0)) AS OreFizice,
-            ppm.DenumireFacultate
-        FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
-        LEFT JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
-        WHERE 
-            (@AnUniv = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) = @AnUniv)
-            AND (@Facultate = 'Toti' OR ppm.DenumireFacultate = @Facultate)
-            AND (@Profesor = 'Toti' OR ppm.NumeIntreg LIKE '%' + @Profesor + '%')
-    ),
-    ProfTotal AS (
-        SELECT 
-            Profesor,
-            SUM(OreFizice) AS TotalOre
-        FROM DateBase
-        GROUP BY Profesor
-    )
-    SELECT 
-        db.Profesor,
-        db.ProgramStudiu,
-        SUM(db.OreFizice) AS Ore,
-        pt.TotalOre AS Total
-    FROM DateBase db
-    INNER JOIN ProfTotal pt ON db.Profesor = pt.Profesor
-    WHERE 
-        (@Specializari = 'Toti' OR db.ProgramStudiu IN (SELECT value FROM STRING_SPLIT(@Specializari, ',')))
-    GROUP BY db.Profesor, db.ProgramStudiu, pt.TotalOre
-    HAVING SUM(db.OreFizice) > 0
-    ORDER BY db.Profesor, Ore DESC";
+            WITH DateBase AS (
+                SELECT 
+                    ppm.NumeIntreg AS Profesor,
+                    ISNULL(ppm.DenumireSpecializare, 'Nespecificat') AS ProgramStudiu,
+                    (ISNULL(ppm.Nr_Ore_Curs, 0) + ISNULL(ppm.Nr_Ore_Seminar, 0) + 
+                     ISNULL(ppm.Nr_Ore_Laborator, 0) + ISNULL(ppm.Nr_Ore_Proiect, 0) + 
+                     ISNULL(ppm.Nr_Ore_Practica, 0)) AS OreFizice,
+                    ppm.DenumireFacultate
+                FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
+                LEFT JOIN [agsis_dw].[dbo].[Cazare] cz ON ppm.ID_AnUniv = cz.ID_AnUniv
+                WHERE 
+                    (@AnUniv = 'Toti' OR UPPER(LTRIM(RTRIM(REPLACE(cz.DenumireAnUniv, CHAR(9), '')))) = @AnUniv)
+                    AND (@Facultate = 'Toti' OR ppm.DenumireFacultate = @Facultate)
+                    AND (@Profesor = 'Toti' OR ppm.NumeIntreg LIKE '%' + @Profesor + '%')
+            ),
+            ProfTotal AS (
+                SELECT 
+                    Profesor,
+                    SUM(OreFizice) AS TotalOre
+                FROM DateBase
+                GROUP BY Profesor
+            )
+            SELECT 
+                db.Profesor,
+                db.ProgramStudiu,
+                SUM(db.OreFizice) AS Ore,
+                pt.TotalOre AS Total
+            FROM DateBase db
+            INNER JOIN ProfTotal pt ON db.Profesor = pt.Profesor
+            WHERE 
+                (@Specializari = 'Toti' OR db.ProgramStudiu IN (SELECT value FROM STRING_SPLIT(@Specializari, ',')))
+            GROUP BY db.Profesor, db.ProgramStudiu, pt.TotalOre
+            HAVING SUM(db.OreFizice) > 0
+            ORDER BY db.Profesor, Ore DESC";
 
             using (var connection = new SqlConnection(_connectionString))
             {
@@ -413,7 +398,6 @@ namespace LicentaV1.Controllers
                         {
                             double ore = Convert.ToDouble(reader["Ore"]);
                             double total = Convert.ToDouble(reader["Total"]);
-                            // Calcul procent în C# pentru precizie
                             double procent = total > 0 ? Math.Round((ore / total) * 100, 2) : 0;
 
                             listaResult.Add(new
@@ -428,7 +412,6 @@ namespace LicentaV1.Controllers
                     }
                 }
             }
-
             return Ok(listaResult);
         }
     }
