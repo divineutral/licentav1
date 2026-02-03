@@ -147,6 +147,15 @@
                 </h2>
                 <div id="collapseNorme" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionRapoarte">
                     <div class="accordion-body">
+                        <div class="d-flex justify-content-end mb-2 gap-2">
+                            <button class="btn btn-danger btn-sm" onclick="downloadPdf('norma')">
+                                <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="downloadExcel('norma')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
+                        </div>
+
                         <div class="table-responsive">
                             <table class="table table-hover table-bordered align-middle">
                                 <thead class="table-light">
@@ -176,6 +185,15 @@
                 </h2>
                 <div id="collapseOre" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionRapoarte">
                     <div class="accordion-body">
+                        <div class="d-flex justify-content-end mb-2 gap-2">
+                            <button class="btn btn-danger btn-sm" onclick="downloadPdf('ore-program')">
+                                <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="downloadExcel('ore-program')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
+                        </div>
+
                         <div class="table-responsive">
                             <table class="table table-hover table-bordered align-middle">
                                 <thead class="table-light">
@@ -184,7 +202,7 @@
                                         <th>Program Studiu</th>
                                         <th class="text-center">Ore Alocate</th>
                                         <th class="text-center">Procent</th>
-                                        <th class="text-center table-primary">Total Ore Profesor</th>
+                                        <th class="text-center table-primary" id="headerTotal">Total Ore Profesor</th>
                                     </tr>
                                 </thead>
                                 <tbody id="oreProgramTableBody">
@@ -204,202 +222,123 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
-        // Stocăm ultima configurație de filtre încărcată pentru fiecare raport
-        // ca să nu reîncărcăm dacă userul închide și deschide la loc fără să schimbe filtrele.
         const cacheState = {
             norme: "",
             ore: ""
         };
 
         $(document).ready(function () {
-            // Inițializare Select2
-            $('#specializareSelect').select2({
-                placeholder: "Alege specializări",
-                allowClear: true,
-                width: 'resolve'
-            });
+            $('#specializareSelect').select2({ placeholder: "Alege specializări", allowClear: true, width: 'resolve' });
+            $('#profesorSelect').select2({ placeholder: "Tastați pentru a căuta profesor...", allowClear: true, width: 'resolve', minimumInputLength: 0 });
 
-            // AICI e setarea pentru căutare profesori (implicit Select2 o are activă)
-            $('#profesorSelect').select2({
-                placeholder: "Tastați pentru a căuta profesor...",
-                allowClear: true,
-                width: 'resolve',
-                minimumInputLength: 0 // Permite afișarea listei imediat, apoi filtrare prin tastare
-            });
-
-            // 1. Încărcare Inițială: Ani Universitari
+            // 1. Liste Inițiale
             fetch('/api/Rapoarte/liste/ani-universitari').then(res => res.json()).then(data => {
                 const s = document.getElementById('anUnivSelect');
                 data.forEach(an => s.innerHTML += `<option value="${an.id}">${an.nume}</option>`);
             });
 
-            // 2. Încărcare Inițială: Facultăți
             fetch('/api/Rapoarte/liste/facultati').then(res => res.json()).then(data => {
                 const s = document.getElementById('facultateSelect');
                 data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
             });
 
-            // =========================================================
-            //  EVENIMENTE CASCADĂ (Dropdowns)
-            // =========================================================
-
-            $('#anUnivSelect').on('change', function () {
-                $('#facultateSelect').trigger('change');
-                invalidateCache();
-            });
+            // Evenimente
+            $('#anUnivSelect').on('change', function () { $('#facultateSelect').trigger('change'); invalidateCache(); });
 
             $('#facultateSelect').on('change', function () {
                 invalidateCache();
                 const anUniv = $('#anUnivSelect').val() || 'Toti';
                 const fac = $(this).val() || 'Toti';
-
                 $('#specializareSelect').empty();
-
                 const params = new URLSearchParams({ anUniv: anUniv, numeFacultate: fac });
-                fetch(`/api/Rapoarte/liste/specializari-per-facultate?${params.toString()}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        const $s = $('#specializareSelect');
-                        data.forEach(u => $s.append(new Option(u, u)));
-                        $s.trigger('change');
-                    });
+                fetch(`/api/Rapoarte/liste/specializari-per-facultate?${params.toString()}`).then(res => res.json()).then(data => {
+                    const $s = $('#specializareSelect');
+                    data.forEach(u => $s.append(new Option(u, u)));
+                    $s.trigger('change');
+                });
             });
 
             $('#specializareSelect').on('change', function () {
                 invalidateCache();
-                const anUniv = $('#anUnivSelect').val() || 'Toti';
-                const facultate = $('#facultateSelect').val() || 'Toti';
-                const specs = $(this).val();
-                const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
-
-                const params = new URLSearchParams({ anUniv: anUniv, facultate: facultate, specializari: querySpecs });
-                fetch(`/api/Rapoarte/liste/profesori-per-specializari?${params.toString()}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        const $p = $('#profesorSelect').empty();
-                        // Adaugăm opțiune goală pentru placeholder corect
-                        $p.append(new Option("", ""));
-                        data.forEach(p => {
-                            if (p !== "Toti") $p.append(new Option(p, p));
-                        });
-                        // Dacă lista conține "Toti" implicit, îl gestionăm, dar Select2 search merge pe text
-                    });
+                const params = new URLSearchParams(getParamsObject());
+                fetch(`/api/Rapoarte/liste/profesori-per-specializari?${params.toString()}`).then(res => res.json()).then(data => {
+                    const $p = $('#profesorSelect').empty();
+                    $p.append(new Option("", ""));
+                    data.forEach(p => { if (p !== "Toti") $p.append(new Option(p, p)); });
+                });
             });
 
-            $('#profesorSelect').on('change', function () {
-                invalidateCache();
-            });
+            $('#profesorSelect').on('change', function () { invalidateCache(); });
 
-            // =========================================================
-            //  LAZY LOADING (Evenimente Accordion)
-            // =========================================================
-
-            // Când se deschide secțiunea NORME
+            // Accordion Logic
             document.getElementById('collapseNorme').addEventListener('show.bs.collapse', function () {
                 const currentParams = getFilterParamsString();
-                // Dacă parametrii s-au schimbat față de ultima încărcare
-                if (cacheState.norme !== currentParams) {
-                    loadNormeData();
-                    cacheState.norme = currentParams; // Actualizăm cache-ul
-                }
+                if (cacheState.norme !== currentParams) { loadNormeData(); cacheState.norme = currentParams; }
             });
 
-            // Când se deschide secțiunea ORE
             document.getElementById('collapseOre').addEventListener('show.bs.collapse', function () {
                 const currentParams = getFilterParamsString();
-                if (cacheState.ore !== currentParams) {
-                    loadOreData();
-                    cacheState.ore = currentParams;
-                }
+                if (cacheState.ore !== currentParams) { loadOreData(); cacheState.ore = currentParams; }
             });
         });
 
-        // Funcție helper pentru a obține semnătura filtrelor curente
-        function getFilterParamsString() {
-            const anUniv = $('#anUnivSelect').val() || 'Toti';
-            const facultate = $('#facultateSelect').val() || 'Toti';
-            const specs = $('#specializareSelect').val();
-            const prof = $('#profesorSelect').val() || 'Toti';
-            const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
-
-            return `an=${anUniv}&fac=${facultate}&spec=${querySpecs}&prof=${prof}`;
+        // --- EXPORT LOGIC ---
+        function downloadExcel(reportType) {
+            const params = new URLSearchParams(getParamsObject());
+            window.location.href = `/api/Rapoarte/export/${reportType}?${params.toString()}`;
         }
 
-        // Resetează starea de "încărcat" când userul schimbă filtrele
-        function invalidateCache() {
-            cacheState.norme = "dirty";
-            cacheState.ore = "dirty";
-            // Opțional: Închidem acordeoanele dacă se schimbă filtrele drastic?
-            // Momentan le lăsăm așa, se vor reîncărca automat dacă sunt deschise și userul dă click din nou pe ele sau toggle.
-            // Pentru UX mai bun, poți adăuga un buton "Aplică" care închide tot.
+        // FUNCTIA PENTRU PDF
+        function downloadPdf(reportType) {
+            const params = new URLSearchParams(getParamsObject());
+            // Apelăm endpoint-ul nou creat pentru PDF
+            window.location.href = `/api/Rapoarte/export/pdf/${reportType}?${params.toString()}`;
         }
 
-        function resetView() {
-            // Închide toate acordeoanele
-            $('.accordion-collapse').collapse('hide');
-            invalidateCache();
-        }
-
-        // =========================================================
-        //  FETCH DATA FUNCTIONS
-        // =========================================================
-
+        // --- DATA LOADERS ---
         async function loadNormeData() {
             const tbody = document.getElementById('normeTableBody');
             tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-
             const params = new URLSearchParams(getParamsObject());
-
             try {
                 const res = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
                 const data = await res.json();
-
-                if (!data || data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nu există date pentru filtrele selectate.</td></tr>';
-                    return;
-                }
-
+                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nu există date.</td></tr>'; return; }
                 let html = '';
                 data.forEach(n => {
-                    const statusHtml = getBadgeStatus(n.status || n.Status);
                     html += `<tr>
                             <td>${n.profesor || n.Profesor}</td>
                             <td>${n.specializare || n.Specializare}</td>
                             <td>${n.materie || n.Materie}</td>
-                            <td class="text-center">${statusHtml}</td>
+                            <td class="text-center">${getBadgeStatus(n.status || n.Status)}</td>
                             <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt}</td>
                             <td class="text-center fw-bold text-primary table-primary">${n.normaSem || n.NormaSem}</td>
                         </tr>`;
                 });
                 tbody.innerHTML = html;
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Eroare: ${err.message}</td></tr>`;
-            }
+            } catch (err) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
         }
 
         async function loadOreData() {
             const tbody = document.getElementById('oreProgramTableBody');
+            const headerTotal = document.getElementById('headerTotal');
+            const specs = $('#specializareSelect').val();
+
+            if (!specs || specs.length === 0 || specs.includes('Toti')) { headerTotal.innerText = "Total General (Anual)"; }
+            else { headerTotal.innerText = "Total (Selecție)"; }
+
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-
             const params = new URLSearchParams(getParamsObject());
-
             try {
                 const res = await fetch(`/api/Rapoarte/ore-profesor-program?${params.toString()}`);
                 const data = await res.json();
-
-                if (!data || data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nu există date.</td></tr>';
-                    return;
-                }
-
+                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nu există date.</td></tr>'; return; }
                 let html = '';
                 data.forEach(item => {
                     let colorClass = 'bg-info';
                     if (item.procent > 50) colorClass = 'bg-success';
                     if (item.procent < 10) colorClass = 'bg-warning';
-
-                    html += `
-                            <tr>
+                    html += `<tr>
                                 <td class="fw-bold">${item.profesor || item.Profesor}</td>
                                 <td>${item.programStudiu || item.ProgramStudiu}</td>
                                 <td class="text-center">${item.ore || item.Ore}</td>
@@ -415,9 +354,7 @@
                             </tr>`;
                 });
                 tbody.innerHTML = html;
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`;
-            }
+            } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
         }
 
         function getParamsObject() {
@@ -430,7 +367,9 @@
                 profesor: $('#profesorSelect').val() || 'Toti'
             };
         }
-
+        function getFilterParamsString() { const p = getParamsObject(); return `an=${p.anUniv}&fac=${p.facultate}&spec=${p.specializari}&prof=${p.profesor}`; }
+        function invalidateCache() { cacheState.norme = "dirty"; cacheState.ore = "dirty"; }
+        function resetView() { $('.accordion-collapse').collapse('hide'); invalidateCache(); }
         function getBadgeStatus(statusText) {
             if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
             if (statusText.toLowerCase().includes('titular')) return `<span class="badge bg-success">Titular</span>`;
