@@ -13,7 +13,6 @@
             --sidebar-width: 250px;
             --bg-light: #f8f9fa;
             --sidebar-dark: #212529;
-            /* CULOAREA TA VERDE */
             --accent-color: #56723e;
         }
 
@@ -55,7 +54,7 @@
             border-radius: 15px;
             margin-bottom: 25px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border-top: 5px solid var(--accent-color); /* Accent vizual */
+            border-top: 5px solid var(--accent-color);
         }
 
         .accordion-item {
@@ -73,7 +72,7 @@
         }
 
             .accordion-button:not(.collapsed) {
-                background-color: #f1f3ee; /* Un verde foarte palid */
+                background-color: #f1f3ee;
                 color: var(--accent-color);
                 box-shadow: none;
             }
@@ -83,7 +82,6 @@
                 border-color: rgba(0,0,0,.125);
             }
 
-        /* Ajustări Select2 */
         .select2-container .select2-selection--single {
             height: 38px !important;
             border: 1px solid #dee2e6 !important;
@@ -100,7 +98,6 @@
             min-height: 38px;
         }
 
-        /* Branding logo */
         .logo-container {
             padding: 20px;
             background: rgba(255,255,255,0.05);
@@ -136,9 +133,26 @@
                 <label class="small fw-bold text-muted d-block">Facultate</label>
                 <select id="facultateSelect" class="form-select" style="min-width: 250px;"></select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="small fw-bold text-muted d-block">Specializare (Multi)</label>
                 <select id="specializareSelect" class="form-select w-100" multiple="multiple"></select>
+            </div>
+            <div class="col-md-2">
+                <label class="small fw-bold text-muted d-block">Semestru</label>
+                <select id="semestruSelect" class="form-select w-100">
+                    <option value="0">Toate</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="small fw-bold text-muted d-block">Tip Post</label>
+                <select id="tipPostSelect" class="form-select w-100">
+                    <option value="Toti">Toate</option>
+                    <option value="Tit">Titular (Tit)</option>
+                    <option value="Sup">Suplinitor (Sup)</option>
+                    <option value="SupTit">SupTit</option>
+                </select>
             </div>
             <div class="col-md-3">
                 <label class="small fw-bold text-muted d-block">Profesor (Caută)</label>
@@ -178,12 +192,14 @@
                                         <th>Specializare</th>
                                         <th>Materie</th>
                                         <th>Tip Post</th>
-                                        <th class="text-center">Ore/Săpt</th>
-                                        <th class="text-center">Total Sem.</th>
+                                        <th class="text-center">Semestru</th>
+                                        <th class="text-center">Ore Conv.</th>
+                                        <th class="text-center">% din Post</th>
+                                        <th class="text-center">Total Post</th>
                                     </tr>
                                 </thead>
                                 <tbody id="normeTableBody">
-                                    <tr><td colspan="6" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
+                                    <tr><td colspan="8" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -214,9 +230,9 @@
                                     <tr>
                                         <th>Profesor</th>
                                         <th>Program Studiu</th>
-                                        <th class="text-center">Ore Alocate</th>
-                                        <th class="text-center">Procent</th>
-                                        <th class="text-center" id="headerTotal">Total Ore Profesor</th>
+                                        <th class="text-center">Nr. Ore Conv.</th>
+                                        <th class="text-center">Procent Post</th>
+                                        <th class="text-center" id="headerTotal">Total Post</th>
                                     </tr>
                                 </thead>
                                 <tbody id="oreProgramTableBody">
@@ -277,7 +293,7 @@
                 });
             });
 
-            $('#profesorSelect').on('change', function () { invalidateCache(); });
+            $('#semestruSelect, #tipPostSelect, #profesorSelect').on('change', function () { invalidateCache(); });
 
             document.getElementById('collapseNorme').addEventListener('show.bs.collapse', function () {
                 const currentParams = getFilterParamsString();
@@ -302,25 +318,27 @@
 
         async function loadNormeData() {
             const tbody = document.getElementById('normeTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
             const params = new URLSearchParams(getParamsObject());
             try {
                 const res = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
                 const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nu există date.</td></tr>'; return; }
+                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nu există date.</td></tr>'; return; }
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                            <td>${n.profesor || n.Profesor}</td>
-                            <td>${n.specializare || n.Specializare}</td>
-                            <td>${n.materie || n.Materie}</td>
-                            <td class="text-center">${getBadgeStatus(n.status || n.Status)}</td>
-                            <td class="text-center fw-bold">${n.normaSapt || n.NormaSapt}</td>
-                            <td class="text-center fw-bold" style="color: #56723e;">${n.normaSem || n.NormaSem}</td>
-                        </tr>`;
+                                <td>${n.profesor || n.Profesor}</td>
+                                <td>${n.specializare || n.Specializare}</td>
+                                <td>${n.materie || n.Materie}</td>
+                                <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
+                                <td class="text-center">${n.semestru || n.Semestru}</td>
+                                <td class="text-center fw-bold">${n.oreConventionale || n.OreConventionale}</td>
+                                <td class="text-center">${n.procentOre || n.ProcentOre}%</td>
+                                <td class="text-center fw-bold" style="color: #56723e;">${n.totalPost || n.TotalPost}</td>
+                            </tr>`;
                 });
                 tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
+            } catch (err) { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
         }
 
         async function loadOreData() {
@@ -328,8 +346,8 @@
             const headerTotal = document.getElementById('headerTotal');
             const specs = $('#specializareSelect').val();
 
-            if (!specs || specs.length === 0 || specs.includes('Toti')) { headerTotal.innerText = "Total General (Anual)"; }
-            else { headerTotal.innerText = "Total (Selecție)"; }
+            if (!specs || specs.length === 0 || specs.includes('Toti')) { headerTotal.innerText = "Total Post (Anual)"; }
+            else { headerTotal.innerText = "Total Post (Selecție)"; }
 
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
             const params = new URLSearchParams(getParamsObject());
@@ -340,23 +358,23 @@
                 let html = '';
                 data.forEach(item => {
                     let colorClass = 'bg-info';
-                    // Putem personaliza și aici culorile dacă dorești, momentan lăsăm Bootstrap standard pt progress bars
-                    if (item.procent > 50) colorClass = 'bg-success';
-                    if (item.procent < 10) colorClass = 'bg-warning';
+                    if ((item.procentPost || item.ProcentPost) > 50) colorClass = 'bg-success';
+                    if ((item.procentPost || item.ProcentPost) < 10) colorClass = 'bg-warning';
+
                     html += `<tr>
-                                <td class="fw-bold">${item.profesor || item.Profesor}</td>
-                                <td>${item.programStudiu || item.ProgramStudiu}</td>
-                                <td class="text-center">${item.ore || item.Ore}</td>
-                                <td class="text-center" style="width: 20%;">
-                                    <div class="d-flex align-items-center">
-                                        <span class="me-2 small">${item.procent || item.Procent}%</span>
-                                        <div class="progress flex-grow-1" style="height: 6px;">
-                                            <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procent || item.Procent}%"></div>
+                                    <td class="fw-bold">${item.profesor || item.Profesor}</td>
+                                    <td>${item.programStudiu || item.ProgramStudiu}</td>
+                                    <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
+                                    <td class="text-center" style="width: 20%;">
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
+                                            <div class="progress flex-grow-1" style="height: 6px;">
+                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td class="text-center fw-bold" style="color: #56723e;">${item.total || item.Total}</td>
-                            </tr>`;
+                                    </td>
+                                    <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
+                                </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -369,16 +387,19 @@
                 anUniv: $('#anUnivSelect').val() || 'Toti',
                 facultate: $('#facultateSelect').val() || 'Toti',
                 specializari: querySpecs,
+                semestru: $('#semestruSelect').val() || 0,
+                tipPost: $('#tipPostSelect').val() || 'Toti',
                 profesor: $('#profesorSelect').val() || 'Toti'
             };
         }
-        function getFilterParamsString() { const p = getParamsObject(); return `an=${p.anUniv}&fac=${p.facultate}&spec=${p.specializari}&prof=${p.profesor}`; }
+        function getFilterParamsString() { const p = getParamsObject(); return `an=${p.anUniv}&fac=${p.facultate}&spec=${p.specializari}&sem=${p.semestru}&tip=${p.tipPost}&prof=${p.profesor}`; }
         function invalidateCache() { cacheState.norme = "dirty"; cacheState.ore = "dirty"; }
         function resetView() { $('.accordion-collapse').collapse('hide'); invalidateCache(); }
         function getBadgeStatus(statusText) {
             if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
-            if (statusText.toLowerCase().includes('titular')) return `<span class="badge" style="background-color: #56723e;">Titular</span>`;
-            return `<span class="badge bg-warning text-dark">${statusText}</span>`;
+            if (statusText.toLowerCase().includes('tit')) return `<span class="badge" style="background-color: #56723e;">${statusText}</span>`;
+            if (statusText.toLowerCase().includes('sup')) return `<span class="badge bg-warning text-dark">${statusText}</span>`;
+            return `<span class="badge bg-secondary">${statusText}</span>`;
         }
     </script>
 </body>
