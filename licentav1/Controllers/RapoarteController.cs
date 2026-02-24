@@ -198,8 +198,7 @@ namespace LicentaV1.Controllers
                         ISNULL(sf.DenumireMaterie, 'Nedefinit') AS Materie,
                         ISNULL(sf.DenTitularSauSuplinitor, 'Nespecificat') AS TipPost,
                         ISNULL(sf.NrSemestruDinAn, 0) AS Semestru,
-                        (ISNULL(sf.Nr_Ore_Curs, 0) * ISNULL(sf.CoefOreConvCurs, 1)) + 
-                        ((ISNULL(sf.Nr_Ore_Seminar, 0) + ISNULL(sf.Nr_Ore_Laborator, 0) + ISNULL(sf.Nr_Ore_Proiect, 0)) * ISNULL(sf.CoefOreConvApp, 1)) AS OreConvLinie,
+                        ISNULL(sf.NrOreConventionale, 0) AS OreConvLinie,
                         UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata,
                         UPPER(LTRIM(RTRIM(au.Denumire))) AS AnCurat
                     FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
@@ -269,8 +268,7 @@ namespace LicentaV1.Controllers
                 SELECT 
                     ppm.NumeIntreg AS Profesor,
                     UPPER(LTRIM(RTRIM(REPLACE(REPLACE(CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1) ELSE sf.DenumireSpecializare END, 'Ș', 'S'), 'Ț', 'T')))) AS ProgramStudiu,
-                    (ISNULL(sf.Nr_Ore_Curs, 0) * ISNULL(sf.CoefOreConvCurs, 1)) + 
-                    ((ISNULL(sf.Nr_Ore_Seminar, 0) + ISNULL(sf.Nr_Ore_Laborator, 0) + ISNULL(sf.Nr_Ore_Proiect, 0)) * ISNULL(sf.CoefOreConvApp, 1)) AS OreConvLinie,
+                    ISNULL(sf.NrOreConventionale, 0) AS OreConvLinie,
                     ISNULL(sf.DenTitularSauSuplinitor, 'Nespecificat') AS TipPost,
                     ISNULL(sf.NrSemestruDinAn, 0) AS Semestru,
                     UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata,
@@ -359,8 +357,7 @@ namespace LicentaV1.Controllers
                         ISNULL(sf.DenumireMaterie, 'Nedefinit') AS DenumireMaterie,
                         ISNULL(sf.DenTitularSauSuplinitor, 'Nespecificat') AS TipPost,
                         ISNULL(sf.NrSemestruDinAn, 0) AS Semestru,
-                        (ISNULL(sf.Nr_Ore_Curs, 0) * ISNULL(sf.CoefOreConvCurs, 1)) + 
-                        ((ISNULL(sf.Nr_Ore_Seminar, 0) + ISNULL(sf.Nr_Ore_Laborator, 0) + ISNULL(sf.Nr_Ore_Proiect, 0)) * ISNULL(sf.CoefOreConvApp, 1)) AS OreConvLinie,
+                        ISNULL(sf.NrOreConventionale, 0) AS OreConvLinie,
                         UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata,
                         UPPER(LTRIM(RTRIM(au.Denumire))) AS AnCurat
                     FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm
@@ -453,7 +450,7 @@ namespace LicentaV1.Controllers
             WITH BaseData AS (
                 SELECT ppm.NumeIntreg,
                     UPPER(LTRIM(RTRIM(REPLACE(REPLACE(CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1) ELSE sf.DenumireSpecializare END, 'Ș', 'S'), 'Ț', 'T')))) AS ProgramStudiu,
-                    (ISNULL(sf.Nr_Ore_Curs, 0) * ISNULL(sf.CoefOreConvCurs, 1)) + ((ISNULL(sf.Nr_Ore_Seminar, 0) + ISNULL(sf.Nr_Ore_Laborator, 0) + ISNULL(sf.Nr_Ore_Proiect, 0)) * ISNULL(sf.CoefOreConvApp, 1)) AS OreConvLinie,
+                    ISNULL(sf.NrOreConventionale, 0) AS OreConvLinie,
                     ISNULL(sf.DenTitularSauSuplinitor, 'Nespecificat') AS TipPost, ISNULL(sf.NrSemestruDinAn, 0) AS Semestru,
                     UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata,
                     UPPER(LTRIM(RTRIM(au.Denumire))) AS AnCurat
@@ -559,7 +556,7 @@ namespace LicentaV1.Controllers
                 WITH BaseData AS (
                     SELECT ppm.NumeIntreg, UPPER(LTRIM(RTRIM(REPLACE(REPLACE(CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1) ELSE sf.DenumireSpecializare END, 'Ș', 'S'), 'Ț', 'T')))) AS SpecializareCurata,
                     ISNULL(sf.DenumireMaterie, 'Nedefinit') AS DenumireMaterie, ISNULL(sf.DenTitularSauSuplinitor, 'Nespecificat') AS TipPost, ISNULL(sf.NrSemestruDinAn, 0) AS Semestru,
-                    (ISNULL(sf.Nr_Ore_Curs, 0) * ISNULL(sf.CoefOreConvCurs, 1)) + ((ISNULL(sf.Nr_Ore_Seminar, 0) + ISNULL(sf.Nr_Ore_Laborator, 0) + ISNULL(sf.Nr_Ore_Proiect, 0)) * ISNULL(sf.CoefOreConvApp, 1)) AS OreConvLinie,
+                    ISNULL(sf.NrOreConventionale, 0) AS OreConvLinie,
                     UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata, UPPER(LTRIM(RTRIM(au.Denumire))) AS AnCurat
                     FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON ppm.ID_AnUniv = au.ID_AnUniv LEFT JOIN [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf ON ppm.ID_Post_Profesor_Materie = sf.ID_Post_Profesor_Materie
                 ),
@@ -650,7 +647,7 @@ namespace LicentaV1.Controllers
                 string sql = @"
                 WITH BaseData AS (
                     SELECT ppm.NumeIntreg, UPPER(LTRIM(RTRIM(REPLACE(REPLACE(CASE WHEN CHARINDEX('+', sf.DenumireSpecializare) > 0 THEN LEFT(sf.DenumireSpecializare, CHARINDEX('+', sf.DenumireSpecializare) - 1) ELSE sf.DenumireSpecializare END, 'Ș', 'S'), 'Ț', 'T')))) AS ProgramStudiu,
-                    (ISNULL(sf.Nr_Ore_Curs, 0) * ISNULL(sf.CoefOreConvCurs, 1)) + ((ISNULL(sf.Nr_Ore_Seminar, 0) + ISNULL(sf.Nr_Ore_Laborator, 0) + ISNULL(sf.Nr_Ore_Proiect, 0)) * ISNULL(sf.CoefOreConvApp, 1)) AS OreConvLinie,
+                    ISNULL(sf.NrOreConventionale, 0) AS OreConvLinie,
                     ISNULL(sf.DenTitularSauSuplinitor, 'Nespecificat') AS TipPost, ISNULL(sf.NrSemestruDinAn, 0) AS Semestru,
                     UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.DenumireFacultate, CHAR(9), ''), 'Ș', 'S'), 'Ț', 'T')))) AS FacultateCurata, UPPER(LTRIM(RTRIM(au.Denumire))) AS AnCurat
                     FROM [agsis_dw].[dbo].[Post_Profesor_Materie] ppm INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON ppm.ID_AnUniv = au.ID_AnUniv LEFT JOIN [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf ON ppm.ID_Post_Profesor_Materie = sf.ID_Post_Profesor_Materie
@@ -728,142 +725,449 @@ namespace LicentaV1.Controllers
             var stream = new MemoryStream(document.GeneratePdf()); return File(stream.ToArray(), "application/pdf", fileName);
         }
 
+        // 40 subdomenii ANS fixe - ordinea coloanelor e identica cu fisierul Diana Ionita
+        private static readonly string[] _domeniiANS = new[]
+        {
+            "Matematică",
+            "Informatică",
+            "Fizică",
+            "Chimie şi inginerie chimică",
+            "Ştiinţele pământului şi atmosferei",
+            "Inginerie civilă",
+            "Inginerie electrică, electronică şi telecomunicaţii",
+            "Inginerie geologică, mine, petrol şi gaze",
+            "Ingineria transporturilor",
+            "Ingineria resurselor vegetale şi animale",
+            "Ingineria sistemelor, calculatoare şi tehnologia informaţiei",
+            "Inginerie mecanică, mecatronică, inginerie industrială şi management",
+            "Biologie",
+            "Biochimie",
+            "Medicină",
+            "Medicină veterinară",
+            "Medicină dentară",
+            "Farmacie",
+            "Ştiinţe juridice",
+            "Ştiinţe administrative",
+            "Ştiinţe ale comunicării",
+            "Sociologie",
+            "Ştiinţe politice",
+            "Ştiinţe militare, informaţii şi ordine publică",
+            "Ştiinţe economice (doar Cibernetică, statistică şi informatică economică)",
+            "Ştiinţe economice (fără  Cibernetică, statistică şi informatică economică)",
+            "Psihologie şi ştiinţe comportamentale",
+            "Filologie",
+            "Filosofie",
+            "Istorie",
+            "Teologie",
+            "Studii culturale",
+            "Arhitectură şi urbanism",
+            "Arte vizuale (fără Istoria şi teoria artei)",
+            "Arte vizuale (doar Istoria şi teoria artei)",
+            "Teatru şi artele spectacolului",
+            "Cinematografie şi media",
+            "Muzică (doar Interpretare muzicală)",
+            "Muzică (fără Interpretare muzicală)",
+            "Ştiinţele Sportului şi Educaţiei Fizice"
+        };
+
         [HttpGet("export/raport-ans")]
-        public IActionResult ExportRaportANS([FromQuery] int idAnUniv = 45)
+        public IActionResult ExportRaportANS([FromQuery] int idAnUniv = 44)
         {
             var dateBrute = new List<RandSqlANS>();
 
             using (var connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
+                // Query corectat: adaugam Facultatea, folosim NrOreConventionale direct (nu calculam)
                 string query = @"
                     SELECT 
-                        NumeIntreg AS NumeComplet, 
-                        DenumireGradDidacticPost AS GradFunctie, 
-                        ISNULL(NrOreConventionale, 0) AS NrOreConventionale, 
-                        DenumireFacultate AS CriteriuMapare 
-                    FROM [agsis_dw].[dbo].[Post_Profesor_Materie]
-                    WHERE ID_AnUniv = @ID_AnUniv AND TitularSauSuplinitor = 1";
+                        ppm.NumeIntreg AS NumeComplet,
+                        ISNULL(ppm.DenumireGradDidacticPost, '') AS GradFunctie,
+                        ISNULL(ppm.DenumireFacultate, 'Nespecificat') AS Facultate,
+                        ISNULL(ppm.DenumireCatedra, 'Nespecificat') AS Departament,
+                        ISNULL(sf.NrOreConventionale, 0) AS OreConventionale,
+                        ISNULL(rsa.Denumire, 'Nedefinit') AS SubdomeniuANS
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                    INNER JOIN [agsis_dw].[dbo].[Post_Profesor_Materie] ppm 
+                        ON sf.ID_Post_Profesor_Materie = ppm.ID_Post_Profesor_Materie
+                    INNER JOIN [AGSIS].[dbo].[N_RAMURA_STIINTA_ANS] rsa 
+                        ON sf.id_metaspecializare = rsa.ID_Element
+                    WHERE sf.id_anuniv = @ID_AnUniv 
+                      AND sf.TitularSauSuplinitor = 1";
 
-                using (var command = new SqlCommand(query, connection))
+                using var command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
                 {
-                    command.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            var numeComplet = reader["NumeComplet"]?.ToString() ?? "";
-                            var partiNume = numeComplet.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                    var numeComplet = reader["NumeComplet"]?.ToString() ?? "";
+                    var parti = numeComplet.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
 
-                            dateBrute.Add(new RandSqlANS
-                            {
-                                Nume = partiNume.Length > 0 ? partiNume[0] : "",
-                                Prenume = partiNume.Length > 1 ? partiNume[1] : "",
-                                GradFunctie = reader["GradFunctie"]?.ToString() ?? "",
-                                OreConventionale = reader["NrOreConventionale"] != DBNull.Value ? Convert.ToDecimal(reader["NrOreConventionale"]) : 0,
-                                DomeniuANS = AsociazaDomeniuANS(reader["CriteriuMapare"]?.ToString() ?? "")
-                            });
-                        }
-                    }
+                    dateBrute.Add(new RandSqlANS
+                    {
+                        Nume = parti.Length > 0 ? parti[0] : "",
+                        Prenume = parti.Length > 1 ? parti[1] : "",
+                        Facultate = reader["Facultate"]?.ToString() ?? "",
+                        Departament = reader["Departament"]?.ToString() ?? "",
+                        GradFunctie = reader["GradFunctie"]?.ToString() ?? "",
+                        OreConventionale = reader["OreConventionale"] != DBNull.Value
+                            ? Convert.ToDecimal(reader["OreConventionale"]) : 0,
+                        DomeniuANS = reader["SubdomeniuANS"]?.ToString() ?? "Nedefinit"
+                    });
                 }
             }
 
-            var profesoriGrupati = dateBrute
-                .GroupBy(x => new { x.Nume, x.Prenume, x.GradFunctie })
-                .Select(g => new
+            // Grupare pe profesor; calculare fractiuni pentru fiecare din cele 40 domenii fixe
+            var profesori = dateBrute
+                .GroupBy(x => new { x.Nume, x.Prenume, x.Facultate, x.Departament, x.GradFunctie })
+                .Select(g =>
                 {
-                    g.Key.Nume,
-                    g.Key.Prenume,
-                    g.Key.GradFunctie,
-                    NormaBaza = ObtineNormaBaza(g.Key.GradFunctie),
-                    Domenii = g.GroupBy(d => d.DomeniuANS)
-                               .Select(dg => new { NumeDomeniu = dg.Key, TotalOreConv = dg.Sum(x => x.OreConventionale) })
-                               .OrderByDescending(d => d.TotalOreConv).ToList()
+                    decimal normaBaza = ObtineNormaBaza(g.Key.GradFunctie);
+                    var orePerDomeniu = g
+                        .GroupBy(r => r.DomeniuANS)
+                        .ToDictionary(dg => dg.Key, dg => dg.Sum(r => r.OreConventionale));
+
+                    var fractiuni = new decimal[40];
+                    for (int i = 0; i < _domeniiANS.Length; i++)
+                    {
+                        if (orePerDomeniu.TryGetValue(_domeniiANS[i], out decimal ore) && normaBaza > 0)
+                            fractiuni[i] = Math.Round(ore / normaBaza, 2);
+                    }
+
+                    return new
+                    {
+                        g.Key.Nume,
+                        g.Key.Prenume,
+                        g.Key.Facultate,
+                        g.Key.Departament,
+                        g.Key.GradFunctie,
+                        NormaBaza = normaBaza,
+                        Fractiuni = fractiuni
+                    };
                 })
-                .OrderBy(p => p.Nume).ThenBy(p => p.Prenume).ToList();
+                .OrderBy(p => p.Facultate).ThenBy(p => p.Departament).ThenBy(p => p.Nume).ThenBy(p => p.Prenume)
+                .ToList();
 
-            using (var workbook = new XLWorkbook())
+            using var workbook = new XLWorkbook();
+            var ws = workbook.Worksheets.Add("CD DRU");
+
+            // ── HELPER: get Excel column letter from 1-based index ──────────────
+            static string ColLetter(int col)
             {
-                var worksheet = workbook.Worksheets.Add("Date ANS");
-                worksheet.Cell(5, 1).Value = "Nr. crt."; worksheet.Cell(5, 2).Value = "Nume"; worksheet.Cell(5, 3).Value = "Prenume";
-                worksheet.Cell(5, 4).Value = "Grad / funcție"; worksheet.Cell(5, 5).Value = "Total normă conform contract";
+                if (col <= 26) return ((char)('A' + col - 1)).ToString();
+                return ((char)('A' + (col - 1) / 26 - 1)).ToString() + ((char)('A' + (col - 1) % 26)).ToString();
+            }
 
-                for (int i = 1; i <= 10; i++)
+            // ── RÂND 1: gol (height 8.25 ca în template) ────────────────────────
+            ws.Row(1).Height = 8.25;
+
+            // ── RÂND 2: titlu Anexa 1 ────────────────────────────────────────────
+            ws.Cell(2, 1).Value = "\nAnexa 1. Tabel instituţional privind normarea şi activitatea de cercetare a cadrelor didactice şi de cercetare din universitate (raportare IC2015)";
+            ws.Cell(2, 1).Style.Font.Bold = true;
+            ws.Cell(2, 1).Style.Font.FontName = "Times New Roman";
+            ws.Cell(2, 1).Style.Font.FontSize = 11;
+            ws.Cell(2, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+            ws.Row(2).Height = 18.0;
+
+            // ── RÂND 3: Universitatea (merge A3:F3) ──────────────────────────────
+            ws.Cell(3, 1).Value = "Universitatea TRANSILVANIA DIN BRAŞOV";
+            ws.Cell(3, 1).Style.Font.FontName = "Times New Roman";
+            ws.Cell(3, 1).Style.Font.FontSize = 11;
+            ws.Range(3, 1, 3, 6).Merge();
+            ws.Row(3).Height = 15.75;
+
+            // ── RÂND 4: Note mari + header grupuri ANS ───────────────────────────
+            // Col A4:D4 merge - nota stanga
+            ws.Cell(4, 1).Value = "NOTĂ: \nSe includ în tabel toate cadrele didactice şi de cercetare titulare (inclusiv cadrele didactice angajate cu normă întreagă, cu un contract pe perioadă determinată conform art.294, din LEN 1/2011, valid în perioada de raportare). Pentru facilitarea verificărilor interne recomandăm gruparea pe facultăţi, respectiv departamente. \nFiecare cadru didactic sau de cercetare al universităţii se raportează pe un singur rând.\nCompletarea în câmpurile aferente col.D-F din tabel se realizează prin selectarea valorii corespunzatoare din lista predefinita in col.D, respectiv completarea cu numarul corespunzator valorii din listele predefinite in col.E si col.F.\nVă rugăm să completați numai spațiile marcate cu culoarea galben.";
+            ws.Cell(4, 1).Style.Font.FontName = "Times New Roman";
+            ws.Cell(4, 1).Style.Font.FontSize = 8;
+            ws.Cell(4, 1).Style.Alignment.WrapText = true;
+            ws.Cell(4, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+            ws.Range(4, 1, 4, 4).Merge();
+
+            // Col E4:F4 merge
+            ws.Range(4, 5, 4, 6).Merge();
+
+            // Col J4:AA4 merge - grupuri Matematica + Inginerie
+            ws.Cell(4, 10).Value = "Matematică şi ştiinţe ale naturii / Ştiinţe inginereşti";
+            ws.Cell(4, 10).Style.Font.Bold = true;
+            ws.Cell(4, 10).Style.Font.FontName = "Times New Roman";
+            ws.Cell(4, 10).Style.Font.FontSize = 8;
+            ws.Cell(4, 10).Style.Alignment.WrapText = true;
+            ws.Cell(4, 10).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(4, 10).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Range(4, 10, 4, 27).Merge(); // J4:AA4
+
+            // Col AB4:AX4 merge - celelalte grupuri
+            ws.Cell(4, 28).Value = "Ştiinţe sociale / Ştiinţe umaniste şi arte";
+            ws.Cell(4, 28).Style.Font.Bold = true;
+            ws.Cell(4, 28).Style.Font.FontName = "Times New Roman";
+            ws.Cell(4, 28).Style.Font.FontSize = 8;
+            ws.Cell(4, 28).Style.Alignment.WrapText = true;
+            ws.Cell(4, 28).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(4, 28).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Range(4, 28, 4, 50).Merge(); // AB4:AX4
+
+            ws.Row(4).Height = 183.75;
+
+            // ── RÂND 5: Headers coloane individuale (A5:A7, B5:B7 etc.) + grupuri domenii ──
+            // Merge-uri coloane individuale pe 3 rânduri (5-7): A,B,C,D,E,F,G,H,I
+            string[] hdr5 = { "Nr. \nCrt.", "Nume si prenume cadru didactic", "CNP",
+                               "Funcţie cadru didactic sau cercetare", "Forma de angajare",
+                               "Calitate conducator doctorat", "Varsta", "Facultate", "Departament" };
+            for (int c = 1; c <= 9; c++)
+            {
+                ws.Cell(5, c).Value = hdr5[c - 1];
+                ws.Cell(5, c).Style.Font.Bold = true;
+                ws.Cell(5, c).Style.Font.FontName = "Times New Roman";
+                ws.Cell(5, c).Style.Font.FontSize = 7;
+                ws.Cell(5, c).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                ws.Cell(5, c).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                ws.Cell(5, c).Style.Alignment.WrapText = true;
+                ws.Range(5, c, 7, c).Merge(); // fiecare coloana merge pe randurile 5-7
+            }
+
+            // Grupuri domenii ANS pe rândul 5 (merge cu subdomenii pe rândul 6-7)
+            // J5:N5 = Matematică şi ştiinţe ale naturii (col 10-14)
+            ws.Cell(5, 10).Value = "Matematică şi ştiinţe ale naturii";
+            ws.Cell(5, 10).Style.Font.Bold = true;
+            ws.Cell(5, 10).Style.Font.FontName = "Times New Roman";
+            ws.Cell(5, 10).Style.Font.FontSize = 8;
+            ws.Cell(5, 10).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(5, 10).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(5, 10).Style.Alignment.WrapText = true;
+            ws.Range(5, 10, 5, 14).Merge();
+
+            // O5:U5 = Ştiinţe inginereşti (col 15-21)
+            ws.Cell(5, 15).Value = "Ştiinţe inginereşti";
+            ws.Cell(5, 15).Style.Font.Bold = true;
+            ws.Cell(5, 15).Style.Font.FontName = "Times New Roman";
+            ws.Cell(5, 15).Style.Font.FontSize = 8;
+            ws.Cell(5, 15).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(5, 15).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(5, 15).Style.Alignment.WrapText = true;
+            ws.Range(5, 15, 5, 21).Merge();
+
+            // V5:AA5 = Ştiinţe biologice şi biomedicale (col 22-27)
+            ws.Cell(5, 22).Value = "Ştiinţe biologice şi biomedicale";
+            ws.Cell(5, 22).Style.Font.Bold = true;
+            ws.Cell(5, 22).Style.Font.FontName = "Times New Roman";
+            ws.Cell(5, 22).Style.Font.FontSize = 8;
+            ws.Cell(5, 22).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(5, 22).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(5, 22).Style.Alignment.WrapText = true;
+            ws.Range(5, 22, 5, 27).Merge();
+
+            // AB5:AJ5 = Ştiinţe sociale (col 28-36)
+            ws.Cell(5, 28).Value = "Ştiinţe sociale";
+            ws.Cell(5, 28).Style.Font.Bold = true;
+            ws.Cell(5, 28).Style.Font.FontName = "Times New Roman";
+            ws.Cell(5, 28).Style.Font.FontSize = 8;
+            ws.Cell(5, 28).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(5, 28).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(5, 28).Style.Alignment.WrapText = true;
+            ws.Range(5, 28, 5, 36).Merge();
+
+            // AK5:AW5 = Ştiinţe umaniste şi arte (col 37-49)
+            ws.Cell(5, 37).Value = "Ştiinţe umaniste şi arte";
+            ws.Cell(5, 37).Style.Font.Bold = true;
+            ws.Cell(5, 37).Style.Font.FontName = "Times New Roman";
+            ws.Cell(5, 37).Style.Font.FontSize = 8;
+            ws.Cell(5, 37).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(5, 37).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(5, 37).Style.Alignment.WrapText = true;
+            ws.Range(5, 37, 5, 49).Merge();
+
+            // AX5:AX7 = Total (col 50) - merge pe 3 rânduri
+            ws.Cell(5, 50).Value = "Total";
+            ws.Cell(5, 50).Style.Font.Bold = true;
+            ws.Cell(5, 50).Style.Font.FontName = "Times New Roman";
+            ws.Cell(5, 50).Style.Font.FontSize = 8;
+            ws.Cell(5, 50).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(5, 50).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Range(5, 50, 7, 50).Merge();
+
+            ws.Row(5).Height = 24.0;
+
+            // ── RÂND 6: Subdomenii individuale (fiecare merge cu rândul 7) ───────
+            for (int i = 0; i < _domeniiANS.Length; i++)
+            {
+                int col = 10 + i;
+                ws.Cell(6, col).Value = _domeniiANS[i];
+                ws.Cell(6, col).Style.Font.FontName = "Times New Roman";
+                ws.Cell(6, col).Style.Font.FontSize = 7;
+                ws.Cell(6, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                ws.Cell(6, col).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                ws.Cell(6, col).Style.Alignment.WrapText = true;
+                ws.Range(6, col, 7, col).Merge(); // fiecare subdomeniu merge cu randul 7
+            }
+
+            ws.Row(6).Height = 19.5;
+
+            // ── RÂND 7: parte din merge-urile de la 6 (implicit prin merge-uri) ──
+            ws.Row(7).Height = 60.6;
+
+            // ── RÂND 8: litere A, B, C, D, E, F, 40 ────────────────────────────
+            string[] litere = { "A", "B", "C", "D", "E", "F" };
+            for (int c = 1; c <= 6; c++)
+            {
+                ws.Cell(8, c).Value = litere[c - 1];
+                ws.Cell(8, c).Style.Font.FontName = "Times New Roman";
+                ws.Cell(8, c).Style.Font.FontSize = 7;
+                ws.Cell(8, c).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                ws.Cell(8, c).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            }
+            ws.Cell(8, 50).Value = 40;
+            ws.Cell(8, 50).Style.Font.FontName = "Times New Roman";
+            ws.Cell(8, 50).Style.Font.FontSize = 7;
+            ws.Cell(8, 50).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Row(8).Height = 13.5;
+
+            // ── Borduri pe header (rânduri 5-8, col 1-50) ───────────────────────
+            var borderStyle = XLBorderStyleValues.Thin;
+            var headerBorderRange = ws.Range(5, 1, 8, 50);
+            headerBorderRange.Style.Border.TopBorder = borderStyle;
+            headerBorderRange.Style.Border.BottomBorder = borderStyle;
+            headerBorderRange.Style.Border.LeftBorder = borderStyle;
+            headerBorderRange.Style.Border.RightBorder = borderStyle;
+            // Medium pe exterior rânduri 5 (top) si 8 (bottom)
+            ws.Range(5, 1, 5, 50).Style.Border.TopBorder = XLBorderStyleValues.Medium;
+            ws.Range(8, 1, 8, 50).Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+
+            // ── DATE: rânduri de la 9 ────────────────────────────────────────────
+            int rand = 9;
+            int nrCrt = 1;
+            // Fill galben ANS (theme 7, tint 0.8 ≈ RGB FFFF99 aproape exact)
+            var fillGalben = XLColor.FromArgb(255, 255, 255, 153);
+
+            foreach (var prof in profesori)
+            {
+                ws.Cell(rand, 1).Value = nrCrt++;
+                ws.Cell(rand, 1).Style.Font.FontName = "Times New Roman";
+                ws.Cell(rand, 1).Style.Font.FontSize = 8;
+                ws.Cell(rand, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+                ws.Cell(rand, 2).Value = $"{prof.Nume} {prof.Prenume}".Trim();
+                ws.Cell(rand, 2).Style.Font.FontSize = 10;
+                // col 3 (CNP) - gol
+
+                ws.Cell(rand, 4).Value = prof.GradFunctie;
+                ws.Cell(rand, 4).Style.Font.FontSize = 10;
+                // col 5, 6, 7 - goale (forma angajare, conducator doctorat, varsta)
+
+                ws.Cell(rand, 8).Value = prof.Facultate;
+                ws.Cell(rand, 8).Style.Font.FontSize = 10;
+
+                ws.Cell(rand, 9).Value = prof.Departament;
+                ws.Cell(rand, 9).Style.Font.FontSize = 10;
+
+                decimal sumaFractiuni = 0;
+                for (int i = 0; i < 40; i++)
                 {
-                    worksheet.Cell(5, 4 + (i * 2) - 1).Value = $"Domeniul ANS {i}";
-                    worksheet.Cell(5, 4 + (i * 2)).Value = $"Fracțiune normă dom. ANS {i}";
-                }
-
-                worksheet.Range(5, 1, 5, 25).Style.Font.Bold = true;
-                int randCurent = 6; int nrCrt = 1;
-
-                foreach (var prof in profesoriGrupati)
-                {
-                    worksheet.Cell(randCurent, 1).Value = nrCrt++; worksheet.Cell(randCurent, 2).Value = prof.Nume;
-                    worksheet.Cell(randCurent, 3).Value = prof.Prenume; worksheet.Cell(randCurent, 4).Value = prof.GradFunctie;
-                    worksheet.Cell(randCurent, 5).Value = 1;
-
-                    int coloanaStartDomeniu = 6;
-                    for (int i = 0; i < Math.Min(10, prof.Domenii.Count); i++)
+                    if (prof.Fractiuni[i] != 0)
                     {
-                        var domeniu = prof.Domenii[i];
-                        decimal fractiune = prof.NormaBaza > 0 ? domeniu.TotalOreConv / prof.NormaBaza : 0;
-                        worksheet.Cell(randCurent, coloanaStartDomeniu).Value = domeniu.NumeDomeniu;
-                        worksheet.Cell(randCurent, coloanaStartDomeniu + 1).Value = Math.Round(fractiune, 3);
-                        worksheet.Cell(randCurent, coloanaStartDomeniu + 1).Style.NumberFormat.Format = "0.000";
-                        coloanaStartDomeniu += 2;
+                        int col = 10 + i;
+                        ws.Cell(rand, col).Value = prof.Fractiuni[i];
+                        ws.Cell(rand, col).Style.NumberFormat.Format = "0.00";
+                        ws.Cell(rand, col).Style.Font.FontSize = 10;
+                        sumaFractiuni += prof.Fractiuni[i];
                     }
-                    randCurent++;
                 }
 
-                worksheet.Columns().AdjustToContents();
-                using (var stream = new MemoryStream())
+                // Col 50: formula SUM(J_:AW_) identic cu template-ul
+                ws.Cell(rand, 50).FormulaA1 = $"=SUM(J{rand}:AW{rand})";
+                ws.Cell(rand, 50).Style.NumberFormat.Format = "0.00";
+                ws.Cell(rand, 50).Style.Font.FontSize = 10;
+
+                // Fill galben pe intregul rand de date (ca in template)
+                ws.Range(rand, 1, rand, 50).Style.Fill.BackgroundColor = fillGalben;
+
+                // Borduri thin pe rand
+                ws.Range(rand, 1, rand, 50).Style.Border.TopBorder = XLBorderStyleValues.Thin;
+                ws.Range(rand, 1, rand, 50).Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+                ws.Range(rand, 1, rand, 50).Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+                ws.Range(rand, 1, rand, 50).Style.Border.RightBorder = XLBorderStyleValues.Thin;
+                // Medium pe left si bottom-ul fiecarui rand (stilul template)
+                ws.Cell(rand, 1).Style.Border.LeftBorder = XLBorderStyleValues.Medium;
+
+                ws.Row(rand).Height = 13.5;
+                rand++;
+            }
+
+            // ── RÂND TOTAL ───────────────────────────────────────────────────────
+            int randTotal = rand;
+            ws.Cell(randTotal, 1).Value = "Total general:";
+            ws.Cell(randTotal, 1).Style.Font.Bold = true;
+            ws.Cell(randTotal, 1).Style.Font.FontName = "Times New Roman";
+            ws.Cell(randTotal, 1).Style.Font.FontSize = 10;
+            ws.Cell(randTotal, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(randTotal, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(randTotal, 1).Style.Alignment.WrapText = true;
+
+            ws.Cell(randTotal, 5).Value = profesori.Count; // numar titulari
+
+            // SUM pe fiecare coloana de domeniu (J..AX) cu referinta la randurile de date
+            if (profesori.Count > 0)
+            {
+                for (int col = 10; col <= 50; col++)
                 {
-                    workbook.SaveAs(stream);
-                    return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Date_ANS.xlsx");
+                    string cl = ColLetter(col);
+                    ws.Cell(randTotal, col).FormulaA1 = $"=SUM({cl}9:{cl}{randTotal - 1})";
+                    ws.Cell(randTotal, col).Style.NumberFormat.Format = "0.00";
+                    ws.Cell(randTotal, col).Style.Font.Bold = true;
+                    ws.Cell(randTotal, col).Style.Font.FontSize = 10;
                 }
             }
+
+            ws.Range(randTotal, 1, randTotal, 50).Style.Border.TopBorder = XLBorderStyleValues.Medium;
+            ws.Range(randTotal, 1, randTotal, 50).Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+            ws.Range(randTotal, 1, randTotal, 50).Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+            ws.Range(randTotal, 1, randTotal, 50).Style.Border.RightBorder = XLBorderStyleValues.Thin;
+            ws.Row(randTotal).Height = 42.6;
+
+            // ── Lățimi coloane exacte din template ───────────────────────────────
+            ws.Column(1).Width = 7.5546875;
+            ws.Column(2).Width = 30.88671875;
+            ws.Column(3).Width = 19.44140625;
+            ws.Column(4).Width = 18.5546875;
+            ws.Column(5).Width = 5.5546875;
+            ws.Column(6).Width = 4.6640625;
+            ws.Column(7).Width = 6.5546875;
+            ws.Column(8).Width = 25.5546875;
+            ws.Column(9).Width = 60.33203125;
+            ws.Column(10).Width = 5.5546875;  // J - Matematica (ingust ca in template)
+            for (int col = 11; col <= 49; col++) ws.Column(col).Width = 13.0;
+            ws.Column(50).Width = 6.109375;
+
+            // ── Freeze dupa rândul 8 si dupa coloana 9 ──────────────────────────
+            ws.SheetView.FreezeRows(8);
+            ws.SheetView.FreezeColumns(9);
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Date_ANS_{idAnUniv}.xlsx");
         }
 
         private decimal ObtineNormaBaza(string grad)
         {
             if (string.IsNullOrWhiteSpace(grad)) return 0;
-            string gradLow = grad.ToLower();
-            if (gradLow.Contains("profesor")) return 11;
-            if (gradLow.Contains("conferentiar") || gradLow.Contains("conferențiar")) return 12;
-            if (gradLow.Contains("lector") || gradLow.Contains("sef lucrari") || gradLow.Contains("șef lucrări")) return 14;
-            if (gradLow.Contains("asistent")) return 16;
+            string g = grad.ToLower();
+            if (g.Contains("profesor")) return 11;
+            if (g.Contains("conferentiar") || g.Contains("conferențiar")) return 12;
+            if (g.Contains("lector") || g.Contains("sef lucrari") || g.Contains("șef lucrări") || g.Contains("șef de lucrări")) return 14;
+            if (g.Contains("asistent")) return 16;
             return 0;
-        }
-
-        private string AsociazaDomeniuANS(string criteriu)
-        {
-            if (string.IsNullOrWhiteSpace(criteriu)) return "Ştiinţe economice (fără  Cibernetică, statistică şi informatică economică)";
-            string val = criteriu.ToLower();
-            if (val.Contains("matematic") || val.Contains("informatic")) return "Matematică";
-            if (val.Contains("fizic")) return "Fizică";
-            if (val.Contains("chimie") || val.Contains("inginerie chimic")) return "Chimie şi inginerie chimică";
-            if (val.Contains("civil") || val.Contains("construct")) return "Inginerie civilă";
-            if (val.Contains("electric") || val.Contains("electronic") || val.Contains("telecomunica")) return "Inginerie electrică, electronică şi telecomunicaţii";
-            if (val.Contains("transport")) return "Ingineria transporturilor";
-            if (val.Contains("silvicultur") || val.Contains("lemn")) return "Ingineria resurselor vegetale şi animale";
-            if (val.Contains("sistem") || val.Contains("calculatoare")) return "Ingineria sistemelor, calculatoare şi tehnologia informaţiei";
-            if (val.Contains("mecanic") || val.Contains("mecatronic") || val.Contains("industrial")) return "Inginerie mecanică, mecatronică, inginerie industrială şi management";
-            if (val.Contains("medicin")) return "Medicină";
-            if (val.Contains("drept") || val.Contains("juridic")) return "Ştiinţe juridice";
-            if (val.Contains("sociologie") || val.Contains("comunicar")) return "Sociologie";
-            if (val.Contains("economic") || val.Contains("business")) return "Ştiinţe economice (fără  Cibernetică, statistică şi informatică economică)";
-            if (val.Contains("psihologie") || val.Contains("educa")) return "Psihologie şi ştiinţe comportamentale";
-            if (val.Contains("liter") || val.Contains("filologie")) return "Filologie";
-            if (val.Contains("sport") || val.Contains("educatie fizic")) return "Ştiinţele Sportului şi Educaţiei Fizice";
-            if (val.Contains("muzic")) return "Muzică (fără Interpretare muzicală)";
-            return "Studii culturale";
         }
 
         private class RandSqlANS
         {
             public string Nume { get; set; } = "";
             public string Prenume { get; set; } = "";
+            public string Facultate { get; set; } = "";
+            public string Departament { get; set; } = "";
             public string GradFunctie { get; set; } = "";
             public decimal OreConventionale { get; set; }
             public string DomeniuANS { get; set; } = "";
