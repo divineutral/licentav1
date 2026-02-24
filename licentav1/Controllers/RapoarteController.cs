@@ -594,22 +594,28 @@ namespace LicentaV1.Controllers
                 }
             }
 
-            var document = Document.Create(container => {
-                container.Page(page => {
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
                     page.Size(PageSizes.A4.Landscape()); page.Margin(2, Unit.Centimetre); page.PageColor(Colors.White); page.DefaultTextStyle(x => x.FontSize(10));
 
-                    page.Header().Column(col => {
+                    page.Header().Column(col =>
+                    {
                         col.Item().Text("Raport Norme Profesori").SemiBold().FontSize(18).FontColor(Color.FromHex(BrandColorHex));
                         col.Item().Text($"Generat la: {DateTime.Now:dd/MM/yyyy}").FontSize(10).FontColor(Colors.Grey.Medium);
-                        col.Item().PaddingTop(5).Text(text => {
+                        col.Item().PaddingTop(5).Text(text =>
+                        {
                             text.Span("Filtre aplicate: ").SemiBold().FontSize(9);
                             text.Span($"An Univ: {anUniv} | Fac: {facultate} | Spec: {specializari} | Prof: {profesor} | Sem: {(semestru == 0 ? "Toate" : semestru.ToString())} | Tip Post: {tipPost}").FontSize(9);
                         });
                     });
 
-                    page.Content().PaddingVertical(1, Unit.Centimetre).Table(table => {
+                    page.Content().PaddingVertical(1, Unit.Centimetre).Table(table =>
+                    {
                         table.ColumnsDefinition(c => { c.RelativeColumn(3); c.RelativeColumn(3); c.RelativeColumn(4); c.RelativeColumn(2); c.ConstantColumn(40); c.ConstantColumn(60); c.ConstantColumn(60); });
-                        table.Header(h => {
+                        table.Header(h =>
+                        {
                             h.Cell().Element(HeaderStyle).Text("Profesor"); h.Cell().Element(HeaderStyle).Text("Specializare"); h.Cell().Element(HeaderStyle).Text("Materie"); h.Cell().Element(HeaderStyle).Text("Tip Post"); h.Cell().Element(HeaderStyle).Text("Sem"); h.Cell().Element(HeaderStyle).Text("Ore Conv"); h.Cell().Element(HeaderStyle).Text("Total Post");
                             static IContainer HeaderStyle(IContainer c) => c.DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White)).Background(Color.FromHex(BrandColorHex)).PaddingVertical(5).PaddingHorizontal(2);
                         });
@@ -678,22 +684,28 @@ namespace LicentaV1.Controllers
                 }
             }
 
-            var document = Document.Create(container => {
-                container.Page(page => {
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
                     page.Size(PageSizes.A4); page.Margin(2, Unit.Centimetre); page.PageColor(Colors.White); page.DefaultTextStyle(x => x.FontSize(10));
 
-                    page.Header().Column(col => {
+                    page.Header().Column(col =>
+                    {
                         col.Item().Text("Statistica Ore pe Programe").SemiBold().FontSize(18).FontColor(Color.FromHex(BrandColorHex));
                         col.Item().Text($"Generat la: {DateTime.Now:dd/MM/yyyy}").FontSize(10).FontColor(Colors.Grey.Medium);
-                        col.Item().PaddingTop(5).Text(text => {
+                        col.Item().PaddingTop(5).Text(text =>
+                        {
                             text.Span("Filtre aplicate: ").SemiBold().FontSize(9);
                             text.Span($"An Univ: {anUniv} | Fac: {facultate} | Spec: {specializari} | Prof: {profesor} | Sem: {(semestru == 0 ? "Toate" : semestru.ToString())} | Tip Post: {tipPost}").FontSize(9);
                         });
                     });
 
-                    page.Content().PaddingVertical(1, Unit.Centimetre).Table(table => {
+                    page.Content().PaddingVertical(1, Unit.Centimetre).Table(table =>
+                    {
                         table.ColumnsDefinition(c => { c.RelativeColumn(3); c.RelativeColumn(4); c.ConstantColumn(50); c.ConstantColumn(50); c.ConstantColumn(60); });
-                        table.Header(h => {
+                        table.Header(h =>
+                        {
                             h.Cell().Element(HeaderStyle).Text("Profesor"); h.Cell().Element(HeaderStyle).Text("Program Studiu"); h.Cell().Element(HeaderStyle).Text("Ore Conv"); h.Cell().Element(HeaderStyle).Text("% Post"); h.Cell().Element(HeaderStyle).Text("Total Post");
                             static IContainer HeaderStyle(IContainer c) => c.DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White)).Background(Color.FromHex(BrandColorHex)).Padding(5);
                         });
@@ -714,6 +726,147 @@ namespace LicentaV1.Controllers
                 fileName = $"StatisticaOre_{string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()))}.pdf";
             }
             var stream = new MemoryStream(document.GeneratePdf()); return File(stream.ToArray(), "application/pdf", fileName);
+        }
+
+        [HttpGet("export/raport-ans")]
+        public IActionResult ExportRaportANS([FromQuery] int idAnUniv = 45)
+        {
+            var dateBrute = new List<RandSqlANS>();
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                string query = @"
+                    SELECT 
+                        NumeIntreg AS NumeComplet, 
+                        DenumireGradDidacticPost AS GradFunctie, 
+                        ISNULL(NrOreConventionale, 0) AS NrOreConventionale, 
+                        DenumireFacultate AS CriteriuMapare 
+                    FROM [agsis_dw].[dbo].[Post_Profesor_Materie]
+                    WHERE ID_AnUniv = @ID_AnUniv AND TitularSauSuplinitor = 1";
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var numeComplet = reader["NumeComplet"]?.ToString() ?? "";
+                            var partiNume = numeComplet.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+
+                            dateBrute.Add(new RandSqlANS
+                            {
+                                Nume = partiNume.Length > 0 ? partiNume[0] : "",
+                                Prenume = partiNume.Length > 1 ? partiNume[1] : "",
+                                GradFunctie = reader["GradFunctie"]?.ToString() ?? "",
+                                OreConventionale = reader["NrOreConventionale"] != DBNull.Value ? Convert.ToDecimal(reader["NrOreConventionale"]) : 0,
+                                DomeniuANS = AsociazaDomeniuANS(reader["CriteriuMapare"]?.ToString() ?? "")
+                            });
+                        }
+                    }
+                }
+            }
+
+            var profesoriGrupati = dateBrute
+                .GroupBy(x => new { x.Nume, x.Prenume, x.GradFunctie })
+                .Select(g => new
+                {
+                    g.Key.Nume,
+                    g.Key.Prenume,
+                    g.Key.GradFunctie,
+                    NormaBaza = ObtineNormaBaza(g.Key.GradFunctie),
+                    Domenii = g.GroupBy(d => d.DomeniuANS)
+                               .Select(dg => new { NumeDomeniu = dg.Key, TotalOreConv = dg.Sum(x => x.OreConventionale) })
+                               .OrderByDescending(d => d.TotalOreConv).ToList()
+                })
+                .OrderBy(p => p.Nume).ThenBy(p => p.Prenume).ToList();
+
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Date ANS");
+                worksheet.Cell(5, 1).Value = "Nr. crt."; worksheet.Cell(5, 2).Value = "Nume"; worksheet.Cell(5, 3).Value = "Prenume";
+                worksheet.Cell(5, 4).Value = "Grad / funcție"; worksheet.Cell(5, 5).Value = "Total normă conform contract";
+
+                for (int i = 1; i <= 10; i++)
+                {
+                    worksheet.Cell(5, 4 + (i * 2) - 1).Value = $"Domeniul ANS {i}";
+                    worksheet.Cell(5, 4 + (i * 2)).Value = $"Fracțiune normă dom. ANS {i}";
+                }
+
+                worksheet.Range(5, 1, 5, 25).Style.Font.Bold = true;
+                int randCurent = 6; int nrCrt = 1;
+
+                foreach (var prof in profesoriGrupati)
+                {
+                    worksheet.Cell(randCurent, 1).Value = nrCrt++; worksheet.Cell(randCurent, 2).Value = prof.Nume;
+                    worksheet.Cell(randCurent, 3).Value = prof.Prenume; worksheet.Cell(randCurent, 4).Value = prof.GradFunctie;
+                    worksheet.Cell(randCurent, 5).Value = 1;
+
+                    int coloanaStartDomeniu = 6;
+                    for (int i = 0; i < Math.Min(10, prof.Domenii.Count); i++)
+                    {
+                        var domeniu = prof.Domenii[i];
+                        decimal fractiune = prof.NormaBaza > 0 ? domeniu.TotalOreConv / prof.NormaBaza : 0;
+                        worksheet.Cell(randCurent, coloanaStartDomeniu).Value = domeniu.NumeDomeniu;
+                        worksheet.Cell(randCurent, coloanaStartDomeniu + 1).Value = Math.Round(fractiune, 3);
+                        worksheet.Cell(randCurent, coloanaStartDomeniu + 1).Style.NumberFormat.Format = "0.000";
+                        coloanaStartDomeniu += 2;
+                    }
+                    randCurent++;
+                }
+
+                worksheet.Columns().AdjustToContents();
+                using (var stream = new MemoryStream())
+                {
+                    workbook.SaveAs(stream);
+                    return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Date_ANS.xlsx");
+                }
+            }
+        }
+
+        private decimal ObtineNormaBaza(string grad)
+        {
+            if (string.IsNullOrWhiteSpace(grad)) return 0;
+            string gradLow = grad.ToLower();
+            if (gradLow.Contains("profesor")) return 11;
+            if (gradLow.Contains("conferentiar") || gradLow.Contains("conferențiar")) return 12;
+            if (gradLow.Contains("lector") || gradLow.Contains("sef lucrari") || gradLow.Contains("șef lucrări")) return 14;
+            if (gradLow.Contains("asistent")) return 16;
+            return 0;
+        }
+
+        private string AsociazaDomeniuANS(string criteriu)
+        {
+            if (string.IsNullOrWhiteSpace(criteriu)) return "Ştiinţe economice (fără  Cibernetică, statistică şi informatică economică)";
+            string val = criteriu.ToLower();
+            if (val.Contains("matematic") || val.Contains("informatic")) return "Matematică";
+            if (val.Contains("fizic")) return "Fizică";
+            if (val.Contains("chimie") || val.Contains("inginerie chimic")) return "Chimie şi inginerie chimică";
+            if (val.Contains("civil") || val.Contains("construct")) return "Inginerie civilă";
+            if (val.Contains("electric") || val.Contains("electronic") || val.Contains("telecomunica")) return "Inginerie electrică, electronică şi telecomunicaţii";
+            if (val.Contains("transport")) return "Ingineria transporturilor";
+            if (val.Contains("silvicultur") || val.Contains("lemn")) return "Ingineria resurselor vegetale şi animale";
+            if (val.Contains("sistem") || val.Contains("calculatoare")) return "Ingineria sistemelor, calculatoare şi tehnologia informaţiei";
+            if (val.Contains("mecanic") || val.Contains("mecatronic") || val.Contains("industrial")) return "Inginerie mecanică, mecatronică, inginerie industrială şi management";
+            if (val.Contains("medicin")) return "Medicină";
+            if (val.Contains("drept") || val.Contains("juridic")) return "Ştiinţe juridice";
+            if (val.Contains("sociologie") || val.Contains("comunicar")) return "Sociologie";
+            if (val.Contains("economic") || val.Contains("business")) return "Ştiinţe economice (fără  Cibernetică, statistică şi informatică economică)";
+            if (val.Contains("psihologie") || val.Contains("educa")) return "Psihologie şi ştiinţe comportamentale";
+            if (val.Contains("liter") || val.Contains("filologie")) return "Filologie";
+            if (val.Contains("sport") || val.Contains("educatie fizic")) return "Ştiinţele Sportului şi Educaţiei Fizice";
+            if (val.Contains("muzic")) return "Muzică (fără Interpretare muzicală)";
+            return "Studii culturale";
+        }
+
+        private class RandSqlANS
+        {
+            public string Nume { get; set; } = "";
+            public string Prenume { get; set; } = "";
+            public string GradFunctie { get; set; } = "";
+            public decimal OreConventionale { get; set; }
+            public string DomeniuANS { get; set; } = "";
         }
     }
 }

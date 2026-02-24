@@ -244,6 +244,24 @@
                 </div>
             </div>
 
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingThree">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseANS" aria-expanded="false" aria-controls="collapseANS">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i> Raport Domenii ANS
+                    </button>
+                </h2>
+                <div id="collapseANS" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#accordionRapoarte">
+                    <div class="accordion-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <p class="mb-0 text-muted">Exportați fracțiunile de normă pe domeniile ANS pentru cadrele didactice titulare (ID An 45 implicit).</p>
+                            <button id="btnExportRaportANS" class="btn btn-success">
+                                <i class="bi bi-file-earmark-excel"></i> Export Raport ANS
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -304,6 +322,12 @@
                 const currentParams = getFilterParamsString();
                 if (cacheState.ore !== currentParams) { loadOreData(); cacheState.ore = currentParams; }
             });
+
+            $('#btnExportRaportANS').on('click', function () {
+                let idAnUniv = 45;
+                let url = `/api/Rapoarte/export/raport-ans?idAnUniv=${idAnUniv}`;
+                window.location.href = url;
+            });
         });
 
         function downloadExcel(reportType) {
@@ -327,15 +351,15 @@
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                                <td>${n.profesor || n.Profesor}</td>
-                                <td>${n.specializare || n.Specializare}</td>
-                                <td>${n.materie || n.Materie}</td>
-                                <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
-                                <td class="text-center">${n.semestru || n.Semestru}</td>
-                                <td class="text-center fw-bold">${n.oreConventionale || n.OreConventionale}</td>
-                                <td class="text-center">${n.procentOre || n.ProcentOre}%</td>
-                                <td class="text-center fw-bold" style="color: #56723e;">${n.totalPost || n.TotalPost}</td>
-                            </tr>`;
+                                    <td>${n.profesor || n.Profesor}</td>
+                                    <td>${n.specializare || n.Specializare}</td>
+                                    <td>${n.materie || n.Materie}</td>
+                                    <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
+                                    <td class="text-center">${n.semestru || n.Semestru}</td>
+                                    <td class="text-center fw-bold">${n.oreConventionale || n.OreConventionale}</td>
+                                    <td class="text-center">${n.procentOre || n.ProcentOre}%</td>
+                                    <td class="text-center fw-bold" style="color: #56723e;">${n.totalPost || n.TotalPost}</td>
+                                </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -362,19 +386,19 @@
                     if ((item.procentPost || item.ProcentPost) < 10) colorClass = 'bg-warning';
 
                     html += `<tr>
-                                    <td class="fw-bold">${item.profesor || item.Profesor}</td>
-                                    <td>${item.programStudiu || item.ProgramStudiu}</td>
-                                    <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
-                                    <td class="text-center" style="width: 20%;">
-                                        <div class="d-flex align-items-center">
-                                            <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
-                                            <div class="progress flex-grow-1" style="height: 6px;">
-                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
+                                        <td class="fw-bold">${item.profesor || item.Profesor}</td>
+                                        <td>${item.programStudiu || item.ProgramStudiu}</td>
+                                        <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
+                                        <td class="text-center" style="width: 20%;">
+                                            <div class="d-flex align-items-center">
+                                                <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
+                                                <div class="progress flex-grow-1" style="height: 6px;">
+                                                    <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
-                                </tr>`;
+                                        </td>
+                                        <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
+                                    </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
