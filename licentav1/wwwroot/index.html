@@ -449,10 +449,8 @@
                 data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
             });
 
-            fetch('/api/Rapoarte/liste/departamente').then(res => res.json()).then(data => {
-                const s = document.getElementById('departamentSelect');
-                data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
-            });
+            // Initializeaza departamente gol pana la alegerea facultatii
+            $('#departamentSelect').append(new Option("Toate", "Toti"));
 
             $('#anUnivSelect').on('change', function () { $('#facultateSelect').trigger('change'); invalidateCache(); });
             $('#departamentSelect').on('change', function () { invalidateCache(); });
@@ -462,13 +460,27 @@
                 invalidateCache();
                 const anUniv = $('#anUnivSelect').val() || 'Toti';
                 const fac = $(this).val() || 'Toti';
+
+                // Actualizare Specializari in cascada
                 $('#specializareSelect').empty();
-                const params = new URLSearchParams({ anUniv: anUniv, numeFacultate: fac });
-                fetch(`/api/Rapoarte/liste/specializari-per-facultate?${params.toString()}`).then(res => res.json()).then(data => {
-                    const $s = $('#specializareSelect');
-                    data.forEach(u => $s.append(new Option(u, u)));
-                    $s.trigger('change');
-                });
+                fetch(`/api/Rapoarte/liste/specializari-per-facultate?anUniv=${anUniv}&numeFacultate=${fac}`)
+                    .then(res => res.json()).then(data => {
+                        const $s = $('#specializareSelect');
+                        data.forEach(u => $s.append(new Option(u, u)));
+                        $s.trigger('change');
+                    });
+
+                // Actualizare Departamente in cascada
+                $('#departamentSelect').empty();
+                fetch(`/api/Rapoarte/liste/departamente?anUniv=${anUniv}&numeFacultate=${fac}`)
+                    .then(res => res.json()).then(data => {
+                        const $d = $('#departamentSelect');
+                        data.forEach(u => {
+                            let text = u === "" ? "Toate" : u;
+                            let val = u === "" ? "Toti" : u;
+                            $d.append(new Option(text, val));
+                        });
+                    });
             });
 
             $('#specializareSelect').on('change', function () {
@@ -602,7 +614,6 @@
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
         }
-
         async function loadTotalNormeData() {
             const tbody = document.getElementById('totalNormeTableBody');
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
@@ -614,26 +625,26 @@
 
                 let html = '';
                 let grandTotalOre = 0;
-                let grandTotalNorme = 0;
+                let grandTotalAnual = 0;
 
                 data.forEach(item => {
                     grandTotalOre += item.totalOreConv;
-                    grandTotalNorme += item.cateNorme;
+                    grandTotalAnual += item.totalAnualOreConv;
 
                     html += `<tr>
-                                    <td class="fw-bold">${item.profesor}</td>
-                                    <td>${item.departament}</td>
-                                    <td>${item.facultate}</td>
-                                    <td class="text-center">${item.totalOreConv}</td>
-                                    <td class="text-center fw-bold text-primary">${item.cateNorme}</td>
-                                </tr>`;
+                                <td class="fw-bold">${item.profesor}</td>
+                                <td>${item.departament}</td>
+                                <td>${item.facultate}</td>
+                                <td class="text-center">${item.totalOreConv}</td>
+                                <td class="text-center fw-bold text-primary">${item.totalAnualOreConv}</td>
+                            </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                <td colspan="3" class="text-end">TOTAL GENERAL:</td>
-                                <td class="text-center">${grandTotalOre.toFixed(2)}</td>
-                                <td class="text-center text-success">${grandTotalNorme.toFixed(2)}</td>
-                             </tr>`;
+                            <td colspan="3" class="text-end">TOTAL GENERAL:</td>
+                            <td class="text-center">${grandTotalOre.toFixed(2)}</td>
+                            <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
+                         </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -642,11 +653,11 @@
         async function loadLimbiStraineData() {
             const tbody = document.getElementById('limbiStraineTableBody');
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams({ anUniv: $('#anUnivSelect').val() || 'Toti' });
+            const params = new URLSearchParams(getParamsObject());
             try {
                 const res = await fetch(`/api/Rapoarte/limbi-straine?${params.toString()}`);
                 const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nu există date pentru programe în limbi străine.</td></tr>'; return; }
+                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nu există date pentru programe în limbi străine conform filtrelor.</td></tr>'; return; }
 
                 let html = '';
                 let sumSem1 = 0, sumSem2 = 0, sumTotal = 0;
@@ -658,10 +669,10 @@
 
                     html += `<tr>
                                     <td>${item.nrCrt}</td>
-                                    <td class="text-start">${item.numeProfesor}</td>
+                                    <td class="text-start fw-bold">${item.numeProfesor}</td>
                                     <td>${item.sem1}</td>
                                     <td>${item.sem2}</td>
-                                    <td class="fw-bold">${item.total}</td>
+                                    <td class="fw-bold text-success">${item.total}</td>
                                 </tr>`;
                 });
 
