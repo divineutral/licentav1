@@ -439,11 +439,20 @@
 
         $(document).ready(function () {
             $('#specializareSelect').select2({ placeholder: "Alege specializări", allowClear: true, width: 'resolve' });
-            $('#profesorSelect').select2({ placeholder: "Tastați pentru a căuta profesor...", allowClear: true, width: 'resolve', minimumInputLength: 0 });
+            $('#profesorSelect').select2({
+                placeholder: "Toți sau caută după nume...",
+                allowClear: true,
+                width: 'resolve',
+                minimumInputLength: 0,
+                language: { noResults: () => "Nu s-a găsit..." }
+            });
 
+            // Populare initiala profesori la incarcarea paginii (dupa ce se incarca anul)
             fetch('/api/Rapoarte/liste/ani-universitari').then(res => res.json()).then(data => {
                 const s = document.getElementById('anUnivSelect');
-                data.forEach(an => s.innerHTML += `<option value="${an.id}">${an.nume}</option>`);
+                data.forEach(an => s.innerHTML += `<option value="${an.nume}">${an.nume}</option>`);
+                // Dupa ce s-a incarcat lista de ani, incarcam profesorii pentru primul an
+                reloadProfesori();
             });
 
             fetch('/api/Rapoarte/liste/facultati').then(res => res.json()).then(data => {
@@ -454,8 +463,8 @@
             // Initializeaza departamente gol pana la alegerea facultatii
             $('#departamentSelect').append(new Option("Toate", "Toti"));
 
-            $('#anUnivSelect').on('change', function () { $('#facultateSelect').trigger('change'); invalidateCache(); });
-            $('#departamentSelect').on('change', function () { invalidateCache(); });
+            $('#anUnivSelect').on('change', function () { $('#facultateSelect').trigger('change'); invalidateCache(); reloadProfesori(); });
+            $('#departamentSelect').on('change', function () { invalidateCache(); reloadProfesori(); });
             $('#formaInvSelect').on('change', function () { invalidateCache(); });
 
             $('#facultateSelect').on('change', function () {
@@ -487,13 +496,23 @@
 
             $('#specializareSelect').on('change', function () {
                 invalidateCache();
-                const params = new URLSearchParams(getParamsObject());
-                fetch(`/api/Rapoarte/liste/profesori-per-specializari?${params.toString()}`).then(res => res.json()).then(data => {
-                    const $p = $('#profesorSelect').empty();
-                    $p.append(new Option("", ""));
-                    data.forEach(p => { if (p !== "Toti") $p.append(new Option(p, p)); });
-                });
+                reloadProfesori();
             });
+
+            function reloadProfesori(cautare) {
+                const anVal = $('#anUnivSelect').val() || 'Toti';
+                const facVal = $('#facultateSelect').val() || 'Toti';
+                const deptVal = $('#departamentSelect').val() || 'Toti';
+                const url = `/api/Rapoarte/liste/profesori-per-specializari?anUniv=${encodeURIComponent(anVal)}&facultate=${encodeURIComponent(facVal)}&specializari=Toti&departament=${encodeURIComponent(deptVal)}`;
+                fetch(url).then(res => res.json()).then(data => {
+                    const valCurent = $('#profesorSelect').val();
+                    const $p = $('#profesorSelect').empty();
+                    $p.append(new Option("Toți", "Toti"));
+                    data.forEach(p => { if (p && p !== 'Toti') $p.append(new Option(p, p)); });
+                    if (valCurent && data.includes(valCurent)) $p.val(valCurent);
+                    $p.trigger('change.select2');
+                }).catch(err => console.error('Eroare la incarcarea profesorilor:', err));
+            }
 
             $('#semestruSelect, #tipPostSelect, #profesorSelect').on('change', function () { invalidateCache(); });
 
@@ -564,23 +583,23 @@
                     totalAplic += aplic;
                     totalConv += conv;
                     html += `<tr>
-                                                <td>${n.profesor || n.Profesor}</td>
-                                                <td>${n.specializare || n.Specializare}</td>
-                                                <td>${n.materie || n.Materie}</td>
-                                                <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
-                                                <td class="text-center">${n.semestru || n.Semestru}</td>
-                                                <td class="text-center">${curs}</td>
-                                                <td class="text-center">${aplic}</td>
-                                                <td class="text-center fw-bold">${conv}</td>
-                                            </tr>`;
+                                                    <td>${n.profesor || n.Profesor}</td>
+                                                    <td>${n.specializare || n.Specializare}</td>
+                                                    <td>${n.materie || n.Materie}</td>
+                                                    <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
+                                                    <td class="text-center">${n.semestru || n.Semestru}</td>
+                                                    <td class="text-center">${curs}</td>
+                                                    <td class="text-center">${aplic}</td>
+                                                    <td class="text-center fw-bold">${conv}</td>
+                                                </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                        <td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                                        <td class="text-center">${totalCurs.toFixed(2)}</td>
-                                        <td class="text-center">${totalAplic.toFixed(2)}</td>
-                                        <td class="text-center text-success">${totalConv.toFixed(2)}</td>
-                                     </tr>`;
+                                            <td colspan="5" class="text-end">TOTAL GENERAL:</td>
+                                            <td class="text-center">${totalCurs.toFixed(2)}</td>
+                                            <td class="text-center">${totalAplic.toFixed(2)}</td>
+                                            <td class="text-center text-success">${totalConv.toFixed(2)}</td>
+                                         </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -607,19 +626,19 @@
                     if ((item.procentPost || item.ProcentPost) < 10) colorClass = 'bg-warning';
 
                     html += `<tr>
-                                                    <td class="fw-bold">${item.profesor || item.Profesor}</td>
-                                                    <td>${item.programStudiu || item.ProgramStudiu}</td>
-                                                    <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
-                                                    <td class="text-center" style="width: 20%;">
-                                                        <div class="d-flex align-items-center">
-                                                            <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
-                                                            <div class="progress flex-grow-1" style="height: 6px;">
-                                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
+                                                        <td class="fw-bold">${item.profesor || item.Profesor}</td>
+                                                        <td>${item.programStudiu || item.ProgramStudiu}</td>
+                                                        <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
+                                                        <td class="text-center" style="width: 20%;">
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
+                                                                <div class="progress flex-grow-1" style="height: 6px;">
+                                                                    <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
-                                                </tr>`;
+                                                        </td>
+                                                        <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
+                                                    </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -642,19 +661,19 @@
                     grandTotalAnual += item.totalAnualOreConv;
 
                     html += `<tr>
-                                        <td class="fw-bold">${item.profesor}</td>
-                                        <td>${item.departament}</td>
-                                        <td>${item.facultate}</td>
-                                        <td class="text-center">${item.totalOreConv}</td>
-                                        <td class="text-center fw-bold text-primary">${item.totalAnualOreConv}</td>
-                                    </tr>`;
+                                            <td class="fw-bold">${item.profesor}</td>
+                                            <td>${item.departament}</td>
+                                            <td>${item.facultate}</td>
+                                            <td class="text-center">${item.totalOreConv}</td>
+                                            <td class="text-center fw-bold text-primary">${item.totalAnualOreConv}</td>
+                                        </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                    <td colspan="3" class="text-end">TOTAL GENERAL:</td>
-                                    <td class="text-center">${grandTotalOre.toFixed(2)}</td>
-                                    <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
-                                 </tr>`;
+                                        <td colspan="3" class="text-end">TOTAL GENERAL:</td>
+                                        <td class="text-center">${grandTotalOre.toFixed(2)}</td>
+                                        <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
+                                     </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -678,20 +697,20 @@
                     sumTotal += item.total;
 
                     html += `<tr>
-                                            <td>${item.nrCrt}</td>
-                                            <td class="text-start fw-bold">${item.numeProfesor}</td>
-                                            <td>${item.sem1}</td>
-                                            <td>${item.sem2}</td>
-                                            <td class="fw-bold text-success">${item.total}</td>
-                                        </tr>`;
+                                                <td>${item.nrCrt}</td>
+                                                <td class="text-start fw-bold">${item.numeProfesor}</td>
+                                                <td>${item.sem1}</td>
+                                                <td>${item.sem2}</td>
+                                                <td class="fw-bold text-success">${item.total}</td>
+                                            </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                        <td colspan="2" class="text-end">TOTAL:</td>
-                                        <td>${sumSem1.toFixed(2)}</td>
-                                        <td>${sumSem2.toFixed(2)}</td>
-                                        <td class="text-success">${sumTotal.toFixed(2)}</td>
-                                     </tr>`;
+                                            <td colspan="2" class="text-end">TOTAL:</td>
+                                            <td>${sumSem1.toFixed(2)}</td>
+                                            <td>${sumSem2.toFixed(2)}</td>
+                                            <td class="text-success">${sumTotal.toFixed(2)}</td>
+                                         </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -709,11 +728,11 @@
                 let html = '';
                 data.forEach(item => {
                     html += `<tr>
-                                            <td class="fw-bold">${item.profesor}</td>
-                                            <td>${item.departament}</td>
-                                            <td>${item.materie}</td>
-                                            <td><span class="badge bg-secondary">${item.tipActivitate}</span></td>
-                                        </tr>`;
+                                                <td class="fw-bold">${item.profesor}</td>
+                                                <td>${item.departament}</td>
+                                                <td>${item.materie}</td>
+                                                <td><span class="badge bg-secondary">${item.tipActivitate}</span></td>
+                                            </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -731,10 +750,10 @@
                 let html = '';
                 data.forEach(item => {
                     html += `<tr>
-                                            <td class="fw-bold">${item.profesor}</td>
-                                            <td>${item.departament}</td>
-                                            <td>${item.facultate}</td>
-                                        </tr>`;
+                                                <td class="fw-bold">${item.profesor}</td>
+                                                <td>${item.departament}</td>
+                                                <td>${item.facultate}</td>
+                                            </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -752,10 +771,10 @@
                 let html = '';
                 data.forEach(item => {
                     html += `<tr>
-                                            <td class="fw-bold">${item.profesor}</td>
-                                            <td>${item.departament}</td>
-                                            <td>${item.facultate}</td>
-                                        </tr>`;
+                                                <td class="fw-bold">${item.profesor}</td>
+                                                <td>${item.departament}</td>
+                                                <td>${item.facultate}</td>
+                                            </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
