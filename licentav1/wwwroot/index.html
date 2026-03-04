@@ -564,23 +564,23 @@
                     totalAplic += aplic;
                     totalConv += conv;
                     html += `<tr>
-                                            <td>${n.profesor || n.Profesor}</td>
-                                            <td>${n.specializare || n.Specializare}</td>
-                                            <td>${n.materie || n.Materie}</td>
-                                            <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
-                                            <td class="text-center">${n.semestru || n.Semestru}</td>
-                                            <td class="text-center">${curs}</td>
-                                            <td class="text-center">${aplic}</td>
-                                            <td class="text-center fw-bold">${conv}</td>
-                                        </tr>`;
+                                                <td>${n.profesor || n.Profesor}</td>
+                                                <td>${n.specializare || n.Specializare}</td>
+                                                <td>${n.materie || n.Materie}</td>
+                                                <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
+                                                <td class="text-center">${n.semestru || n.Semestru}</td>
+                                                <td class="text-center">${curs}</td>
+                                                <td class="text-center">${aplic}</td>
+                                                <td class="text-center fw-bold">${conv}</td>
+                                            </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                    <td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                                    <td class="text-center">${totalCurs.toFixed(2)}</td>
-                                    <td class="text-center">${totalAplic.toFixed(2)}</td>
-                                    <td class="text-center text-success">${totalConv.toFixed(2)}</td>
-                                 </tr>`;
+                                        <td colspan="5" class="text-end">TOTAL GENERAL:</td>
+                                        <td class="text-center">${totalCurs.toFixed(2)}</td>
+                                        <td class="text-center">${totalAplic.toFixed(2)}</td>
+                                        <td class="text-center text-success">${totalConv.toFixed(2)}</td>
+                                     </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -607,19 +607,19 @@
                     if ((item.procentPost || item.ProcentPost) < 10) colorClass = 'bg-warning';
 
                     html += `<tr>
-                                                <td class="fw-bold">${item.profesor || item.Profesor}</td>
-                                                <td>${item.programStudiu || item.ProgramStudiu}</td>
-                                                <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
-                                                <td class="text-center" style="width: 20%;">
-                                                    <div class="d-flex align-items-center">
-                                                        <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
-                                                        <div class="progress flex-grow-1" style="height: 6px;">
-                                                            <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
+                                                    <td class="fw-bold">${item.profesor || item.Profesor}</td>
+                                                    <td>${item.programStudiu || item.ProgramStudiu}</td>
+                                                    <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
+                                                    <td class="text-center" style="width: 20%;">
+                                                        <div class="d-flex align-items-center">
+                                                            <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
+                                                            <div class="progress flex-grow-1" style="height: 6px;">
+                                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
-                                            </tr>`;
+                                                    </td>
+                                                    <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
+                                                </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -642,19 +642,19 @@
                     grandTotalAnual += item.totalAnualOreConv;
 
                     html += `<tr>
-                                    <td class="fw-bold">${item.profesor}</td>
-                                    <td>${item.departament}</td>
-                                    <td>${item.facultate}</td>
-                                    <td class="text-center">${item.totalOreConv}</td>
-                                    <td class="text-center fw-bold text-primary">${item.totalAnualOreConv}</td>
-                                </tr>`;
+                                        <td class="fw-bold">${item.profesor}</td>
+                                        <td>${item.departament}</td>
+                                        <td>${item.facultate}</td>
+                                        <td class="text-center">${item.totalOreConv}</td>
+                                        <td class="text-center fw-bold text-primary">${item.totalAnualOreConv}</td>
+                                    </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                <td colspan="3" class="text-end">TOTAL GENERAL:</td>
-                                <td class="text-center">${grandTotalOre.toFixed(2)}</td>
-                                <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
-                             </tr>`;
+                                    <td colspan="3" class="text-end">TOTAL GENERAL:</td>
+                                    <td class="text-center">${grandTotalOre.toFixed(2)}</td>
+                                    <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
+                                 </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -678,20 +678,20 @@
                     sumTotal += item.total;
 
                     html += `<tr>
-                                        <td>${item.nrCrt}</td>
-                                        <td class="text-start fw-bold">${item.numeProfesor}</td>
-                                        <td>${item.sem1}</td>
-                                        <td>${item.sem2}</td>
-                                        <td class="fw-bold text-success">${item.total}</td>
-                                    </tr>`;
+                                            <td>${item.nrCrt}</td>
+                                            <td class="text-start fw-bold">${item.numeProfesor}</td>
+                                            <td>${item.sem1}</td>
+                                            <td>${item.sem2}</td>
+                                            <td class="fw-bold text-success">${item.total}</td>
+                                        </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                    <td colspan="2" class="text-end">TOTAL:</td>
-                                    <td>${sumSem1.toFixed(2)}</td>
-                                    <td>${sumSem2.toFixed(2)}</td>
-                                    <td class="text-success">${sumTotal.toFixed(2)}</td>
-                                 </tr>`;
+                                        <td colspan="2" class="text-end">TOTAL:</td>
+                                        <td>${sumSem1.toFixed(2)}</td>
+                                        <td>${sumSem2.toFixed(2)}</td>
+                                        <td class="text-success">${sumTotal.toFixed(2)}</td>
+                                     </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -709,11 +709,11 @@
                 let html = '';
                 data.forEach(item => {
                     html += `<tr>
-                                        <td class="fw-bold">${item.profesor}</td>
-                                        <td>${item.departament}</td>
-                                        <td>${item.materie}</td>
-                                        <td><span class="badge bg-secondary">${item.tipActivitate}</span></td>
-                                    </tr>`;
+                                            <td class="fw-bold">${item.profesor}</td>
+                                            <td>${item.departament}</td>
+                                            <td>${item.materie}</td>
+                                            <td><span class="badge bg-secondary">${item.tipActivitate}</span></td>
+                                        </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -731,10 +731,10 @@
                 let html = '';
                 data.forEach(item => {
                     html += `<tr>
-                                        <td class="fw-bold">${item.profesor}</td>
-                                        <td>${item.departament}</td>
-                                        <td>${item.facultate}</td>
-                                    </tr>`;
+                                            <td class="fw-bold">${item.profesor}</td>
+                                            <td>${item.departament}</td>
+                                            <td>${item.facultate}</td>
+                                        </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -752,10 +752,10 @@
                 let html = '';
                 data.forEach(item => {
                     html += `<tr>
-                                        <td class="fw-bold">${item.profesor}</td>
-                                        <td>${item.departament}</td>
-                                        <td>${item.facultate}</td>
-                                    </tr>`;
+                                            <td class="fw-bold">${item.profesor}</td>
+                                            <td>${item.departament}</td>
+                                            <td>${item.facultate}</td>
+                                        </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
