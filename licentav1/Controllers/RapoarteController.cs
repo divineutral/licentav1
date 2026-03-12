@@ -442,19 +442,23 @@ namespace LicentaV1.Controllers
         private string BuildNormaSql()
         {
             // ---------------------------------------------------------------
-            // CUPLAJ FIX COMPLET:
-            // Pas 1 - Filtrat: toate randurile filtrate cu flag SpecPrimara
-            // Pas 2 - Cuplaje: per (Profesor,Materie,TipPost,Semestru,StatFunctii)
-            //         -> SpecPrimara=MIN, ToateSpec=concatenare, NrSpec=count
-            // Pas 3 - Final: JOIN pe SpecPrimara => UN SINGUR RAND per materie cuplata
-            //         Ore curs = cele de pe SpecPrimara (curs e comun = o singura valoare)
-            //         Ore aplicatii = MAX din cuplaj (aplicatiile pot diferi)
-            //         Ore conv = MAX din cuplaj
-            // NU folosim window functions in interiorul unui GROUP BY (ilegal SQL Server)
+            // ARHITECTURA FINALA - 3 CTE-uri (fara STRING_AGG pentru compatibilitate SQL Server 2014+):
+            //
+            // 1. Filtrat: Filtrare + normalizare TipPost
+            // 2. Agregat: GROUP BY (Profesor, Spec, Materie, TipPost, Sem, StatFunctii)
+            //    => elimina grupe multiple de laborator/seminar per specializare
+            //    SUM(OreCurs), MAX(OreAplicatii), MAX(OreConv)
+            // 3. Cuplaje: GROUP BY (Profesor, Materie, TipPost, Sem, StatFunctii)
+            //    => SpecPrimara=MIN, OreAplicatiiMax, OreConvMax, NrSpec
+            //    JOIN pe SpecPrimara => un singur rand per materie
+            //
+            // Mentiunea cuplajului (lista specializari) se construieste in C# prin
+            // al doilea SELECT cu ToateSpecSql (mai rapid decat subquery corelat)
             // ---------------------------------------------------------------
             return BaseDataSql + @",
             Filtrat AS (
-                SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.DenumireMaterie,
+                SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.NumeSpecOriginal,
+                       bd.DenumireMaterie,
                        CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT'
                             THEN 'Suplinitor' ELSE bd.TipPost END AS TipPost,
                        bd.Semestru, bd.ID_Catedra, bd.ID_StatDeFunctii,
@@ -468,57 +472,57 @@ namespace LicentaV1.Controllers
                   AND (@semestru=0 OR bd.Semestru=@semestru)
                   AND (@tipPost='Toti' OR CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT' THEN 'Suplinitor' ELSE bd.TipPost END=@tipPost)
             ),
-            Cuplaje AS (
-                SELECT f.NumeIntreg, f.DenumireMaterie, f.TipPost, f.Semestru, f.ID_StatDeFunctii,
-                       COUNT(DISTINCT f.SpecializareCurata) AS NrSpec,
-                       MIN(f.SpecializareCurata)             AS SpecPrimara,
-                       MAX(f.OreAplicatiiLinie)              AS OreAplicatiiMax,
-                       MAX(f.OreConvLinie)                   AS OreConvMax,
-                       STUFF((
-                           SELECT ' + ' + f2.SpecializareCurata
-                           FROM Filtrat f2
-                           WHERE f2.NumeIntreg      =f.NumeIntreg
-                             AND f2.DenumireMaterie  =f.DenumireMaterie
-                             AND f2.TipPost          =f.TipPost
-                             AND f2.Semestru         =f.Semestru
-                             AND f2.ID_StatDeFunctii =f.ID_StatDeFunctii
-                           ORDER BY f2.SpecializareCurata
-                           FOR XML PATH(''),TYPE
-                       ).value('.','NVARCHAR(MAX)'),1,3,'') AS ToateSpec
-                FROM Filtrat f
-                GROUP BY f.NumeIntreg, f.DenumireMaterie, f.TipPost, f.Semestru, f.ID_StatDeFunctii
+            Agregat AS (
+                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
+                       MAX(ID_Catedra)   AS ID_Catedra,
+                       ID_StatDeFunctii,
+                       SUM(OreCursLinie)      AS OreCurs,
+                       MAX(OreAplicatiiLinie) AS OreAplicatii,
+                       MAX(OreConvLinie)      AS OreConv
+                FROM Filtrat
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
             ),
-            Final AS (
-                -- UN SINGUR RAND per materie: join pe SpecPrimara (ore curs = ce e pe spec primara)
-                SELECT c.NumeIntreg, c.SpecPrimara AS SpecializareCurata, c.DenumireMaterie,
-                       c.TipPost, c.Semestru,
-                       fp.ID_Catedra,
-                       fp.OreCursLinie        AS TotalOreCurs,
-                       c.OreAplicatiiMax      AS TotalOreAplicatii,
-                       c.OreConvMax           AS TotalOreConv,
-                       CASE WHEN c.NrSpec > 1
-                            THEN 'Cuplaj cu: ' + REPLACE(REPLACE(c.ToateSpec,' + '+c.SpecPrimara,''),c.SpecPrimara+' + ','')
-                            ELSE ''
-                       END AS Mentiuni
-                FROM Cuplaje c
-                INNER JOIN Filtrat fp
-                    ON fp.NumeIntreg      =c.NumeIntreg
-                    AND fp.DenumireMaterie =c.DenumireMaterie
-                    AND fp.TipPost         =c.TipPost
-                    AND fp.Semestru        =c.Semestru
-                    AND fp.ID_StatDeFunctii=c.ID_StatDeFunctii
-                    AND fp.SpecializareCurata=c.SpecPrimara
+            Cuplaje AS (
+                SELECT a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru, a.ID_StatDeFunctii,
+                       COUNT(DISTINCT a.SpecializareCurata) AS NrSpec,
+                       MIN(a.SpecializareCurata)            AS SpecPrimara,
+                       MAX(a.OreAplicatii)                  AS OreAplicatiiMax,
+                       MAX(a.OreConv)                       AS OreConvMax
+                FROM Agregat a
+                GROUP BY a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru, a.ID_StatDeFunctii
             )
-            SELECT f.NumeIntreg AS Profesor, f.SpecializareCurata AS Specializare,
-                   f.DenumireMaterie AS Materie, f.TipPost, f.Semestru, f.ID_Catedra,
-                   f.TotalOreCurs      AS NrOreCurs,
-                   f.TotalOreAplicatii AS NrOreAplicatii,
-                   f.TotalOreConv      AS NrOreConventionale,
-                   f.Mentiuni,
-                   SUM(f.TotalOreConv) OVER(PARTITION BY f.NumeIntreg, f.TipPost) AS TotalTipPost,
-                   SUM(f.TotalOreConv) OVER(PARTITION BY f.NumeIntreg)            AS TotalPost
-            FROM Final f
-            ORDER BY f.NumeIntreg, f.TipPost, f.DenumireMaterie";
+            SELECT c.NumeIntreg AS Profesor, c.SpecPrimara AS Specializare,
+                   c.DenumireMaterie AS Materie, c.TipPost, c.Semestru,
+                   ag.ID_Catedra,
+                   ag.OreCurs          AS NrOreCurs,
+                   c.OreAplicatiiMax   AS NrOreAplicatii,
+                   c.OreConvMax        AS NrOreConventionale,
+                   c.NrSpec,
+                   -- Toate specializarile pentru cuplaje (vor fi procesate in C#)
+                   -- Returnam separat un rand per spec ca sa putem concatena in C#
+                   -- Dar ca sa nu complicam, facem un subquery simplu DOAR cand NrSpec>1
+                   CASE WHEN c.NrSpec > 1 THEN (
+                       SELECT TOP 1 STUFF((
+                           SELECT ', ' + a2.SpecializareCurata
+                           FROM Agregat a2
+                           WHERE a2.NumeIntreg=c.NumeIntreg AND a2.DenumireMaterie=c.DenumireMaterie
+                             AND a2.TipPost=c.TipPost AND a2.Semestru=c.Semestru
+                             AND a2.ID_StatDeFunctii=c.ID_StatDeFunctii
+                             AND a2.SpecializareCurata <> c.SpecPrimara
+                           ORDER BY a2.SpecializareCurata
+                           FOR XML PATH(''),TYPE
+                       ).value('.','NVARCHAR(MAX)'),1,2,'')
+                       FROM Agregat WHERE NumeIntreg=c.NumeIntreg
+                   ) ELSE '' END AS SpecCuplate,
+                   SUM(c.OreConvMax) OVER(PARTITION BY c.NumeIntreg, c.TipPost) AS TotalTipPost,
+                   SUM(c.OreConvMax) OVER(PARTITION BY c.NumeIntreg)            AS TotalPost
+            FROM Cuplaje c
+            INNER JOIN Agregat ag
+                ON ag.NumeIntreg=c.NumeIntreg AND ag.DenumireMaterie=c.DenumireMaterie
+                AND ag.TipPost=c.TipPost AND ag.Semestru=c.Semestru
+                AND ag.ID_StatDeFunctii=c.ID_StatDeFunctii AND ag.SpecializareCurata=c.SpecPrimara
+            ORDER BY c.NumeIntreg, c.TipPost, c.DenumireMaterie
+            OPTION (RECOMPILE)";
         }
 
         [HttpGet("norma-profesori")]
@@ -530,7 +534,7 @@ namespace LicentaV1.Controllers
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
             using var cmd = new SqlCommand(BuildNormaSql(), conn);
-            cmd.CommandTimeout = 180;
+            cmd.CommandTimeout = 300;
             AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -547,7 +551,9 @@ namespace LicentaV1.Controllers
                     NrOreCurs = reader["NrOreCurs"] != DBNull.Value ? Convert.ToDouble(reader["NrOreCurs"]) : 0.0,
                     NrOreAplicatii = reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
                     NrOreConventionale = reader["NrOreConventionale"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConventionale"]) : 0.0,
-                    Mentiuni = reader["Mentiuni"]?.ToString() ?? "",
+                    Mentiuni = reader["SpecCuplate"] != DBNull.Value && !string.IsNullOrEmpty(reader["SpecCuplate"]?.ToString())
+                                         ? "Cuplaj cu: " + reader["SpecCuplate"]?.ToString()
+                                         : "",
                     TotalTipPost = reader["TotalTipPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalTipPost"]) : 0.0,
                     TotalPost = reader["TotalPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalPost"]) : 0.0
                 });
@@ -570,7 +576,7 @@ namespace LicentaV1.Controllers
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
             using var cmd = new SqlCommand(BuildNormaSql(), conn);
-            cmd.CommandTimeout = 180;
+            cmd.CommandTimeout = 300;
             AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -581,7 +587,8 @@ namespace LicentaV1.Controllers
                     reader["NrOreCurs"] != DBNull.Value ? Convert.ToDouble(reader["NrOreCurs"]) : 0.0,
                     reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
                     reader["NrOreConventionale"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConventionale"]) : 0.0,
-                    reader["Mentiuni"]?.ToString() ?? "");
+                    reader["SpecCuplate"] != DBNull.Value && !string.IsNullOrEmpty(reader["SpecCuplate"]?.ToString())
+                        ? "Cuplaj cu: " + reader["SpecCuplate"]?.ToString() : "");
             }
             string fileName = string.IsNullOrEmpty(profesor) || profesor == "Toti"
                 ? "NormaProfesori_General.xlsx"
@@ -621,6 +628,7 @@ namespace LicentaV1.Controllers
             // Dedup: per (Profesor, Materie, TipPost, Semestru, StatFunctii) -> MAX ore
             // Apoi grupam pe SpecializareCurata (spec primara a cuplajului)
             string sql = BaseDataSql + @",
+            -- Pas 1: Filtru + normalizare TipPost
             FiltratRaw AS (
                 SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.DenumireMaterie,
                        CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT'
@@ -634,29 +642,35 @@ namespace LicentaV1.Controllers
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
                   AND (@semestru=0 OR bd.Semestru=@semestru) AND (@tipPost='Toti' OR CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT' THEN 'Suplinitor' ELSE bd.TipPost END=@tipPost)
             ),
-            -- Cuplaje: SpecPrimara per (Profesor, Materie, TipPost, Semestru, StatFunctii)
+            -- Pas 2: Pre-agregare (elimina grupe multiple per materie)
+            Agregat2 AS (
+                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
+                       SUM(OreCursLinie)     AS OreCurs,
+                       MAX(OreAplicatiiLinie) AS OreAplicatii,
+                       MAX(OreConvLinie)      AS OreConv
+                FROM FiltratRaw
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+            ),
+            -- Pas 3: Detectare cuplaje -> SpecPrimara pe datele deja agregate
             CuplajeProg AS (
                 SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
                        MIN(SpecializareCurata) AS SpecPrimara,
-                       MAX(OreAplicatiiLinie)  AS OreAplicatiiMax,
-                       MAX(OreConvLinie)       AS OreConvMax
-                FROM FiltratRaw
+                       MAX(OreAplicatii)  AS OreAplicatiiMax,
+                       MAX(OreConv)       AS OreConvMax
+                FROM Agregat2
                 GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
             ),
-            -- Join cu Filtrat pe SpecPrimara pentru ore curs corecte
+            -- Pas 4: Un rand per materie per spec primara
             Dedup AS (
                 SELECT cp.NumeIntreg, cp.SpecPrimara AS SpecializareCurata,
-                       fr.OreCursLinie AS OreCurs,
+                       ag.OreCurs AS OreCurs,
                        cp.OreAplicatiiMax AS OreAplicatii,
                        cp.OreConvMax AS OreConv
                 FROM CuplajeProg cp
-                INNER JOIN FiltratRaw fr
-                    ON fr.NumeIntreg      =cp.NumeIntreg
-                    AND fr.DenumireMaterie =cp.DenumireMaterie
-                    AND fr.TipPost         =cp.TipPost
-                    AND fr.Semestru        =cp.Semestru
-                    AND fr.ID_StatDeFunctii=cp.ID_StatDeFunctii
-                    AND fr.SpecializareCurata=cp.SpecPrimara
+                INNER JOIN Agregat2 ag
+                    ON ag.NumeIntreg=cp.NumeIntreg AND ag.DenumireMaterie=cp.DenumireMaterie
+                    AND ag.TipPost=cp.TipPost AND ag.Semestru=cp.Semestru
+                    AND ag.ID_StatDeFunctii=cp.ID_StatDeFunctii AND ag.SpecializareCurata=cp.SpecPrimara
             ),
             Filtrat AS (
                 SELECT NumeIntreg AS Profesor, SpecializareCurata AS ProgramStudiu,
@@ -722,22 +736,26 @@ namespace LicentaV1.Controllers
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
                   AND (@semestru=0 OR bd.Semestru=@semestru) AND (@tipPost='Toti' OR CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT' THEN 'Suplinitor' ELSE bd.TipPost END=@tipPost)
             ),
+            Agregat2 AS (
+                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
+                       SUM(OreCursLinie) AS OreCurs, MAX(OreAplicatiiLinie) AS OreAplicatii, MAX(OreConvLinie) AS OreConv
+                FROM FiltratRaw
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+            ),
             CuplajeProg AS (
                 SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
                        MIN(SpecializareCurata) AS SpecPrimara,
-                       MAX(OreAplicatiiLinie)  AS OreAplicatiiMax,
-                       MAX(OreConvLinie)       AS OreConvMax
-                FROM FiltratRaw
-                GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+                       MAX(OreAplicatii) AS OreAplicatiiMax, MAX(OreConv) AS OreConvMax
+                FROM Agregat2 GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
             ),
             Dedup AS (
                 SELECT cp.NumeIntreg, cp.SpecPrimara AS SpecializareCurata,
-                       fr.OreCursLinie AS OreCurs, cp.OreAplicatiiMax AS OreAplicatii, cp.OreConvMax AS OreConv
+                       ag.OreCurs AS OreCurs, cp.OreAplicatiiMax AS OreAplicatii, cp.OreConvMax AS OreConv
                 FROM CuplajeProg cp
-                INNER JOIN FiltratRaw fr
-                    ON fr.NumeIntreg=cp.NumeIntreg AND fr.DenumireMaterie=cp.DenumireMaterie
-                    AND fr.TipPost=cp.TipPost AND fr.Semestru=cp.Semestru
-                    AND fr.ID_StatDeFunctii=cp.ID_StatDeFunctii AND fr.SpecializareCurata=cp.SpecPrimara
+                INNER JOIN Agregat2 ag
+                    ON ag.NumeIntreg=cp.NumeIntreg AND ag.DenumireMaterie=cp.DenumireMaterie
+                    AND ag.TipPost=cp.TipPost AND ag.Semestru=cp.Semestru
+                    AND ag.ID_StatDeFunctii=cp.ID_StatDeFunctii AND ag.SpecializareCurata=cp.SpecPrimara
             ),
             Filtrat AS (
                 SELECT NumeIntreg, SpecializareCurata AS ProgramStudiu,
@@ -794,11 +812,15 @@ namespace LicentaV1.Controllers
 
         private string BuildNormaTotaluriSql()
         {
-            // FIX R3:
-            // 1. Dedup pe (NumeComplet, ID_Profesor, TipPost, FormaInv, DenumireMaterie, Semestru, ID_StatDeFunctii)
-            //    => MAX(OreConv) per materie cuplata. ID_Catedra si Facultate vin separat dupa dedup.
-            // 2. SupTit -> Suplinitor in DateBrute inainte de Dedup
-            // 3. Agreg fara ROW_NUMBER (nu mai e nevoie, fiecare profesor-tippost e unic)
+            // FIX R3 FINAL:
+            // 1. DateBrute: toate randurile, TipPost normalizat
+            //    ORICE != 'Titular' si != 'Titulara' => 'Suplinitor'
+            //    (Sup, SupTit, Suplinitor, Nespecificat, gol => toate 'Suplinitor')
+            // 2. Dedup: GROUP BY (Profesor, TipPost, FormaInv, Materie, Sem, StatFunctii)
+            //    => MAX(OreConv) per materie per grup (elimina grupe multiple)
+            //    ID_Catedra si Facultate prin MAX() dupa dedup
+            // 3. Agreg: GROUP BY (Profesor, TipPost) => OreIF/OreID/OreIFR/Total
+            //    => MAX 2 RANDURI per profesor (Titular + Suplinitor)
             return @"
             WITH DateBrute AS (
                 SELECT
@@ -810,10 +832,10 @@ namespace LicentaV1.Controllers
                     ISNULL(vcm.DenumireMaterie,'Nedefinit')                              AS DenumireMaterie,
                     ISNULL(vcm.NrSemestruDinAn,0)                                       AS Semestru,
                     vcm.ID_StatDeFunctii,
-                    CASE WHEN UPPER(ISNULL(sf.DenTitularSauSuplinitor,'Nespecificat')) LIKE '%SUPT%'
-                              OR UPPER(ISNULL(sf.DenTitularSauSuplinitor,''))='SUPTIT'
-                         THEN 'Suplinitor'
-                         ELSE ISNULL(sf.DenTitularSauSuplinitor,'Nespecificat')
+                    -- REGULA: Titular = 'Titular'/'Titulara', TOT RESTUL = 'Suplinitor'
+                    CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TITULAR','TITULARA')
+                         THEN 'Titular'
+                         ELSE 'Suplinitor'
                     END AS TipPost,
                     CASE
                         WHEN vcm.DenumireSpecializare LIKE '%-IFR%' OR vcm.DenumireSpecializare LIKE '% IFR%' THEN 'IFR'
@@ -830,8 +852,7 @@ namespace LicentaV1.Controllers
                   AND (@fac='Toti' OR LTRIM(RTRIM(vcm.DenumireFacultate)) COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR vcm.NumeIntregProfesor=@prof)
             ),
-            -- Dedup cuplaje: per materie+post+semestru+statFunctii -> MAX(OreConv)
-            -- NU includem ID_Catedra/Facultate in GROUP BY ca sa nu spargem deduplicarea
+            -- Pre-agregare: elimina grupe multiple per materie, MAX(OreConv) per combinatie
             Dedup AS (
                 SELECT NumeComplet, ID_Profesor, TipPost, FormaInv,
                        DenumireMaterie, Semestru, ID_StatDeFunctii,
@@ -842,6 +863,7 @@ namespace LicentaV1.Controllers
                 GROUP BY NumeComplet, ID_Profesor, TipPost, FormaInv,
                          DenumireMaterie, Semestru, ID_StatDeFunctii
             ),
+            -- Agregare finala: un rand per (Profesor, TipPost) - max 2 randuri per persoana
             Agreg AS (
                 SELECT NumeComplet, ID_Profesor,
                        MAX(ID_Catedra) AS ID_Catedra,
@@ -1007,11 +1029,20 @@ namespace LicentaV1.Controllers
                         'Administrarea afacerilor','Managementul resurselor umane',
                         'Dezvoltarea afacerilor turistice','Medicina traditionala chineza'))
             ),
-            -- Deduplicare: per materie+post+semestru luam MAX(OreConv) - evitam cuplajele
+            -- Pas 1: Pre-agregare per (Profesor, Spec, Materie, TipPost, Sem, StatFunctii)
+            -- Elimina grupe multiple de laborator/seminar
+            PreAgreg AS (
+                SELECT NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii,
+                       MAX(OreConv) AS OreConvSpec
+                FROM DateLimbi
+                GROUP BY NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii
+            ),
+            -- Pas 2: Deduplicare cuplaje: per (Profesor, Materie, Sem, StatFunctii) -> MAX
+            -- Acum un singur rand per materie per profesor (cuplajele comprimate)
             Dedup AS (
                 SELECT NumeComplet, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii,
-                       MAX(OreConv) AS OreConvDedup
-                FROM DateLimbi
+                       MAX(OreConvSpec) AS OreConvDedup
+                FROM PreAgreg
                 GROUP BY NumeComplet, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii
             )
             SELECT NumeComplet,
@@ -1247,15 +1278,17 @@ namespace LicentaV1.Controllers
 
         private const string TitulariSql = @"
             WITH TitulariBase AS (
+                -- Luam cel mai recent rand per profesor (Ordine DESC = intrarea curenta)
+                -- Filtrul TitularAnUniv=1 si ID_AnUnivCatedra=45 garanteaza titularii reali
                 SELECT v.ID_Profesor, v.NumeIntreg, v.DenumireCatedra, v.DenumireFacultate,
-                       v.Ordine,
                        ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor ORDER BY v.Ordine DESC) AS Rn
                 FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] v
                 WHERE v.TitularAnUniv=1 AND v.ID_AnUnivCatedra=45
-                  AND (@fac='Toti' OR v.DenumireFacultate COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
             )
             SELECT ID_Profesor, NumeIntreg AS NumeComplet, DenumireCatedra, DenumireFacultate AS Facultate
-            FROM TitulariBase WHERE Rn=1
+            FROM TitulariBase
+            WHERE Rn=1
+              AND (@fac='Toti' OR DenumireFacultate COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
             ORDER BY NumeIntreg";
 
         [HttpGet("titulari")]
@@ -1319,7 +1352,7 @@ namespace LicentaV1.Controllers
 
         private const string ColaboratoriSql = @"
             WITH ColabBase AS (
-                -- Profesori care predau in an 45 dar NU sunt titulari
+                -- Profesori care predau in an 45 dar NU sunt titulari (TitularAnUniv=1, an=45)
                 SELECT DISTINCT vcm.ID_Profesor
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
                 WHERE vcm.ID_AnUniv=45
@@ -1329,13 +1362,13 @@ namespace LicentaV1.Controllers
                   )
             ),
             NomenclatorColab AS (
-                -- Luam departamentul si facultatea din nomenclator (cea mai recenta intrare)
+                -- Cel mai recent rand din nomenclator per colaborator (Ordine DESC)
+                -- Filtrul @fac DUPA ROW_NUMBER ca sa nu pierdem oameni din alte intrari istorice
                 SELECT v.ID_Profesor, v.NumeIntreg, v.DenumireCatedra, v.DenumireFacultate,
                        ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor ORDER BY v.Ordine DESC) AS Rn
                 FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] v
                 INNER JOIN ColabBase cb ON cb.ID_Profesor=v.ID_Profesor
                 WHERE v.ID_AnUnivCatedra=45
-                  AND (@fac='Toti' OR v.DenumireFacultate COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
             ),
             -- Colaboratori care nu apar deloc in nomenclator (fara entry in View_Profesori)
             FaraEntry AS (
@@ -1347,16 +1380,27 @@ namespace LicentaV1.Controllers
                 INNER JOIN ColabBase cb ON cb.ID_Profesor=vcm.ID_Profesor
                 WHERE vcm.ID_AnUniv=45
                   AND NOT EXISTS (SELECT 1 FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vx WHERE vx.ID_Profesor=vcm.ID_Profesor)
-                  AND (@fac='Toti' OR vcm.DenumireFacultate COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
+            ),
+            RezultatBrut AS (
+                SELECT nc.ID_Profesor, nc.NumeIntreg AS NumeComplet,
+                       nc.DenumireCatedra, nc.DenumireFacultate AS Facultate
+                FROM NomenclatorColab nc WHERE nc.Rn=1
+                UNION ALL
+                SELECT fe.ID_Profesor, fe.NumeIntreg AS NumeComplet,
+                       CAST(fe.StatDeFunctiiID_Catedra AS VARCHAR(50)) AS DenumireCatedra,
+                       fe.DenumireFacultate AS Facultate
+                FROM FaraEntry fe WHERE fe.Rn=1
+            ),
+            -- Deduplicare finala: un rand per ID_Profesor (VASVARI MARIA-BIANCA fix)
+            Final AS (
+                SELECT ID_Profesor, NumeComplet, DenumireCatedra, Facultate,
+                       ROW_NUMBER() OVER(PARTITION BY ID_Profesor ORDER BY NumeComplet) AS Rn2
+                FROM RezultatBrut
             )
-            SELECT nc.ID_Profesor, nc.NumeIntreg AS NumeComplet,
-                   nc.DenumireCatedra, nc.DenumireFacultate AS Facultate
-            FROM NomenclatorColab nc WHERE nc.Rn=1
-            UNION ALL
-            SELECT fe.ID_Profesor, fe.NumeIntreg AS NumeComplet,
-                   CAST(fe.StatDeFunctiiID_Catedra AS VARCHAR(50)) AS DenumireCatedra,
-                   fe.DenumireFacultate AS Facultate
-            FROM FaraEntry fe WHERE fe.Rn=1
+            SELECT ID_Profesor, NumeComplet, DenumireCatedra, Facultate
+            FROM Final
+            WHERE Rn2=1
+              AND (@fac='Toti' OR Facultate COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
             ORDER BY NumeComplet";
 
         [HttpGet("colaboratori")]
@@ -1430,22 +1474,48 @@ namespace LicentaV1.Controllers
         [HttpGet("date-ans")]
         public IActionResult GetDateANS([FromQuery] int idAnUniv = 45)
         {
+            // FIX ANS: porneste din TitulariAns (sursa de adevar) spre ore prin LEFT JOIN
+            // - Titulari fara ore (concediu etc.) apar in lista cu fractiuni goale
+            // - Colaboratorii NU apar (nu sunt in TitulariAns)
+            // - Rânduri fantoma (--CERCETATOR--) filtrate prin LTRIM/RTRIM/NOT LIKE '--%'
             var dateBrute = new List<RandSqlANS>();
+            var totiTitularii = new List<(int Id, string Nume, string Facultate, string Dept, string Grad)>();
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-            string query = $@"
-                WITH TitulariAns AS (
-                    -- Sursa de adevar: titularii reali din nomenclator
-                    SELECT v.ID_Profesor, v.NumeIntreg AS NumeComplet,
-                           v.DenumireCatedra, v.DenumireFacultate AS Facultate,
-                           v.DenumireGradDidactic AS GradDidactic,
+
+            // Pas 1: lista curata a titularilor (un rand per profesor)
+            string queryTitulari = @"
+                WITH T AS (
+                    SELECT v.ID_Profesor, v.NumeIntreg, v.DenumireCatedra,
+                           v.DenumireFacultate, v.DenumireGradDidactic,
                            ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor ORDER BY v.Ordine DESC) AS Rn
                     FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] v
                     WHERE v.TitularAnUniv=1 AND v.ID_AnUnivCatedra=@ID_AnUniv
                 )
-                SELECT vcm.NumeIntregProfesor AS NumeComplet, vcm.ID_Profesor,
-                       ta.GradDidactic,
-                       ta.DenumireCatedra, ta.Facultate,
+                SELECT ID_Profesor, NumeIntreg, DenumireCatedra, DenumireFacultate, DenumireGradDidactic
+                FROM T
+                WHERE Rn=1
+                  AND LTRIM(RTRIM(ISNULL(NumeIntreg,''))) != ''
+                  AND NumeIntreg NOT LIKE '--%'
+                ORDER BY NumeIntreg";
+            using (var cmd1 = new SqlCommand(queryTitulari, conn))
+            {
+                cmd1.CommandTimeout = 60;
+                cmd1.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
+                using var r1 = cmd1.ExecuteReader();
+                while (r1.Read())
+                    totiTitularii.Add((
+                        Convert.ToInt32(r1["ID_Profesor"]),
+                        FixNume(r1["NumeIntreg"]?.ToString(), r1["ID_Profesor"]),
+                        r1["DenumireFacultate"]?.ToString() ?? "",
+                        r1["DenumireCatedra"]?.ToString() ?? "",
+                        r1["DenumireGradDidactic"]?.ToString() ?? ""
+                    ));
+            }
+
+            // Pas 2: orele per domeniu ANS (numai pentru titulari)
+            string queryOre = @"
+                SELECT vcm.ID_Profesor,
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
                        sf.id_metaspecializare AS IdMetaspec
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
@@ -1453,37 +1523,40 @@ namespace LicentaV1.Controllers
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                INNER JOIN TitulariAns ta ON ta.ID_Profesor=vcm.ID_Profesor AND ta.Rn=1
                 WHERE vcm.ID_AnUniv=@ID_AnUniv";
-
-            using var cmd = new SqlCommand(query, conn);
-            cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            var orePerProf = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
+            using (var cmd2 = new SqlCommand(queryOre, conn))
             {
-                int idMeta = reader["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(reader["IdMetaspec"]) : 0;
-                if (!MappingMetaspec.TryGetValue(idMeta, out int idAns)) continue;
-                if (!AnsIdToCol.ContainsKey(idAns)) continue;
-                dateBrute.Add(new RandSqlANS
+                cmd2.CommandTimeout = 120;
+                cmd2.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
+                using var r2 = cmd2.ExecuteReader();
+                while (r2.Read())
                 {
-                    NumeComplet = FixNume(reader["NumeComplet"]?.ToString(), reader["ID_Profesor"]),
-                    Facultate = reader["Facultate"]?.ToString() ?? "",
-                    Departament = reader["DenumireCatedra"]?.ToString() ?? "",
-                    GradDidactic = reader["GradDidactic"]?.ToString() ?? "",
-                    OreConventionale = Convert.ToDecimal(reader["OreConventionale"]),
-                    IdANS = idAns,
-                });
+                    int idProf = Convert.ToInt32(r2["ID_Profesor"]);
+                    int idMeta = r2["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(r2["IdMetaspec"]) : 0;
+                    decimal ore = Convert.ToDecimal(r2["OreConventionale"]);
+                    if (!orePerProf.ContainsKey(idProf)) orePerProf[idProf] = new List<(int, decimal)>();
+                    orePerProf[idProf].Add((idMeta, ore));
+                }
             }
 
-            var profesori = dateBrute
-                .GroupBy(x => x.NumeComplet)
-                .Select(g =>
+            // Pas 3: combina titularii cu orele lor
+            var profesori = new List<object>();
+            int nrCrt = 1;
+            foreach (var (id, nume, fac, dept, grad) in totiTitularii.OrderBy(t => t.Nume))
+            {
+                var fractiuni = new Dictionary<string, decimal>();
+                if (orePerProf.TryGetValue(id, out var listaOre))
                 {
-                    var first = g.First();
-                    var orePerAns = g.GroupBy(x => x.IdANS).ToDictionary(ag => ag.Key, ag => ag.Sum(x => x.OreConventionale));
+                    var orePerAns = new Dictionary<int, decimal>();
+                    foreach (var (idMeta, ore) in listaOre)
+                    {
+                        if (!MappingMetaspec.TryGetValue(idMeta, out int idAns)) continue;
+                        if (!AnsIdToCol.ContainsKey(idAns)) continue;
+                        if (!orePerAns.ContainsKey(idAns)) orePerAns[idAns] = 0m;
+                        orePerAns[idAns] += ore;
+                    }
                     decimal totalOre = orePerAns.Values.Sum();
-                    var fractiuni = new Dictionary<string, decimal>();
                     if (totalOre > 0)
                     {
                         int maxKey = orePerAns.OrderByDescending(x => x.Value).First().Key;
@@ -1497,36 +1570,60 @@ namespace LicentaV1.Controllers
                         }
                         fractiuni[DomeniiExcel[AnsIdToCol[maxKey] - 10]] = Math.Round(1m - sum, 2);
                     }
-                    return new
-                    {
-                        NumeComplet = g.Key,
-                        Facultate = first.Facultate,
-                        Departament = first.Departament,
-                        GradFunctie = MapareGradANS(first.GradDidactic),
-                        DomeniiMapate = fractiuni
-                    };
-                }).OrderBy(p => p.NumeComplet).ToList();
-
+                }
+                profesori.Add(new
+                {
+                    NrCrt = nrCrt++,
+                    NumeComplet = nume,
+                    Facultate = fac,
+                    Departament = dept,
+                    GradFunctie = MapareGradANS(grad),
+                    DomeniiMapate = fractiuni
+                });
+            }
             return Ok(profesori);
         }
 
         [HttpGet("export/raport-ans")]
         public IActionResult ExportRaportANS([FromQuery] int idAnUniv = 45)
         {
-            var dateBrute = new List<RandSqlANS>();
+            // Acelasi pattern ca GetDateANS: 2 query-uri separate
+            // 1. Lista curata titulari (sursa de adevar)
+            // 2. Orele per domeniu ANS (LEFT JOIN implicit prin Dictionary)
+            var totiTitulariiExp = new List<(int Id, string Nume, string Facultate, string Dept, string Grad)>();
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-            string query = $@"
-                WITH TitulariAns AS (
-                    SELECT v.ID_Profesor, v.NumeIntreg AS NumeComplet,
-                           v.DenumireCatedra, v.DenumireFacultate AS Facultate,
-                           v.DenumireGradDidactic AS GradDidactic,
+
+            string queryTit = @"
+                WITH T AS (
+                    SELECT v.ID_Profesor, v.NumeIntreg, v.DenumireCatedra,
+                           v.DenumireFacultate, v.DenumireGradDidactic,
                            ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor ORDER BY v.Ordine DESC) AS Rn
                     FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] v
                     WHERE v.TitularAnUniv=1 AND v.ID_AnUnivCatedra=@ID_AnUniv
                 )
-                SELECT vcm.NumeIntregProfesor AS NumeComplet, vcm.ID_Profesor,
-                       ta.GradDidactic, ta.DenumireCatedra, ta.Facultate,
+                SELECT ID_Profesor, NumeIntreg, DenumireCatedra, DenumireFacultate, DenumireGradDidactic
+                FROM T WHERE Rn=1
+                  AND LTRIM(RTRIM(ISNULL(NumeIntreg,''))) != ''
+                  AND NumeIntreg NOT LIKE '--%'
+                ORDER BY NumeIntreg";
+            using (var cmd1 = new SqlCommand(queryTit, conn))
+            {
+                cmd1.CommandTimeout = 60;
+                cmd1.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
+                using var r1 = cmd1.ExecuteReader();
+                while (r1.Read())
+                    totiTitulariiExp.Add((
+                        Convert.ToInt32(r1["ID_Profesor"]),
+                        FixNume(r1["NumeIntreg"]?.ToString(), r1["ID_Profesor"]),
+                        r1["DenumireFacultate"]?.ToString() ?? "",
+                        r1["DenumireCatedra"]?.ToString() ?? "",
+                        r1["DenumireGradDidactic"]?.ToString() ?? ""
+                    ));
+            }
+
+            string queryOreExp = @"
+                SELECT vcm.ID_Profesor,
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
                        sf.id_metaspecializare AS IdMetaspec
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
@@ -1534,60 +1631,58 @@ namespace LicentaV1.Controllers
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                INNER JOIN TitulariAns ta ON ta.ID_Profesor=vcm.ID_Profesor AND ta.Rn=1
                 WHERE vcm.ID_AnUniv=@ID_AnUniv";
-
-            using var cmd = new SqlCommand(query, conn);
-            cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            var orePerProfExp = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
+            using (var cmd2 = new SqlCommand(queryOreExp, conn))
             {
-                int idMeta = reader["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(reader["IdMetaspec"]) : 0;
-                if (!MappingMetaspec.TryGetValue(idMeta, out int idAns)) continue;
-                if (!AnsIdToCol.ContainsKey(idAns)) continue;
-                dateBrute.Add(new RandSqlANS
+                cmd2.CommandTimeout = 120;
+                cmd2.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
+                using var r2 = cmd2.ExecuteReader();
+                while (r2.Read())
                 {
-                    NumeComplet = FixNume(reader["NumeComplet"]?.ToString(), reader["ID_Profesor"]),
-                    Departament = reader["DenumireCatedra"]?.ToString() ?? "",
-                    Facultate = reader["Facultate"]?.ToString() ?? "",
-                    GradDidactic = reader["GradDidactic"]?.ToString() ?? "",
-                    OreConventionale = Convert.ToDecimal(reader["OreConventionale"]),
-                    IdANS = idAns,
-                });
+                    int idProf = Convert.ToInt32(r2["ID_Profesor"]);
+                    int idMeta = r2["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(r2["IdMetaspec"]) : 0;
+                    decimal ore = Convert.ToDecimal(r2["OreConventionale"]);
+                    if (!orePerProfExp.ContainsKey(idProf)) orePerProfExp[idProf] = new List<(int, decimal)>();
+                    orePerProfExp[idProf].Add((idMeta, ore));
+                }
             }
 
             var profesori = new List<ProfANS>();
-            foreach (var grp in dateBrute.GroupBy(x => x.NumeComplet))
+            foreach (var (id, nume, fac, dept, grad) in totiTitulariiExp.OrderBy(t => t.Nume))
             {
-                var first = grp.First();
-                var orePerCol = new Dictionary<int, decimal>();
-                foreach (var rand in grp)
-                {
-                    int col = AnsIdToCol[rand.IdANS];
-                    if (!orePerCol.ContainsKey(col)) orePerCol[col] = 0m;
-                    orePerCol[col] += rand.OreConventionale;
-                }
-                decimal totalOre = orePerCol.Values.Sum();
                 var fractiuni = new Dictionary<int, decimal>();
-                if (totalOre > 0)
+                if (orePerProfExp.TryGetValue(id, out var listaOreE))
                 {
-                    int maxKey = orePerCol.OrderByDescending(x => x.Value).First().Key;
-                    decimal sum = 0;
-                    foreach (var kv in orePerCol)
+                    var orePerCol = new Dictionary<int, decimal>();
+                    foreach (var (idMeta, ore) in listaOreE)
                     {
-                        if (kv.Key == maxKey) continue;
-                        decimal frac = Math.Round(kv.Value / totalOre, 2);
-                        fractiuni[kv.Key] = frac; sum += frac;
+                        if (!MappingMetaspec.TryGetValue(idMeta, out int idAns)) continue;
+                        if (!AnsIdToCol.ContainsKey(idAns)) continue;
+                        int col = AnsIdToCol[idAns];
+                        if (!orePerCol.ContainsKey(col)) orePerCol[col] = 0m;
+                        orePerCol[col] += ore;
                     }
-                    fractiuni[maxKey] = Math.Round(1m - sum, 2);
+                    decimal totalOre = orePerCol.Values.Sum();
+                    if (totalOre > 0)
+                    {
+                        int maxKey = orePerCol.OrderByDescending(x => x.Value).First().Key;
+                        decimal sum = 0;
+                        foreach (var kv in orePerCol)
+                        {
+                            if (kv.Key == maxKey) continue;
+                            decimal frac = Math.Round(kv.Value / totalOre, 2);
+                            fractiuni[kv.Key] = frac; sum += frac;
+                        }
+                        fractiuni[maxKey] = Math.Round(1m - sum, 2);
+                    }
                 }
                 profesori.Add(new ProfANS
                 {
-                    NumeComplet = grp.Key,
-                    Departament = first.Departament,
-                    Facultate = first.Facultate,
-                    GradFunctie = MapareGradANS(first.GradDidactic),
+                    NumeComplet = nume,
+                    Departament = dept,
+                    Facultate = fac,
+                    GradFunctie = MapareGradANS(grad),
                     Fractiuni = fractiuni
                 });
             }

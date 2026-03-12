@@ -1,5 +1,4 @@
-﻿﻿
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ro">
 <head>
     <meta charset="UTF-8">
@@ -450,39 +449,61 @@
             fetch('/api/Rapoarte/liste/facultati').then(res => res.json()).then(data => {
                 const s = document.getElementById('facultateSelect');
                 data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
+                // Dupa incarcarea facultatilor, incarca departamentele pentru prima facultate selectata
+                $('#facultateSelect').trigger('change');
             });
 
-            // Initializeaza departamente gol pana la alegerea facultatii
-            $('#departamentSelect').append(new Option("Toate", "Toti"));
+            $('#anUnivSelect').on('change', function () {
+                $('#facultateSelect').trigger('change');
+                invalidateCache();
+            });
 
-            $('#anUnivSelect').on('change', function () { $('#facultateSelect').trigger('change'); invalidateCache(); });
             $('#departamentSelect').on('change', function () { invalidateCache(); });
             $('#formaInvSelect').on('change', function () { invalidateCache(); });
 
+            // =====================================================================
+            // CASCADA FACULTATE -> DEPARTAMENT + SPECIALIZARE
+            // La schimbarea facultatii:
+            //   1. Reincarca departamentele filtrate dupa facultatea selectata
+            //   2. Reincarca specializarile filtrate dupa facultatea selectata
+            //   3. Reincarca profesorii
+            // =====================================================================
             $('#facultateSelect').on('change', function () {
                 invalidateCache();
                 const anUniv = $('#anUnivSelect').val() || 'Toti';
                 const fac = $(this).val() || 'Toti';
 
-                // Actualizare Specializari in cascada
+                // --- Actualizare Departamente in cascada ---
+                // Golim si punem "Se incarca..." cat timp asteptam raspunsul
+                const $dept = $('#departamentSelect');
+                $dept.empty().append(new Option('Se încarcă...', ''));
+
+                fetch(`/api/Rapoarte/liste/departamente?anUniv=${encodeURIComponent(anUniv)}&numeFacultate=${encodeURIComponent(fac)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        $dept.empty();
+                        // Serverul returneaza "Toti" ca primul element - il mapam la "Toate" vizual
+                        data.forEach(u => {
+                            const text = (u === 'Toti' || u === '') ? 'Toate' : u;
+                            const val = (u === 'Toti' || u === '') ? 'Toti' : u;
+                            $dept.append(new Option(text, val));
+                        });
+                        // Selectam automat "Toate" dupa reincarcarea listei
+                        $dept.val('Toti');
+                        invalidateCache();
+                    })
+                    .catch(() => {
+                        $dept.empty().append(new Option('Toate', 'Toti'));
+                    });
+
+                // --- Actualizare Specializari in cascada ---
                 $('#specializareSelect').empty();
-                fetch(`/api/Rapoarte/liste/specializari-per-facultate?anUniv=${anUniv}&numeFacultate=${fac}`)
-                    .then(res => res.json()).then(data => {
+                fetch(`/api/Rapoarte/liste/specializari-per-facultate?anUniv=${encodeURIComponent(anUniv)}&numeFacultate=${encodeURIComponent(fac)}`)
+                    .then(res => res.json())
+                    .then(data => {
                         const $s = $('#specializareSelect');
                         data.forEach(u => $s.append(new Option(u, u)));
                         $s.trigger('change');
-                    });
-
-                // Actualizare Departamente in cascada
-                $('#departamentSelect').empty();
-                fetch(`/api/Rapoarte/liste/departamente?anUniv=${anUniv}&numeFacultate=${fac}`)
-                    .then(res => res.json()).then(data => {
-                        const $d = $('#departamentSelect');
-                        data.forEach(u => {
-                            let text = u === "" ? "Toate" : u;
-                            let val = u === "" ? "Toti" : u;
-                            $d.append(new Option(text, val));
-                        });
                     });
             });
 
@@ -565,23 +586,23 @@
                     totalAplic += aplic;
                     totalConv += conv;
                     html += `<tr>
-                                                <td>${n.profesor || n.Profesor}</td>
-                                                <td>${n.specializare || n.Specializare}</td>
-                                                <td>${n.materie || n.Materie}</td>
-                                                <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
-                                                <td class="text-center">${n.semestru || n.Semestru}</td>
-                                                <td class="text-center">${curs}</td>
-                                                <td class="text-center">${aplic}</td>
-                                                <td class="text-center fw-bold">${conv}</td>
-                                            </tr>`;
+                            <td>${n.profesor || n.Profesor || ''}</td>
+                            <td>${n.specializare || n.Specializare || ''}</td>
+                            <td>${n.materie || n.Materie || ''}</td>
+                            <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
+                            <td class="text-center">${n.semestru || n.Semestru || ''}</td>
+                            <td class="text-center">${curs}</td>
+                            <td class="text-center">${aplic}</td>
+                            <td class="text-center fw-bold">${conv}</td>
+                        </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                        <td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                                        <td class="text-center">${totalCurs.toFixed(2)}</td>
-                                        <td class="text-center">${totalAplic.toFixed(2)}</td>
-                                        <td class="text-center text-success">${totalConv.toFixed(2)}</td>
-                                     </tr>`;
+                        <td colspan="5" class="text-end">TOTAL GENERAL:</td>
+                        <td class="text-center">${totalCurs.toFixed(2)}</td>
+                        <td class="text-center">${totalAplic.toFixed(2)}</td>
+                        <td class="text-center text-success">${totalConv.toFixed(2)}</td>
+                    </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -603,28 +624,36 @@
                 if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nu există date.</td></tr>'; return; }
                 let html = '';
                 data.forEach(item => {
+                    // Campurile returnate de API: Profesor, ProgramStudiu, OreConvProgram, ProcentPost, TotalPost
+                    const profesor = item.profesor || item.Profesor || '';
+                    const program = item.programStudiu || item.ProgramStudiu || '';
+                    const oreConv = item.oreConvProgram || item.OreConvProgram || 0;
+                    const procent = item.procentPost || item.ProcentPost || 0;
+                    const totalPost = item.totalPost || item.TotalPost || 0;
+
                     let colorClass = 'bg-info';
-                    if ((item.procentPost || item.ProcentPost) > 50) colorClass = 'bg-success';
-                    if ((item.procentPost || item.ProcentPost) < 10) colorClass = 'bg-warning';
+                    if (procent > 50) colorClass = 'bg-success';
+                    if (procent < 10) colorClass = 'bg-warning';
 
                     html += `<tr>
-                                                    <td class="fw-bold">${item.profesor || item.Profesor}</td>
-                                                    <td>${item.programStudiu || item.ProgramStudiu}</td>
-                                                    <td class="text-center">${item.nrOreConv || item.NrOreConv}</td>
-                                                    <td class="text-center" style="width: 20%;">
-                                                        <div class="d-flex align-items-center">
-                                                            <span class="me-2 small">${item.procentPost || item.ProcentPost}%</span>
-                                                            <div class="progress flex-grow-1" style="height: 6px;">
-                                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${item.procentPost || item.ProcentPost}%"></div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-center fw-bold" style="color: #56723e;">${item.totalPost || item.TotalPost}</td>
-                                                </tr>`;
+                            <td class="fw-bold">${profesor}</td>
+                            <td>${program}</td>
+                            <td class="text-center">${oreConv}</td>
+                            <td class="text-center" style="width: 20%;">
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2 small">${procent}%</span>
+                                    <div class="progress flex-grow-1" style="height: 6px;">
+                                        <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${procent}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center fw-bold" style="color: #56723e;">${totalPost}</td>
+                        </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
         }
+
         async function loadTotalNormeData() {
             const tbody = document.getElementById('totalNormeTableBody');
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
@@ -639,23 +668,30 @@
                 let grandTotalAnual = 0;
 
                 data.forEach(item => {
-                    grandTotalOre += item.totalOreConv;
-                    grandTotalAnual += item.totalAnualOreConv;
+                    // Campurile returnate de API: NumeComplet, TipPost, Facultate, OreIF, OreID, OreIFR, TotalOreConv, TotalAnual
+                    const profesor = item.numeComplet || item.NumeComplet || item.profesor || '';
+                    const dept = item.departament || item.Departament || '';
+                    const facultate = item.facultate || item.Facultate || '';
+                    const totalOre = parseFloat(item.totalOreConv || item.TotalOreConv || 0);
+                    const totalAnual = parseFloat(item.totalAnual || item.TotalAnual || 0);
+
+                    grandTotalOre += totalOre;
+                    grandTotalAnual += totalAnual;
 
                     html += `<tr>
-                                        <td class="fw-bold">${item.profesor}</td>
-                                        <td>${item.departament}</td>
-                                        <td>${item.facultate}</td>
-                                        <td class="text-center">${item.totalOreConv}</td>
-                                        <td class="text-center fw-bold text-primary">${item.totalAnualOreConv}</td>
-                                    </tr>`;
+                            <td class="fw-bold">${profesor}</td>
+                            <td>${dept}</td>
+                            <td>${facultate}</td>
+                            <td class="text-center">${totalOre.toFixed(2)}</td>
+                            <td class="text-center fw-bold text-primary">${totalAnual.toFixed(2)}</td>
+                        </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                    <td colspan="3" class="text-end">TOTAL GENERAL:</td>
-                                    <td class="text-center">${grandTotalOre.toFixed(2)}</td>
-                                    <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
-                                 </tr>`;
+                        <td colspan="3" class="text-end">TOTAL GENERAL:</td>
+                        <td class="text-center">${grandTotalOre.toFixed(2)}</td>
+                        <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
+                    </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -674,25 +710,33 @@
                 let sumSem1 = 0, sumSem2 = 0, sumTotal = 0;
 
                 data.forEach(item => {
-                    sumSem1 += item.sem1;
-                    sumSem2 += item.sem2;
-                    sumTotal += item.total;
+                    // FIX: campul se numeste "profesor" nu "numeProfesor"
+                    // API returneaza: NrCrt, Profesor, TotalSem1, TotalSem2, Total
+                    const nrCrt = item.nrCrt || item.NrCrt || '';
+                    const profesor = item.profesor || item.Profesor || '';
+                    const sem1 = parseFloat(item.totalSem1 || item.TotalSem1 || 0);
+                    const sem2 = parseFloat(item.totalSem2 || item.TotalSem2 || 0);
+                    const total = parseFloat(item.total || item.Total || 0);
+
+                    sumSem1 += sem1;
+                    sumSem2 += sem2;
+                    sumTotal += total;
 
                     html += `<tr>
-                                            <td>${item.nrCrt}</td>
-                                            <td class="text-start fw-bold">${item.numeProfesor}</td>
-                                            <td>${item.sem1}</td>
-                                            <td>${item.sem2}</td>
-                                            <td class="fw-bold text-success">${item.total}</td>
-                                        </tr>`;
+                            <td>${nrCrt}</td>
+                            <td class="text-start fw-bold">${profesor}</td>
+                            <td>${sem1.toFixed(2)}</td>
+                            <td>${sem2.toFixed(2)}</td>
+                            <td class="fw-bold text-success">${total.toFixed(2)}</td>
+                        </tr>`;
                 });
 
                 html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                        <td colspan="2" class="text-end">TOTAL:</td>
-                                        <td>${sumSem1.toFixed(2)}</td>
-                                        <td>${sumSem2.toFixed(2)}</td>
-                                        <td class="text-success">${sumTotal.toFixed(2)}</td>
-                                     </tr>`;
+                        <td colspan="2" class="text-end">TOTAL:</td>
+                        <td>${sumSem1.toFixed(2)}</td>
+                        <td>${sumSem2.toFixed(2)}</td>
+                        <td class="text-success">${sumTotal.toFixed(2)}</td>
+                    </tr>`;
 
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -710,11 +754,11 @@
                 let html = '';
                 data.forEach(item => {
                     html += `<tr>
-                                            <td class="fw-bold">${item.profesor}</td>
-                                            <td>${item.departament}</td>
-                                            <td>${item.materie}</td>
-                                            <td><span class="badge bg-secondary">${item.tipActivitate}</span></td>
-                                        </tr>`;
+                            <td class="fw-bold">${item.profesor || item.Profesor || ''}</td>
+                            <td>${item.departament || item.Departament || ''}</td>
+                            <td>${item.materie || item.Materie || ''}</td>
+                            <td><span class="badge bg-secondary">${item.tipActivitate || item.TipActivitate || ''}</span></td>
+                        </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -731,11 +775,15 @@
 
                 let html = '';
                 data.forEach(item => {
+                    // API returneaza: NumeComplet (nu "profesor")
+                    const nume = item.numeComplet || item.NumeComplet || item.profesor || '';
+                    const dept = item.denumireCatedra || item.DenumireCatedra || item.departament || '';
+                    const facultate = item.facultate || item.Facultate || '';
                     html += `<tr>
-                                            <td class="fw-bold">${item.profesor}</td>
-                                            <td>${item.departament}</td>
-                                            <td>${item.facultate}</td>
-                                        </tr>`;
+                            <td class="fw-bold">${nume}</td>
+                            <td>${dept}</td>
+                            <td>${facultate}</td>
+                        </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
@@ -752,11 +800,15 @@
 
                 let html = '';
                 data.forEach(item => {
+                    // API returneaza: NumeComplet, DenumireCatedra, Facultate
+                    const nume = item.numeComplet || item.NumeComplet || item.profesor || '';
+                    const dept = item.denumireCatedra || item.DenumireCatedra || item.departament || '';
+                    const facultate = item.facultate || item.Facultate || '';
                     html += `<tr>
-                                            <td class="fw-bold">${item.profesor}</td>
-                                            <td>${item.departament}</td>
-                                            <td>${item.facultate}</td>
-                                        </tr>`;
+                            <td class="fw-bold">${nume}</td>
+                            <td>${dept}</td>
+                            <td>${facultate}</td>
+                        </tr>`;
                 });
                 tbody.innerHTML = html;
             } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
