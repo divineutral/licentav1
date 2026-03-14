@@ -358,7 +358,12 @@ namespace LicentaV1.Controllers
                     'S','S'),'T','T')))) COLLATE DATABASE_DEFAULT                   AS SpecializareCurata,
                     vcm.DenumireSpecializare                                         AS NumeSpecOriginal,
                     ISNULL(vcm.DenumireMaterie,'Nedefinit')                          AS DenumireMaterie,
-                    ISNULL(sf.DenTitularSauSuplinitor,'Nespecificat')                AS TipPost,
+                    -- Normalizare TipPost chiar in BaseData:
+                    -- 'TITULAR'/'TITULARA' -> 'Titular', orice altceva -> 'Suplinitor'
+                    CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TITULAR','TITULARA')
+                         THEN 'Titular'
+                         ELSE 'Suplinitor'
+                    END                                                              AS TipPost,
                     ISNULL(vcm.NrSemestruDinAn,0)                                   AS Semestru,
                     CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))         AS OreConvLinie,
                     ISNULL(vcm.Nr_Ore_Curs,0)                                       AS OreCursLinie,
@@ -374,10 +379,29 @@ namespace LicentaV1.Controllers
                     vcm.ID_StatDeFunctii                                             AS ID_StatDeFunctii
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
                 INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                LEFT JOIN [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                -- JOIN deduplicat: un singur rand per (StatDeFunctii, Spec, Materie, Sem)
+                -- MAX(DenTitularSauSuplinitor): 'T' > 'S' alfabetic => prioritate Titular
+                LEFT JOIN (
+                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                           MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
+                    GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
+                ) sf
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
+                -- Filtrul @dept se aplica pe departamentul PROFESORULUI (nu al specializarii studentilor)
+                -- JOIN pe nomenclatorul HR (View_Profesori_CF_AnUniv) - luat un singur rand per profesor
+                LEFT JOIN (
+                    SELECT vp.ID_Profesor, vp.DenumireCatedra AS DeptProfesor
+                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
+                    WHERE vp.ID_AnUnivCatedra = 45
+                      AND vp.Ordine = (
+                          SELECT MAX(vp2.Ordine) FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp2
+                          WHERE vp2.ID_Profesor=vp.ID_Profesor AND vp2.ID_AnUnivCatedra=45
+                      )
+                ) profDept ON profDept.ID_Profesor=vcm.ID_Profesor
+                WHERE (@dept='Toti' OR profDept.DeptProfesor COLLATE Latin1_General_CI_AI = @dept COLLATE Latin1_General_CI_AI)
             )";
 
         // TitulariSubquery: folosit in raportul ANS (filtru titular in WHERE)
@@ -473,23 +497,31 @@ namespace LicentaV1.Controllers
                   AND (@tipPost='Toti' OR CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT' THEN 'Suplinitor' ELSE bd.TipPost END=@tipPost)
             ),
             Agregat AS (
+                -- Reguli agregate per (Profesor, Spec, Materie, TipPost, Sem):
+                --   OreCurs:       MAX  (cursul se tine o singura data, nu se aduna pe grupe)
+                --   OreAplicatii:  SUM  (laboratoarele pe grupe diferite se aduna)
+                --   OreConv:       MAX  (conventialele nu se inmultesc cu nr grupe)
+                --   ID_StatDeFunctii: MAX (nu in GROUP BY - altfel materii cu acelasi
+                --                    nume dar StatFunctii diferit raman pe 2 randuri)
                 SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
-                       MAX(ID_Catedra)   AS ID_Catedra,
-                       ID_StatDeFunctii,
-                       SUM(OreCursLinie)      AS OreCurs,
-                       MAX(OreAplicatiiLinie) AS OreAplicatii,
+                       MAX(ID_Catedra)        AS ID_Catedra,
+                       MAX(ID_StatDeFunctii)  AS ID_StatDeFunctii,
+                       MAX(OreCursLinie)      AS OreCurs,
+                       SUM(OreAplicatiiLinie) AS OreAplicatii,
                        MAX(OreConvLinie)      AS OreConv
                 FROM Filtrat
-                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
             ),
             Cuplaje AS (
-                SELECT a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru, a.ID_StatDeFunctii,
+                -- Detectare cuplaje: aceeasi materie+profesor+post+semestru pe mai multe spec
+                -- ID_StatDeFunctii nu mai e cheie (scos din Agregat GROUP BY)
+                SELECT a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru,
                        COUNT(DISTINCT a.SpecializareCurata) AS NrSpec,
                        MIN(a.SpecializareCurata)            AS SpecPrimara,
-                       MAX(a.OreAplicatii)                  AS OreAplicatiiMax,
+                       SUM(a.OreAplicatii)                  AS OreAplicatiiMax,
                        MAX(a.OreConv)                       AS OreConvMax
                 FROM Agregat a
-                GROUP BY a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru, a.ID_StatDeFunctii
+                GROUP BY a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru
             )
             SELECT c.NumeIntreg AS Profesor, c.SpecPrimara AS Specializare,
                    c.DenumireMaterie AS Materie, c.TipPost, c.Semestru,
@@ -498,16 +530,12 @@ namespace LicentaV1.Controllers
                    c.OreAplicatiiMax   AS NrOreAplicatii,
                    c.OreConvMax        AS NrOreConventionale,
                    c.NrSpec,
-                   -- Toate specializarile pentru cuplaje (vor fi procesate in C#)
-                   -- Returnam separat un rand per spec ca sa putem concatena in C#
-                   -- Dar ca sa nu complicam, facem un subquery simplu DOAR cand NrSpec>1
                    CASE WHEN c.NrSpec > 1 THEN (
                        SELECT TOP 1 STUFF((
                            SELECT ', ' + a2.SpecializareCurata
                            FROM Agregat a2
                            WHERE a2.NumeIntreg=c.NumeIntreg AND a2.DenumireMaterie=c.DenumireMaterie
                              AND a2.TipPost=c.TipPost AND a2.Semestru=c.Semestru
-                             AND a2.ID_StatDeFunctii=c.ID_StatDeFunctii
                              AND a2.SpecializareCurata <> c.SpecPrimara
                            ORDER BY a2.SpecializareCurata
                            FOR XML PATH(''),TYPE
@@ -520,7 +548,7 @@ namespace LicentaV1.Controllers
             INNER JOIN Agregat ag
                 ON ag.NumeIntreg=c.NumeIntreg AND ag.DenumireMaterie=c.DenumireMaterie
                 AND ag.TipPost=c.TipPost AND ag.Semestru=c.Semestru
-                AND ag.ID_StatDeFunctii=c.ID_StatDeFunctii AND ag.SpecializareCurata=c.SpecPrimara
+                AND ag.SpecializareCurata=c.SpecPrimara
             ORDER BY c.NumeIntreg, c.TipPost, c.DenumireMaterie
             OPTION (RECOMPILE)";
         }
@@ -642,23 +670,23 @@ namespace LicentaV1.Controllers
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
                   AND (@semestru=0 OR bd.Semestru=@semestru) AND (@tipPost='Toti' OR CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT' THEN 'Suplinitor' ELSE bd.TipPost END=@tipPost)
             ),
-            -- Pas 2: Pre-agregare (elimina grupe multiple per materie)
+            -- Pas 2: Pre-agregare (MAX curs, SUM aplicatii, fara ID_StatDeFunctii in cheie)
             Agregat2 AS (
-                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
-                       SUM(OreCursLinie)     AS OreCurs,
-                       MAX(OreAplicatiiLinie) AS OreAplicatii,
+                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
+                       MAX(OreCursLinie)      AS OreCurs,
+                       SUM(OreAplicatiiLinie) AS OreAplicatii,
                        MAX(OreConvLinie)      AS OreConv
                 FROM FiltratRaw
-                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
             ),
             -- Pas 3: Detectare cuplaje -> SpecPrimara pe datele deja agregate
             CuplajeProg AS (
-                SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
+                SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru,
                        MIN(SpecializareCurata) AS SpecPrimara,
-                       MAX(OreAplicatii)  AS OreAplicatiiMax,
+                       SUM(OreAplicatii)  AS OreAplicatiiMax,
                        MAX(OreConv)       AS OreConvMax
                 FROM Agregat2
-                GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+                GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru
             ),
             -- Pas 4: Un rand per materie per spec primara
             Dedup AS (
@@ -670,7 +698,7 @@ namespace LicentaV1.Controllers
                 INNER JOIN Agregat2 ag
                     ON ag.NumeIntreg=cp.NumeIntreg AND ag.DenumireMaterie=cp.DenumireMaterie
                     AND ag.TipPost=cp.TipPost AND ag.Semestru=cp.Semestru
-                    AND ag.ID_StatDeFunctii=cp.ID_StatDeFunctii AND ag.SpecializareCurata=cp.SpecPrimara
+                    AND ag.SpecializareCurata=cp.SpecPrimara
             ),
             Filtrat AS (
                 SELECT NumeIntreg AS Profesor, SpecializareCurata AS ProgramStudiu,
@@ -737,16 +765,16 @@ namespace LicentaV1.Controllers
                   AND (@semestru=0 OR bd.Semestru=@semestru) AND (@tipPost='Toti' OR CASE WHEN UPPER(bd.TipPost) LIKE '%SUPT%' OR UPPER(bd.TipPost)='SUPTIT' THEN 'Suplinitor' ELSE bd.TipPost END=@tipPost)
             ),
             Agregat2 AS (
-                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
-                       SUM(OreCursLinie) AS OreCurs, MAX(OreAplicatiiLinie) AS OreAplicatii, MAX(OreConvLinie) AS OreConv
+                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
+                       MAX(OreCursLinie) AS OreCurs, SUM(OreAplicatiiLinie) AS OreAplicatii, MAX(OreConvLinie) AS OreConv
                 FROM FiltratRaw
-                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
             ),
             CuplajeProg AS (
-                SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii,
+                SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru,
                        MIN(SpecializareCurata) AS SpecPrimara,
-                       MAX(OreAplicatii) AS OreAplicatiiMax, MAX(OreConv) AS OreConvMax
-                FROM Agregat2 GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru, ID_StatDeFunctii
+                       SUM(OreAplicatii) AS OreAplicatiiMax, MAX(OreConv) AS OreConvMax
+                FROM Agregat2 GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru
             ),
             Dedup AS (
                 SELECT cp.NumeIntreg, cp.SpecPrimara AS SpecializareCurata,
@@ -755,7 +783,7 @@ namespace LicentaV1.Controllers
                 INNER JOIN Agregat2 ag
                     ON ag.NumeIntreg=cp.NumeIntreg AND ag.DenumireMaterie=cp.DenumireMaterie
                     AND ag.TipPost=cp.TipPost AND ag.Semestru=cp.Semestru
-                    AND ag.ID_StatDeFunctii=cp.ID_StatDeFunctii AND ag.SpecializareCurata=cp.SpecPrimara
+                    AND ag.SpecializareCurata=cp.SpecPrimara
             ),
             Filtrat AS (
                 SELECT NumeIntreg, SpecializareCurata AS ProgramStudiu,
@@ -832,10 +860,12 @@ namespace LicentaV1.Controllers
                     ISNULL(vcm.DenumireMaterie,'Nedefinit')                              AS DenumireMaterie,
                     ISNULL(vcm.NrSemestruDinAn,0)                                       AS Semestru,
                     vcm.ID_StatDeFunctii,
-                    -- REGULA: Titular = 'Titular'/'Titulara', TOT RESTUL = 'Suplinitor'
-                    CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TITULAR','TITULARA')
-                         THEN 'Titular'
-                         ELSE 'Suplinitor'
+                    -- REGULA FINALA: Titular = bit TitularSauSuplinitor=1 SAU DenTitularSauSuplinitor IN ('TITULAR','TITULARA')
+                    -- TOT RESTUL (inclusiv NULL) = 'Suplinitor'
+                    CASE
+                        WHEN ISNULL(vppm.TitularSauSuplinitor, 0) = 1 THEN 'Titular'
+                        WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TITULAR','TITULARA') THEN 'Titular'
+                        ELSE 'Suplinitor'
                     END AS TipPost,
                     CASE
                         WHEN vcm.DenumireSpecializare LIKE '%-IFR%' OR vcm.DenumireSpecializare LIKE '% IFR%' THEN 'IFR'
@@ -844,24 +874,36 @@ namespace LicentaV1.Controllers
                     END AS FormaInv
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
                 INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                LEFT JOIN [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                -- JOIN deduplicat: un singur rand per (StatDeFunctii, Spec, Materie, Sem)
+                -- MAX(DenTitularSauSuplinitor): 'T' > 'S' alfabetic => prioritate Titular
+                LEFT JOIN (
+                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                           MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
+                    GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
+                ) sf
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
+                LEFT JOIN [AGSIS].[pi].[View_PostProfesorMaterie] vppm
+                    ON vppm.ID_Profesor=vcm.ID_Profesor AND vppm.ID_AnUniv=vcm.ID_AnUniv
+                    AND vppm.DenumireMaterie=vcm.DenumireMaterie
+                    AND vppm.DenumireSpecializare=vcm.DenumireSpecializare
                 WHERE (@an='Toti' OR UPPER(LTRIM(RTRIM(au.Denumire)))=@an)
                   AND (@fac='Toti' OR LTRIM(RTRIM(vcm.DenumireFacultate)) COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR vcm.NumeIntregProfesor=@prof)
             ),
-            -- Pre-agregare: elimina grupe multiple per materie, MAX(OreConv) per combinatie
+            -- Pre-agregare: elimina grupe multiple (MAX curs, SUM aplicatii/conv per materie)
+            -- ID_StatDeFunctii SCOS din cheie - materii cu acelasi nume dar state diferite se unifica
             Dedup AS (
                 SELECT NumeComplet, ID_Profesor, TipPost, FormaInv,
-                       DenumireMaterie, Semestru, ID_StatDeFunctii,
+                       DenumireMaterie, Semestru,
                        MAX(OreConv)    AS OreConvDedup,
                        MAX(ID_Catedra) AS ID_Catedra,
                        MAX(Facultate)  AS Facultate
                 FROM DateBrute
                 GROUP BY NumeComplet, ID_Profesor, TipPost, FormaInv,
-                         DenumireMaterie, Semestru, ID_StatDeFunctii
+                         DenumireMaterie, Semestru
             ),
             -- Agregare finala: un rand per (Profesor, TipPost) - max 2 randuri per persoana
             Agreg AS (
@@ -994,7 +1036,14 @@ namespace LicentaV1.Controllers
                              ELSE vcm.DenumireSpecializare END,'S','S'),'T','T')))) AS SpecializareCurata
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
                 INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                LEFT JOIN [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                -- JOIN deduplicat: un singur rand per (StatDeFunctii, Spec, Materie, Sem)
+                -- MAX(DenTitularSauSuplinitor): 'T' > 'S' alfabetic => prioritate Titular
+                LEFT JOIN (
+                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                           MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
+                    GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
+                ) sf
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
@@ -1029,21 +1078,21 @@ namespace LicentaV1.Controllers
                         'Administrarea afacerilor','Managementul resurselor umane',
                         'Dezvoltarea afacerilor turistice','Medicina traditionala chineza'))
             ),
-            -- Pas 1: Pre-agregare per (Profesor, Spec, Materie, TipPost, Sem, StatFunctii)
-            -- Elimina grupe multiple de laborator/seminar
+            -- Pas 1: Pre-agregare per (Profesor, Spec, Materie, TipPost, Sem)
+            -- MAX curs, SUM aplicatii - fara ID_StatDeFunctii ca sa unificam materii din state diferite
             PreAgreg AS (
-                SELECT NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii,
+                SELECT NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost,
                        MAX(OreConv) AS OreConvSpec
                 FROM DateLimbi
-                GROUP BY NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii
+                GROUP BY NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost
             ),
-            -- Pas 2: Deduplicare cuplaje: per (Profesor, Materie, Sem, StatFunctii) -> MAX
-            -- Acum un singur rand per materie per profesor (cuplajele comprimate)
+            -- Pas 2: Deduplicare cuplaje: per (Profesor, Materie, Sem, TipPost) -> MAX
+            -- Comprima cuplajele (IE + CIG) intr-un singur rand cu OreConv maxime
             Dedup AS (
-                SELECT NumeComplet, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii,
+                SELECT NumeComplet, DenumireMaterie, Semestru, TipPost,
                        MAX(OreConvSpec) AS OreConvDedup
                 FROM PreAgreg
-                GROUP BY NumeComplet, DenumireMaterie, Semestru, TipPost, ID_StatDeFunctii
+                GROUP BY NumeComplet, DenumireMaterie, Semestru, TipPost
             )
             SELECT NumeComplet,
                    CAST(ROUND(SUM(CASE WHEN Semestru IN (1,3,5,7,9,11) THEN OreConvDedup ELSE 0 END)*14,2) AS DECIMAL(10,2)) AS Sem1,
@@ -1146,11 +1195,11 @@ namespace LicentaV1.Controllers
 
         private string BuildDisciplineSql()
         {
-            // FIX TIMEOUT R5:
-            // Problema: CTE dublu imbricat (DisciplineUnice -> Profesori -> FOR XML PATH corelat)
-            // era foarte lent pe 12k+ randuri.
-            // Solutie: un singur CTE DU + FOR XML PATH corelat direct pe el.
-            // FOR XML PATH cu DISTINCT inline e acceptat si rapid pe SQL Server 2014+.
+            // FIX R5: Un profesor = UN SINGUR RAND per forma de invatamant
+            // Problema anterioara: Prof facea DISTINCT pe (NumeIntreg, ID_Catedra, FormaInv)
+            //   => un rand per departament => ABAGIU Sorin aparea de 3 ori in IF
+            // Fix: Prof grupeaza STRICT pe (NumeIntreg, FormaInv), ID_Catedra = MIN (dept principal)
+            // FOR XML PATH colecteaza disciplinele din TOATE catedrele (fara filtru ID_Catedra)
             return BaseDataSql + @",
             DU AS (
                 SELECT DISTINCT
@@ -1164,17 +1213,19 @@ namespace LicentaV1.Controllers
                   AND (@semestru=0 OR bd.Semestru=@semestru)
                   AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
             ),
+            -- Prof: UN SINGUR RAND per (Profesor, FormaInv) - ID_Catedra = departamentul principal
             Prof AS (
-                SELECT DISTINCT NumeIntreg, ID_Catedra, ID_Profesor, FormaInv FROM DU
+                SELECT NumeIntreg, MIN(ID_Catedra) AS ID_Catedra,
+                       MAX(ID_Profesor) AS ID_Profesor, FormaInv
+                FROM DU
+                GROUP BY NumeIntreg, FormaInv
             )
             SELECT p.NumeIntreg, p.ID_Catedra, p.ID_Profesor, p.FormaInv,
                    STUFF((
-                       SELECT ', ' + d2.DenumireMaterie
+                       SELECT DISTINCT ', ' + d2.DenumireMaterie
                        FROM DU d2
                        WHERE d2.NumeIntreg=p.NumeIntreg AND d2.FormaInv=p.FormaInv
-                         AND d2.ID_Catedra=p.ID_Catedra AND d2.ID_Profesor=p.ID_Profesor
-                       GROUP BY d2.DenumireMaterie
-                       ORDER BY d2.DenumireMaterie
+                       ORDER BY ', ' + d2.DenumireMaterie
                        FOR XML PATH(''),TYPE
                    ).value('.','NVARCHAR(MAX)'),1,2,'') AS Discipline
             FROM Prof p
@@ -1519,7 +1570,14 @@ namespace LicentaV1.Controllers
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
                        sf.id_metaspecializare AS IdMetaspec
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                INNER JOIN [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                -- JOIN deduplicat: un singur rand per (StatDeFunctii, Spec, Materie, Sem)
+                INNER JOIN (
+                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                           MAX(id_metaspecializare) AS id_metaspecializare,
+                           MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
+                    GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
+                ) sf
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
@@ -1627,7 +1685,14 @@ namespace LicentaV1.Controllers
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
                        sf.id_metaspecializare AS IdMetaspec
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                INNER JOIN [AGSIS].[pi].[StatDeFunctiiPeSpecializare] sf
+                -- JOIN deduplicat: un singur rand per (StatDeFunctii, Spec, Materie, Sem)
+                INNER JOIN (
+                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                           MAX(id_metaspecializare) AS id_metaspecializare,
+                           MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
+                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
+                    GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
+                ) sf
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
