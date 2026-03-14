@@ -334,8 +334,8 @@
                                     <tr>
                                         <th>Nume și prenume</th>
                                         <th>Departament</th>
-                                        <th>Disciplina</th>
-                                        <th>Tip Activitate</th>
+                                        <th>Forma Înv.</th>
+                                        <th>Discipline Predate</th>
                                     </tr>
                                 </thead>
                                 <tbody id="disciplineTableBody">
@@ -434,8 +434,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-    <script>
-        const cacheState = { norme: "", ore: "", totalNorme: "", limbiStraine: "", discipline: "", titulari: "", colaboratori: "" };
+    <script>const cacheState = { norme: "", ore: "", totalNorme: "", limbiStraine: "", discipline: "", titulari: "", colaboratori: "" };
 
         $(document).ready(function () {
             $('#specializareSelect').select2({ placeholder: "Alege specializări", allowClear: true, width: 'resolve' });
@@ -756,8 +755,8 @@
                     html += `<tr>
                             <td class="fw-bold">${item.profesor || item.Profesor || ''}</td>
                             <td>${item.departament || item.Departament || ''}</td>
-                            <td>${item.materie || item.Materie || ''}</td>
-                            <td><span class="badge bg-secondary">${item.tipActivitate || item.TipActivitate || ''}</span></td>
+                            <td><span class="badge bg-secondary">${item.formaInvatamant || item.FormaInvatamant || ''}</span></td>
+                            <td style="white-space: pre-wrap;">${item.discipline || item.Discipline || ''}</td>
                         </tr>`;
                 });
                 tbody.innerHTML = html;
@@ -854,7 +853,6 @@
             if (statusText.toLowerCase().includes('tit')) return `<span class="badge" style="background-color: #56723e;">${statusText}</span>`;
             if (statusText.toLowerCase().includes('sup')) return `<span class="badge bg-warning text-dark">${statusText}</span>`;
             return `<span class="badge bg-secondary">${statusText}</span>`;
-        }
-    </script>
+        }</script>
 </body>
 </html>
