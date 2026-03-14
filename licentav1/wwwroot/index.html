@@ -443,13 +443,18 @@
             fetch('/api/Rapoarte/liste/ani-universitari').then(res => res.json()).then(data => {
                 const s = document.getElementById('anUnivSelect');
                 data.forEach(an => s.innerHTML += `<option value="${an.id}">${an.nume}</option>`);
+                // Primul element (cel mai recent an universitar) este selectat implicit
+                if (data.length > 0) {
+                    s.value = data[0].id;
+                }
+                // Dupa ce se incarca anii, triggerem cascada
+                $('#facultateSelect').trigger('change');
             });
 
             fetch('/api/Rapoarte/liste/facultati').then(res => res.json()).then(data => {
                 const s = document.getElementById('facultateSelect');
                 data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
-                // Dupa incarcarea facultatilor, incarca departamentele pentru prima facultate selectata
-                $('#facultateSelect').trigger('change');
+                // Nu mai triggerem change aici - se face deja dupa incarcarea anilor
             });
 
             $('#anUnivSelect').on('change', function () {

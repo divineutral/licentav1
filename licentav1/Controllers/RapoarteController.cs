@@ -280,17 +280,29 @@ namespace LicentaV1.Controllers
         [HttpGet("liste/departamente")]
         public ActionResult GetDepartamente(string? anUniv, string? numeFacultate)
         {
+            // SURSA CORECTA: departamentele vin din View_Profesori_CF_AnUniv (nomenclator HR)
+            // NU din StatDeFunctiiID_Catedra din View_CentralizareMateriiProfesor
+            // (acela e ID-ul specializarii studentilor, nu departamentul profesorului)
             var lista = new List<string> { "Toti" };
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-            using var cmd = new SqlCommand(
-                "SELECT DISTINCT vcm.StatDeFunctiiID_Catedra FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm WHERE vcm.StatDeFunctiiID_Catedra IS NOT NULL AND (@fac='Toti' OR vcm.DenumireFacultate COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI) ORDER BY vcm.StatDeFunctiiID_Catedra", conn);
-            cmd.Parameters.AddWithValue("@fac", numeFacultate ?? "Toti");
+            using var cmd = new SqlCommand(@"
+                SELECT DISTINCT vp.DenumireCatedra
+                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
+                WHERE vp.ID_AnUnivCatedra = 45
+                  AND vp.DenumireCatedra IS NOT NULL
+                  AND LTRIM(RTRIM(vp.DenumireCatedra)) != ''
+                  AND (@fac = 'Toti'
+                       OR vp.DenumireFacultate COLLATE Latin1_General_CI_AI
+                          = @fac COLLATE Latin1_General_CI_AI)
+                ORDER BY vp.DenumireCatedra", conn);
+            cmd.Parameters.AddWithValue("@fac", string.IsNullOrWhiteSpace(numeFacultate) ? "Toti" : numeFacultate.Trim());
             using var reader = cmd.ExecuteReader();
-            var idSet = new HashSet<string>();
             while (reader.Read())
-                if (reader[0] != DBNull.Value) { var den = GetDenumireCatedra(Convert.ToInt64(reader[0])); if (idSet.Add(den)) lista.Add(den); }
-            lista.Sort((a, b) => a == "Toti" ? -1 : b == "Toti" ? 1 : string.Compare(a, b));
+            {
+                var den = reader[0]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(den)) lista.Add(den);
+            }
             return Ok(lista);
         }
 
@@ -389,11 +401,11 @@ namespace LicentaV1.Controllers
                     vcm.ID_StatDeFunctii                                             AS ID_StatDeFunctii
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
                 INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                -- JOIN pe StatDeFunctiiPeSpecializare FARA MAX pe DenTitularSauSuplinitor
-                -- Fiecare rand Tit si Sup raman separate => nu se colapseaza niciodata
-                -- Daca acelasi ID_StatDeFunctii are atat Tit cat si Sup, ambele raman
+                -- Pre-deduplicare StatDeFunctiiPeSpecializare per (StatFunctii, TipPost, Spec, Materie, Sem)
+                -- Fiecare combinatie (StatFunctii + TipPost) ramane un rand distinct
+                -- Nu folosim MAX() care ar colapa Titular cu Suplinitor
                 LEFT JOIN (
-                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
+                    SELECT DISTINCT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
                            NrSemestruDinAn, DenTitularSauSuplinitor
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
                 ) sf
@@ -438,10 +450,12 @@ namespace LicentaV1.Controllers
         {
             return BaseDataSql + @",
             Filtrat AS (
+                -- Pre-deduplicare: daca JOIN-ul pe StatDeFunctii produce rânduri duplicate
+                -- (acelasi VCM row JOIN-at cu mai multe rânduri din StatDeFunctii cu chei identice),
+                -- le colapsam cu MAX/SUM corect per (Profesor, Spec, Materie, TipPost, Sem, Catedra)
                 SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.NumeSpecOriginal,
-                       bd.DenumireMaterie,
-                       bd.TipPost,  -- NU modificam TipPost! Vine corect din BaseData.
-                       bd.Semestru, bd.ID_Catedra, bd.ID_StatDeFunctii,
+                       bd.DenumireMaterie, bd.TipPost, bd.Semestru,
+                       bd.ID_Catedra, bd.ID_StatDeFunctii,
                        bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
                 FROM BaseData bd
                 WHERE (@an='Toti' OR bd.AnCurat=@an)
@@ -453,10 +467,11 @@ namespace LicentaV1.Controllers
                   AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
             ),
             Agregat AS (
-                -- TipPost ESTE in GROUP BY: randurile Titular si Suplinitor sunt complet separate
-                -- OreCurs: MAX (cursul comun nu se inmulteste pe grupe)
-                -- OreAplicatii: SUM (laborator pe grupe diferite se aduna)
-                -- OreConv: MAX (conventionalele nu se inmultesc)
+                -- Per (Profesor, Spec, Materie, TipPost, Sem):
+                --   OreCurs:      MAX  (cursul se tine o singura data per spec)
+                --   OreAplicatii: SUM  (grupe diferite de laborator per spec se aduna)
+                --   OreConv:      MAX  (valoarea conventionala per spec, nu se aduna grupele)
+                -- Suma pe specializarile cuplate se face in CTE Cuplaje de mai jos
                 SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
                        MAX(ID_Catedra)        AS ID_Catedra,
                        MAX(ID_StatDeFunctii)  AS ID_StatDeFunctii,
@@ -467,21 +482,23 @@ namespace LicentaV1.Controllers
                 GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
             ),
             Cuplaje AS (
-                -- Cuplajele se calculeaza SEPARAT per TipPost
-                -- O materie predata ca Titular la spec A+B = 1 rand Titular cu SpecPrimara=A
-                -- Aceeasi materie predata ca Suplinitor la spec C = 1 rand Suplinitor separat
+                -- Cuplaje SEPARATE pe TipPost
+                -- OreCurs: MAX (cursul e comun pentru toate specializarile cuplate)
+                -- OreAplicatii: SUM (aplicatiile se tin separat per specializare)
+                -- OreConv: SUM (conventionalele se aduna din toate specializarile cuplate)
                 SELECT a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru,
                        COUNT(DISTINCT a.SpecializareCurata) AS NrSpec,
                        MIN(a.SpecializareCurata)            AS SpecPrimara,
+                       MAX(a.OreCurs)                       AS OreCursMax,
                        SUM(a.OreAplicatii)                  AS OreAplicatiiMax,
-                       MAX(a.OreConv)                       AS OreConvMax
+                       SUM(a.OreConv)                       AS OreConvMax
                 FROM Agregat a
                 GROUP BY a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru
             )
             SELECT c.NumeIntreg AS Profesor, c.SpecPrimara AS Specializare,
                    c.DenumireMaterie AS Materie, c.TipPost, c.Semestru,
                    ag.ID_Catedra,
-                   ag.OreCurs          AS NrOreCurs,
+                   c.OreCursMax        AS NrOreCurs,
                    c.OreAplicatiiMax   AS NrOreAplicatii,
                    c.OreConvMax        AS NrOreConventionale,
                    c.NrSpec,
@@ -1250,6 +1267,7 @@ namespace LicentaV1.Controllers
                 WHERE v.TitularAnUniv = 1
                   AND v.ID_AnUnivCatedra = 45
                   AND v.DidCerc = 'D'
+                  AND v.Ordine IS NOT NULL
                   AND LTRIM(RTRIM(ISNULL(v.NumeIntreg,''))) != ''
                   AND v.NumeIntreg NOT LIKE '--%'
             )
@@ -1324,6 +1342,7 @@ namespace LicentaV1.Controllers
                 WHERE TitularAnUniv = 1
                   AND ID_AnUnivCatedra = 45
                   AND DidCerc = 'D'
+                  AND Ordine IS NOT NULL
                   AND LTRIM(RTRIM(ISNULL(NumeIntreg,''))) != ''
                   AND NumeIntreg NOT LIKE '--%'
             ),
@@ -1451,6 +1470,7 @@ namespace LicentaV1.Controllers
                 WHERE v.TitularAnUniv = 1
                   AND v.ID_AnUnivCatedra = @ID_AnUniv
                   AND v.DidCerc = 'D'
+                  AND v.Ordine IS NOT NULL
                   AND LTRIM(RTRIM(ISNULL(v.NumeIntreg,''))) != ''
                   AND v.NumeIntreg NOT LIKE '--%'
             )
