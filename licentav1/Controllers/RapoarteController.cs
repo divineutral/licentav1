@@ -367,7 +367,18 @@ namespace LicentaV1.Controllers
         // NU pe catedra specializarii studentilor.
         // =====================================================================
         private const string BaseDataSql = @"
-            WITH BaseData AS (
+            WITH VcmDedup AS (
+                -- Eliminam randurile duplicate native din View_CentralizareMateriiProfesor
+                -- (view-ul poate returna acelasi rand de mai multe ori pentru aceeasi grupa/spec)
+                SELECT DISTINCT
+                    ID_Profesor, NumeIntregProfesor, ID_AnUniv, ID_StatDeFunctii,
+                    DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                    Nr_Ore_Curs, Nr_Ore_Seminar, Nr_Ore_Laborator, Nr_Ore_Proiect,
+                    NrOreConventionale, DenumireFacultate, StatDeFunctiiID_Catedra
+                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor]
+                WHERE ID_AnUniv = 45
+            ),
+            BaseData AS (
                 SELECT
                     vcm.NumeIntregProfesor                                          AS NumeIntreg,
                     vcm.ID_Profesor                                                  AS ID_Profesor,
@@ -378,9 +389,6 @@ namespace LicentaV1.Controllers
                     'S','S'),'T','T')))) COLLATE DATABASE_DEFAULT                   AS SpecializareCurata,
                     vcm.DenumireSpecializare                                         AS NumeSpecOriginal,
                     ISNULL(vcm.DenumireMaterie,'Nedefinit')                          AS DenumireMaterie,
-                    -- TipPost: pastram valoarea originala normalizata - NU suprascriem Titular cu Suplinitor!
-                    -- 'TIT'/'Tit'/'Titular'/'Titulara' -> 'Titular'
-                    -- 'SUP'/'Sup'/'Suplinitor'/'SupTit'/NULL/gol -> 'Suplinitor'
                     CASE
                         WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
                              THEN 'Titular'
@@ -391,6 +399,8 @@ namespace LicentaV1.Controllers
                     ISNULL(vcm.Nr_Ore_Curs,0)                                       AS OreCursLinie,
                     ISNULL(vcm.Nr_Ore_Seminar,0)+ISNULL(vcm.Nr_Ore_Laborator,0)+ISNULL(vcm.Nr_Ore_Proiect,0) AS OreAplicatiiLinie,
                     LTRIM(RTRIM(ISNULL(vcm.DenumireFacultate,'')))                  AS FacultateCurata,
+                    -- FacultateProfesor: facultatea HR a profesorului (pentru filtrul @fac)
+                    ISNULL(profDept.FacProfesor, LTRIM(RTRIM(ISNULL(vcm.DenumireFacultate,'')))) AS FacultateProfesor,
                     vcm.StatDeFunctiiID_Catedra                                      AS ID_Catedra,
                     UPPER(LTRIM(RTRIM(au.Denumire))) COLLATE DATABASE_DEFAULT        AS AnCurat,
                     CASE
@@ -399,11 +409,8 @@ namespace LicentaV1.Controllers
                         ELSE 'IF'
                     END                                                              AS FormaInv,
                     vcm.ID_StatDeFunctii                                             AS ID_StatDeFunctii
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
+                FROM VcmDedup vcm
                 INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                -- Pre-deduplicare StatDeFunctiiPeSpecializare per (StatFunctii, TipPost, Spec, Materie, Sem)
-                -- Fiecare combinatie (StatFunctii + TipPost) ramane un rand distinct
-                -- Nu folosim MAX() care ar colapa Titular cu Suplinitor
                 LEFT JOIN (
                     SELECT DISTINCT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
                            NrSemestruDinAn, DenTitularSauSuplinitor
@@ -413,19 +420,20 @@ namespace LicentaV1.Controllers
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
                 LEFT JOIN (
-                    SELECT vp.ID_Profesor, vp.DenumireCatedra AS DeptProfesor
-                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
-                    WHERE vp.ID_AnUnivCatedra = 45
-                      AND vp.Ordine = (
-                          SELECT MAX(vp2.Ordine) FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp2
-                          WHERE vp2.ID_Profesor=vp.ID_Profesor AND vp2.ID_AnUnivCatedra=45
-                      )
+                    -- Departamentul HR al profesorului: un singur rand per profesor
+                    -- Luam MIN(DenumireCatedra) ca tiebreaker cand exista mai multe
+                    SELECT ID_Profesor,
+                           MIN(DenumireCatedra) AS DeptProfesor,
+                           MIN(DenumireFacultate) AS FacProfesor
+                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
+                    WHERE ID_AnUnivCatedra = 45
+                    GROUP BY ID_Profesor
                 ) profDept ON profDept.ID_Profesor=vcm.ID_Profesor
                 WHERE (@dept='Toti' OR profDept.DeptProfesor COLLATE Latin1_General_CI_AI = @dept COLLATE Latin1_General_CI_AI)
             )";
 
         private const string FiltreStandard = @"(@an='Toti' OR bd.AnCurat=@an)
-                             AND (@fac='Toti' OR bd.FacultateCurata=@fac)
+                             AND (@fac='Toti' OR bd.FacultateProfesor COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                              AND (@prof='Toti' OR bd.NumeIntreg=@prof)
                              AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
                              AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
@@ -450,16 +458,17 @@ namespace LicentaV1.Controllers
         {
             return BaseDataSql + @",
             Filtrat AS (
-                -- Pre-deduplicare: daca JOIN-ul pe StatDeFunctii produce rânduri duplicate
-                -- (acelasi VCM row JOIN-at cu mai multe rânduri din StatDeFunctii cu chei identice),
-                -- le colapsam cu MAX/SUM corect per (Profesor, Spec, Materie, TipPost, Sem, Catedra)
                 SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.NumeSpecOriginal,
                        bd.DenumireMaterie, bd.TipPost, bd.Semestru,
                        bd.ID_Catedra, bd.ID_StatDeFunctii,
                        bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
                 FROM BaseData bd
                 WHERE (@an='Toti' OR bd.AnCurat=@an)
-                  AND (@fac='Toti' OR bd.FacultateCurata=@fac)
+                  -- @fac filtreaza dupa facultatea HR a profesorului (FacultateProfesor),
+                  -- NU dupa facultatea studentilor (FacultateCurata).
+                  -- Aceasta asigura ca un profesor de la Litere apare in raportul Litere
+                  -- chiar daca preda si la alte facultati.
+                  AND (@fac='Toti' OR bd.FacultateProfesor COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR bd.NumeIntreg=@prof)
                   AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
@@ -626,7 +635,7 @@ namespace LicentaV1.Controllers
                        bd.Semestru, bd.ID_StatDeFunctii,
                        bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
                 FROM BaseData bd
-                WHERE (@an='Toti' OR bd.AnCurat=@an) AND (@fac='Toti' OR bd.FacultateCurata=@fac)
+                WHERE (@an='Toti' OR bd.AnCurat=@an) AND (@fac='Toti' OR bd.FacultateProfesor COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR bd.NumeIntreg=@prof)
                   AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
@@ -718,7 +727,7 @@ namespace LicentaV1.Controllers
                        bd.TipPost, bd.Semestru, bd.ID_StatDeFunctii,
                        bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
                 FROM BaseData bd
-                WHERE (@an='Toti' OR bd.AnCurat=@an) AND (@fac='Toti' OR bd.FacultateCurata=@fac)
+                WHERE (@an='Toti' OR bd.AnCurat=@an) AND (@fac='Toti' OR bd.FacultateProfesor COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR bd.NumeIntreg=@prof)
                   AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
@@ -801,7 +810,22 @@ namespace LicentaV1.Controllers
         private string BuildNormaTotaluriSql()
         {
             return @"
-            WITH DateBrute AS (
+            WITH VcmDedup3 AS (
+                SELECT DISTINCT
+                    ID_Profesor, NumeIntregProfesor, ID_AnUniv, ID_StatDeFunctii,
+                    DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                    NrOreConventionale, DenumireFacultate, StatDeFunctiiID_Catedra
+                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor]
+                WHERE ID_AnUniv = 45
+            ),
+            ProfDept3 AS (
+                SELECT ID_Profesor, MIN(DenumireCatedra) AS DeptProfesor,
+                       MIN(DenumireFacultate) AS FacProfesor
+                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
+                WHERE ID_AnUnivCatedra = 45
+                GROUP BY ID_Profesor
+            ),
+            DateBrute AS (
                 SELECT
                     vcm.NumeIntregProfesor                                              AS NumeComplet,
                     vcm.ID_Profesor,
@@ -811,8 +835,6 @@ namespace LicentaV1.Controllers
                     ISNULL(vcm.DenumireMaterie,'Nedefinit')                              AS DenumireMaterie,
                     ISNULL(vcm.NrSemestruDinAn,0)                                       AS Semestru,
                     vcm.ID_StatDeFunctii,
-                    -- TipPost din StatDeFunctiiPeSpecializare (sursa corecta pentru norma)
-                    -- Titular si Suplinitor RAMAN SEPARATE
                     CASE
                         WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
                              THEN 'Titular'
@@ -823,19 +845,21 @@ namespace LicentaV1.Controllers
                         WHEN vcm.DenumireSpecializare LIKE '%-ID%'  OR vcm.DenumireSpecializare LIKE '% ID%'  THEN 'ID'
                         ELSE 'IF'
                     END AS FormaInv
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
+                FROM VcmDedup3 vcm
                 INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
                 LEFT JOIN (
-                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
+                    SELECT DISTINCT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
                            NrSemestruDinAn, DenTitularSauSuplinitor
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
                 ) sf
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
+                LEFT JOIN ProfDept3 pd ON pd.ID_Profesor = vcm.ID_Profesor
                 WHERE (@an='Toti' OR UPPER(LTRIM(RTRIM(au.Denumire)))=@an)
-                  AND (@fac='Toti' OR LTRIM(RTRIM(vcm.DenumireFacultate)) COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
+                  AND (@fac='Toti' OR ISNULL(pd.FacProfesor,'') COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR vcm.NumeIntregProfesor=@prof)
+                  AND (@dept='Toti' OR ISNULL(pd.DeptProfesor,'') COLLATE Latin1_General_CI_AI = @dept COLLATE Latin1_General_CI_AI)
             ),
             -- Dedup: elimina grupe multiple per materie
             -- TipPost in GROUP BY: Titular si Suplinitor raman separate!
@@ -879,6 +903,7 @@ namespace LicentaV1.Controllers
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
+            cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
             cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -918,6 +943,7 @@ namespace LicentaV1.Controllers
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
+            cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
             cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -1139,7 +1165,7 @@ namespace LicentaV1.Controllers
                     bd.NumeIntreg, bd.ID_Catedra, bd.ID_Profesor, bd.FormaInv, bd.DenumireMaterie
                 FROM BaseData bd
                 WHERE (@an='Toti' OR bd.AnCurat=@an)
-                  AND (@fac='Toti' OR bd.FacultateCurata=@fac)
+                  AND (@fac='Toti' OR bd.FacultateProfesor COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR bd.NumeIntreg=@prof)
                   AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
@@ -1262,14 +1288,22 @@ namespace LicentaV1.Controllers
         private const string TitulariSql = @"
             WITH TitulariBase AS (
                 SELECT v.ID_Profesor, v.NumeIntreg, v.DenumireCatedra, v.DenumireFacultate,
-                       ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor ORDER BY v.Ordine DESC) AS Rn
+                       ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor
+                                         ORDER BY CASE v.DenumireGradDidactic
+                                             WHEN 'Profesor' THEN 1 WHEN 'Conferentiar' THEN 2
+                                             WHEN 'Lector/Sef Lucrari' THEN 3 WHEN 'Asistent' THEN 4
+                                             ELSE 5 END) AS Rn
                 FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] v
                 WHERE v.TitularAnUniv = 1
                   AND v.ID_AnUnivCatedra = 45
                   AND v.DidCerc = 'D'
-                  AND v.Ordine IS NOT NULL
                   AND LTRIM(RTRIM(ISNULL(v.NumeIntreg,''))) != ''
                   AND v.NumeIntreg NOT LIKE '--%'
+                  -- Excludem titularii inactivi (fara nicio ora in an 45)
+                  AND EXISTS (
+                      SELECT 1 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm2
+                      WHERE vcm2.ID_Profesor = v.ID_Profesor AND vcm2.ID_AnUniv = 45
+                  )
             )
             SELECT ID_Profesor, NumeIntreg AS NumeComplet, DenumireCatedra, DenumireFacultate AS Facultate
             FROM TitulariBase
@@ -1335,16 +1369,19 @@ namespace LicentaV1.Controllers
         // Deduplicare finala garanteaza un singur rand per ID_Profesor
         // =====================================================================
         private const string ColaboratoriSql = @"
-            WITH TitulariDidactici AS (
-                -- Setul exact de titulari didactici (acelasi criteriu ca R6 Titulari)
+                        WITH TitulariDidactici AS (
+                -- Titulari activi: TitularAnUniv=1, DidCerc='D', AU ore in an 45
                 SELECT DISTINCT ID_Profesor
-                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
+                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp_td
                 WHERE TitularAnUniv = 1
                   AND ID_AnUnivCatedra = 45
                   AND DidCerc = 'D'
-                  AND Ordine IS NOT NULL
                   AND LTRIM(RTRIM(ISNULL(NumeIntreg,''))) != ''
                   AND NumeIntreg NOT LIKE '--%'
+                  AND EXISTS (
+                      SELECT 1 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm3
+                      WHERE vcm3.ID_Profesor = vp_td.ID_Profesor AND vcm3.ID_AnUniv = 45
+                  )
             ),
             ColabBase AS (
                 -- Toti profesorii activi in an 45 care NU sunt titulari didactici
@@ -1465,14 +1502,22 @@ namespace LicentaV1.Controllers
             WITH T AS (
                 SELECT v.ID_Profesor, v.NumeIntreg, v.DenumireCatedra,
                        v.DenumireFacultate, v.DenumireGradDidactic,
-                       ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor ORDER BY v.Ordine DESC) AS Rn
+                       ROW_NUMBER() OVER(PARTITION BY v.ID_Profesor
+                                         ORDER BY CASE v.DenumireGradDidactic
+                                             WHEN 'Profesor' THEN 1 WHEN 'Conferentiar' THEN 2
+                                             WHEN 'Lector/Sef Lucrari' THEN 3 WHEN 'Asistent' THEN 4
+                                             ELSE 5 END) AS Rn
                 FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] v
                 WHERE v.TitularAnUniv = 1
                   AND v.ID_AnUnivCatedra = @ID_AnUniv
                   AND v.DidCerc = 'D'
-                  AND v.Ordine IS NOT NULL
                   AND LTRIM(RTRIM(ISNULL(v.NumeIntreg,''))) != ''
                   AND v.NumeIntreg NOT LIKE '--%'
+                  -- Excludem titularii fara ore (inactivi/pensionati) - aceasta aduce lista la ~741
+                  AND EXISTS (
+                      SELECT 1 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm_ans
+                      WHERE vcm_ans.ID_Profesor = v.ID_Profesor AND vcm_ans.ID_AnUniv = @ID_AnUniv
+                  )
             )
             SELECT ID_Profesor, NumeIntreg, DenumireCatedra, DenumireFacultate, DenumireGradDidactic
             FROM T
