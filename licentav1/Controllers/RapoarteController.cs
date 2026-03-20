@@ -615,79 +615,135 @@ namespace LicentaV1.Controllers
 
         #endregion
 
-        #region ================= RAPORT 2: ORE PE PROGRAM =================
+        // =====================================================================
+        // FIX RAPORT 2: DISTRIBUȚIE ORE PE PROGRAM
+        //
+        // PROBLEMA (Efectul de Tunel):
+        //   TotalPost era calculat cu OVER(PARTITION BY NumeIntreg) DUPĂ filtrare
+        //   => dacă filtrezi pe o facultate, totalul se recalcula doar pe ce rămânea vizibil
+        //   => profesorul apărea cu 100% chiar dacă acea facultate e doar 30% din norma lui
+        //
+        // SOLUȚIA:
+        //   CTE TotalAbsolutProfesor calculează SUM(OreConv) per profesor
+        //   aplicând DOAR @an și @semestru (ignoră @fac, @dept, @specs, @tipPost)
+        //   => baza de calcul e MEREU norma totală din universitate
+        //   => ProcentPost = (OreConvGrup / TotalAbsolut) * 100
+        // =====================================================================
+
+        // -----------------------------------------------------------------------
+        // ÎNLOCUIEȘTE variabila `sql` din GetOreProfProgram și ExportOreProgramExcel
+        // cu string-ul de mai jos (același SQL pentru ambele metode).
+        // -----------------------------------------------------------------------
+
+        private string BuildOreProfProgramSql()
+        {
+            return BaseDataSql + @",
+    -- ================================================================
+    -- TotalAbsolutProfesor: norma TOTALA a profesorului in universitate
+    -- Aplica DOAR @an si @semestru. Ignora @fac, @dept, @specs, @tipPost
+    -- Aceasta este baza imuabila de calcul pentru ProcentPost
+    -- ================================================================
+    TotalAbsolutProfesor AS (
+        SELECT
+            bd.NumeIntreg,
+            SUM(bd.OreConvLinie) AS TotalAbsolut
+        FROM BaseData bd
+        WHERE (@an='Toti' OR bd.AnCurat=@an)
+          AND (@semestru=0 OR bd.Semestru=@semestru)
+        GROUP BY bd.NumeIntreg
+    ),
+    -- ================================================================
+    -- FiltratRaw: date filtrate conform TUTUROR filtrelor utilizatorului
+    -- Acestea determina CE se afiseaza in raport, dar NU baza procentului
+    -- ================================================================
+    FiltratRaw AS (
+        SELECT bd.NumeIntreg, bd.ID_Profesor, bd.SpecializareCurata, bd.NumeSpecOriginal,
+               bd.DenumireMaterie, bd.TipPost, bd.Semestru, bd.ID_StatDeFunctii,
+               bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
+        FROM BaseData bd
+        WHERE (@an='Toti'      OR bd.AnCurat=@an)
+          AND (@fac='Toti'     OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
+          AND (@prof='Toti'    OR bd.NumeIntreg=@prof)
+          AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
+          AND (@specs='Toti'   OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
+          AND (@semestru=0     OR bd.Semestru=@semestru)
+          AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
+          AND (@dept='Toti'    OR bd.ID_Catedra IN (SELECT value FROM STRING_SPLIT(@deptIds,',')))
+    ),
+    -- Per (Profesor, Spec, Materie, TipPost, Sem): MAX curs, SUM aplicatii, MAX conv
+    Agregat2 AS (
+        SELECT NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
+               MAX(OreCursLinie)      AS OreCurs,
+               SUM(OreAplicatiiLinie) AS OreAplicatii,
+               MAX(OreConvLinie)      AS OreConv
+        FROM FiltratRaw
+        GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru
+    ),
+    -- Dedup cuplaje per (Profesor, Materie, TipPost, Sem)
+    CuplajeProg AS (
+        SELECT NumeIntreg, ID_Profesor, DenumireMaterie, TipPost, Semestru,
+               MIN(SpecializareCurata) AS SpecPrimara,
+               MAX(OreCurs)           AS OreCursMax,
+               SUM(OreAplicatii)      AS OreAplicatiiMax,
+               MAX(OreConv)           AS OreConvMax
+        FROM Agregat2
+        GROUP BY NumeIntreg, ID_Profesor, DenumireMaterie, TipPost, Semestru
+    ),
+    Dedup AS (
+        SELECT cp.NumeIntreg, cp.ID_Profesor, cp.SpecPrimara AS SpecializareCurata,
+               cp.OreCursMax    AS OreCurs,
+               cp.OreAplicatiiMax AS OreAplicatii,
+               cp.OreConvMax    AS OreConv
+        FROM CuplajeProg cp
+    ),
+    -- Agreg per (Profesor, Program): suma ore per program vizibil
+    Filtrat AS (
+        SELECT NumeIntreg, ID_Profesor,
+               SpecializareCurata             AS ProgramStudiu,
+               SUM(OreConv)                   AS OreConvProgram,
+               SUM(OreCurs)                   AS OreCursProgram,
+               SUM(OreAplicatii)              AS OreAplicatiiProgram
+        FROM Dedup
+        GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata
+        HAVING SUM(OreConv) > 0
+    )
+    SELECT
+        f.NumeIntreg                                        AS Profesor,
+        f.ID_Profesor,
+        ISNULL(f.ProgramStudiu,'Nespecificat')              AS ProgramStudiu,
+        ISNULL(f.OreConvProgram,0)                         AS NrOreConv,
+        ISNULL(f.OreCursProgram,0)                         AS NrOreCurs,
+        ISNULL(f.OreAplicatiiProgram,0)                    AS NrOreAplicatii,
+        -- TotalAbsolut = norma totala din universitate (ignorand filtrele de fac/dept/spec/tipPost)
+        ISNULL(tap.TotalAbsolut,0)                         AS TotalPost,
+        -- ProcentPost calculat pe baza normei totale, nu pe ce e vizibil in raport
+        CAST(
+            CASE
+                WHEN ISNULL(tap.TotalAbsolut,0) = 0 THEN 0
+                ELSE (ISNULL(f.OreConvProgram,0) / tap.TotalAbsolut) * 100
+            END
+        AS DECIMAL(10,2))                                  AS ProcentPost
+    FROM Filtrat f
+    LEFT JOIN TotalAbsolutProfesor tap ON tap.NumeIntreg = f.NumeIntreg
+    ORDER BY f.NumeIntreg, f.OreConvProgram DESC
+    OPTION (RECOMPILE)";
+        }
+
+        // -----------------------------------------------------------------------
+        // GetOreProfProgram: înlocuiește metoda existenta cu aceasta
+        // -----------------------------------------------------------------------
 
         [HttpGet("ore-profesor-program")]
-        public async Task<IActionResult> GetOreProfProgram(string? anUniv = "Toti", string? facultate = "Toti",
-            string? specializari = "Toti", string? profesor = "Toti", int semestru = 0,
-            string tipPost = "Toti", string? formaInvatamant = "Toti", string? departament = "Toti")
+        public async Task<IActionResult> GetOreProfProgram(
+            string? anUniv = "Toti", string? facultate = "Toti",
+            string? specializari = "Toti", string? profesor = "Toti",
+            int semestru = 0, string tipPost = "Toti",
+            string? formaInvatamant = "Toti", string? departament = "Toti")
         {
             var result = new List<object>();
-            string sql = BaseDataSql + @",
-            FiltratRaw AS (
-                SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.DenumireMaterie,
-                       bd.TipPost,  -- TipPost pastrat din BaseData, nu modificat
-                       bd.Semestru, bd.ID_StatDeFunctii,
-                       bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
-                FROM BaseData bd
-                WHERE (@an='Toti' OR bd.AnCurat=@an) AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-                  AND (@prof='Toti' OR bd.NumeIntreg=@prof)
-                  AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
-                  AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-                  AND (@semestru=0 OR bd.Semestru=@semestru)
-                  AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
-            ),
-            Agregat2 AS (
-                -- TipPost in GROUP BY: Titular si Suplinitor raman separate
-                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
-                       MAX(OreCursLinie)      AS OreCurs,
-                       SUM(OreAplicatiiLinie) AS OreAplicatii,
-                       MAX(OreConvLinie)      AS OreConv
-                FROM FiltratRaw
-                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
-            ),
-            CuplajeProg AS (
-                -- Cuplaje SEPARATE pe TipPost
-                SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru,
-                       MIN(SpecializareCurata) AS SpecPrimara,
-                       SUM(OreAplicatii)  AS OreAplicatiiMax,
-                       MAX(OreConv)       AS OreConvMax
-                FROM Agregat2
-                GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru
-            ),
-            Dedup AS (
-                SELECT cp.NumeIntreg, cp.SpecPrimara AS SpecializareCurata,
-                       ag.OreCurs AS OreCurs,
-                       cp.OreAplicatiiMax AS OreAplicatii,
-                       cp.OreConvMax AS OreConv
-                FROM CuplajeProg cp
-                INNER JOIN Agregat2 ag
-                    ON ag.NumeIntreg=cp.NumeIntreg AND ag.DenumireMaterie=cp.DenumireMaterie
-                    AND ag.TipPost=cp.TipPost AND ag.Semestru=cp.Semestru
-                    AND ag.SpecializareCurata=cp.SpecPrimara
-            ),
-            Filtrat AS (
-                SELECT NumeIntreg AS Profesor, SpecializareCurata AS ProgramStudiu,
-                       SUM(OreConv)       AS OreConvProgram,
-                       SUM(OreCurs)       AS OreCursProgram,
-                       SUM(OreAplicatii)  AS OreAplicatiiProgram
-                FROM Dedup
-                GROUP BY NumeIntreg, SpecializareCurata
-                HAVING SUM(OreConv)>0
-            ),
-            TotalProfesor AS (SELECT Profesor, SUM(OreConvProgram) AS TotalPost FROM Filtrat GROUP BY Profesor)
-            SELECT f.Profesor, ISNULL(f.ProgramStudiu,'Nespecificat') AS ProgramStudiu,
-                   ISNULL(f.OreConvProgram,0) AS NrOreConv,
-                   ISNULL(f.OreCursProgram,0) AS NrOreCurs,
-                   ISNULL(f.OreAplicatiiProgram,0) AS NrOreAplicatii,
-                   ISNULL(t.TotalPost,0) AS TotalPost,
-                   CAST(CASE WHEN ISNULL(t.TotalPost,0)=0 THEN 0 ELSE (ISNULL(f.OreConvProgram,0)/t.TotalPost)*100 END AS DECIMAL(10,2)) AS ProcentPost
-            FROM Filtrat f INNER JOIN TotalProfesor t ON f.Profesor=t.Profesor
-            ORDER BY f.Profesor, f.OreConvProgram DESC";
-
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
-            using var cmd = new SqlCommand(sql, conn);
+            using var cmd = new SqlCommand(BuildOreProfProgramSql(), conn);
             cmd.CommandTimeout = 120;
             AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
             using var reader = await cmd.ExecuteReaderAsync();
@@ -705,93 +761,73 @@ namespace LicentaV1.Controllers
             return Ok(result);
         }
 
+        // -----------------------------------------------------------------------
+        // ExportOreProgramExcel: înlocuiește metoda existenta cu aceasta
+        // -----------------------------------------------------------------------
+
         [HttpGet("export/ore-program")]
-        public async Task<IActionResult> ExportOreProgramExcel(string? anUniv, string? facultate,
-            string? specializari, string? profesor, int semestru = 0, string tipPost = "Toti",
+        public async Task<IActionResult> ExportOreProgramExcel(
+            string? anUniv = "Toti", string? facultate = "Toti",
+            string? specializari = "Toti", string? profesor = "Toti",
+            int semestru = 0, string tipPost = "Toti",
             string? formaInvatamant = "Toti", string? departament = "Toti")
         {
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Profesor"), new DataColumn("Program Studiu"),
-                new DataColumn("Nr Ore Curs", typeof(double)), new DataColumn("Nr Ore Aplicatii", typeof(double)),
-                new DataColumn("Nr Ore Conv", typeof(double)), new DataColumn("Procent Post", typeof(double))
-            });
-            string sql = BaseDataSql + @",
-            FiltratRaw AS (
-                SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.DenumireMaterie,
-                       bd.TipPost, bd.Semestru, bd.ID_StatDeFunctii,
-                       bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
-                FROM BaseData bd
-                WHERE (@an='Toti' OR bd.AnCurat=@an) AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-                  AND (@prof='Toti' OR bd.NumeIntreg=@prof)
-                  AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
-                  AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-                  AND (@semestru=0 OR bd.Semestru=@semestru)
-                  AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
-            ),
-            Agregat2 AS (
-                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
-                       MAX(OreCursLinie) AS OreCurs, SUM(OreAplicatiiLinie) AS OreAplicatii, MAX(OreConvLinie) AS OreConv
-                FROM FiltratRaw
-                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
-            ),
-            CuplajeProg AS (
-                SELECT NumeIntreg, DenumireMaterie, TipPost, Semestru,
-                       MIN(SpecializareCurata) AS SpecPrimara,
-                       SUM(OreAplicatii) AS OreAplicatiiMax, MAX(OreConv) AS OreConvMax
-                FROM Agregat2 GROUP BY NumeIntreg, DenumireMaterie, TipPost, Semestru
-            ),
-            Dedup AS (
-                SELECT cp.NumeIntreg, cp.SpecPrimara AS SpecializareCurata,
-                       ag.OreCurs AS OreCurs, cp.OreAplicatiiMax AS OreAplicatii, cp.OreConvMax AS OreConv
-                FROM CuplajeProg cp
-                INNER JOIN Agregat2 ag
-                    ON ag.NumeIntreg=cp.NumeIntreg AND ag.DenumireMaterie=cp.DenumireMaterie
-                    AND ag.TipPost=cp.TipPost AND ag.Semestru=cp.Semestru
-                    AND ag.SpecializareCurata=cp.SpecPrimara
-            ),
-            Filtrat AS (
-                SELECT NumeIntreg, SpecializareCurata AS ProgramStudiu,
-                       SUM(OreConv) AS OreConvProgram, SUM(OreCurs) AS OreCursProgram,
-                       SUM(OreAplicatii) AS OreAplicatiiProgram
-                FROM Dedup GROUP BY NumeIntreg, SpecializareCurata HAVING SUM(OreConv)>0
-            ),
-            TotalProfesor AS (SELECT NumeIntreg, SUM(OreConvProgram) AS TotalPost FROM Filtrat GROUP BY NumeIntreg)
-            SELECT f.NumeIntreg, ISNULL(f.ProgramStudiu,'Nespecificat') AS ProgramStudiu,
-                   ISNULL(f.OreCursProgram,0) AS NrOreCurs, ISNULL(f.OreAplicatiiProgram,0) AS NrOreAplicatii,
-                   ISNULL(f.OreConvProgram,0) AS OreConvProgram,
-                   CAST(CASE WHEN ISNULL(t.TotalPost,0)=0 THEN 0 ELSE (ISNULL(f.OreConvProgram,0)/t.TotalPost)*100 END AS DECIMAL(10,2)) AS ProcentPost
-            FROM Filtrat f INNER JOIN TotalProfesor t ON f.NumeIntreg=t.NumeIntreg
-            ORDER BY f.NumeIntreg, f.OreConvProgram DESC";
+        new DataColumn("Profesor"),
+        new DataColumn("Program Studiu"),
+        new DataColumn("Nr Ore Curs",    typeof(double)),
+        new DataColumn("Nr Ore Aplicatii", typeof(double)),
+        new DataColumn("Nr Ore Conv",    typeof(double)),
+        new DataColumn("Total Norma Univ.", typeof(double)),   // norma totala, ignorand filtrele
+        new DataColumn("Procent Post",   typeof(double))
+    });
 
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
-            using var cmd = new SqlCommand(sql, conn);
+            using var cmd = new SqlCommand(BuildOreProfProgramSql(), conn);
             cmd.CommandTimeout = 120;
             AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
-                dt.Rows.Add(reader["NumeIntreg"], reader["ProgramStudiu"],
+                dt.Rows.Add(
+                    reader["Profesor"]?.ToString() ?? "",
+                    reader["ProgramStudiu"]?.ToString() ?? "",
                     reader["NrOreCurs"] != DBNull.Value ? Convert.ToDouble(reader["NrOreCurs"]) : 0.0,
                     reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
-                    reader["OreConvProgram"] != DBNull.Value ? Convert.ToDouble(reader["OreConvProgram"]) : 0.0,
-                    reader["ProcentPost"] != DBNull.Value ? Convert.ToDouble(reader["ProcentPost"]) : 0.0);
+                    reader["NrOreConv"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConv"]) : 0.0,
+                    reader["TotalPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalPost"]) : 0.0,
+                    reader["ProcentPost"] != DBNull.Value ? Convert.ToDouble(reader["ProcentPost"]) : 0.0
+                );
 
             string fileName = string.IsNullOrEmpty(profesor) || profesor == "Toti"
                 ? "StatisticaOre_General.xlsx"
                 : $"StatisticaOre_{string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()))}.xlsx";
+
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Distributie Ore");
+            // Rand 1: info filtre
             ws.Cell(1, 1).Value = $"An: {anUniv} | Facultate: {facultate} | Profesor: {profesor}";
-            var tbl = ws.Cell(3, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
+            ws.Cell(2, 1).Value = "NOTA: Coloana 'Total Norma Univ.' si 'Procent Post' reflecta norma totala din universitate, independent de filtrele de Facultate/Departament/Specializare.";
+            ws.Cell(2, 1).Style.Font.Italic = true;
+            ws.Cell(2, 1).Style.Font.FontColor = XLColor.Gray;
+            var tbl = ws.Cell(4, 1).InsertTable(dt);
+            tbl.Theme = XLTableTheme.None;
+            tbl.ShowTotalsRow = true;
+            tbl.Field("Nr Ore Curs").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Nr Ore Aplicatii").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Nr Ore Conv").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Profesor").TotalsRowLabel = "TOTAL GENERAL";
             ws.Columns().AdjustToContents();
-            StyleHeader(ws.Range(3, 1, 3, dt.Columns.Count));
-            using var stream = new MemoryStream(); wb.SaveAs(stream);
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            StyleHeader(ws.Range(4, 1, 4, dt.Columns.Count));
+            using var stream = new MemoryStream();
+            wb.SaveAs(stream);
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName);
         }
-
-        #endregion
-
         // =====================================================================
         // FIX RAPORT 3: NORME TOTALURI
         // Problema: MAX(Facultate) / MAX(ID_Catedra) din activitate => date gresite
