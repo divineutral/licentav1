@@ -38,32 +38,101 @@ namespace LicentaV1.Controllers
 
         private static readonly Dictionary<int, int> MappingMetaspec = new Dictionary<int, int>
         {
-            { 20, 5 }, { 34, 5 }, { 44, 5 }, { 182, 5 }, { 837, 5 }, { 847, 5 }, { 848, 5 },
-            { 43, 9 }, { 148, 8 }, { 171, 11 }, { 306, 11 }, { 358, 11 }, { 464, 11 },
-            { 466, 11 }, { 615, 11 }, { 823, 11 }, { 828, 11 },
-            { 35, 11 }, { 82, 7 }, { 84, 7 }, { 139, 11 }, { 162, 7 }, { 310, 7 },
-            { 315, 7 }, { 316, 7 }, { 362, 7 }, { 372, 7 }, { 418, 7 }, { 597, 7 }, { 617, 7 },
-            { 116, 12 }, { 126, 11 }, { 129, 11 }, { 156, 11 }, { 228, 11 }, { 229, 12 },
-            { 404, 11 }, { 529, 11 }, { 142, 11 }, { 326, 11 }, { 531, 11 }, { 806, 11 }, { 819, 11 },
-            { 53, 11 }, { 138, 11 }, { 446, 11 }, { 448, 11 }, { 449, 11 }, { 450, 11 },
-            { 451, 11 }, { 496, 11 }, { 497, 11 }, { 821, 11 },
-            { 46, 9 }, { 122, 9 }, { 176, 9 }, { 178, 9 }, { 731, 9 },
-            { 72, 9 }, { 90, 9 }, { 118, 9 }, { 226, 9 }, { 235, 9 }, { 249, 9 },
-            { 307, 9 }, { 437, 9 }, { 458, 9 }, { 566, 9 }, { 845, 9 },
-            { 101, 40 }, { 102, 40 }, { 104, 40 }, { 251, 1 }, { 317, 40 },
-            { 340, 1 }, { 368, 40 }, { 369, 40 }, { 477, 40 },
-            { 45, 25 }, { 73, 25 }, { 93, 25 }, { 112, 24 }, { 221, 25 }, { 223, 25 },
-            { 227, 25 }, { 242, 25 }, { 283, 25 }, { 288, 25 }, { 299, 25 },
-            { 181, 31 }, { 196, 27 }, { 197, 27 }, { 200, 27 }, { 205, 27 }, { 207, 27 },
-            { 209, 27 }, { 217, 27 }, { 218, 27 }, { 341, 27 }, { 343, 27 }, { 463, 27 },
-            { 511, 27 }, { 512, 27 }, { 513, 27 }, { 514, 27 }, { 726, 27 }, { 798, 27 }, { 801, 27 },
-            { 60, 18 }, { 64, 18 }, { 331, 18 }, { 485, 18 }, { 555, 18 },
-            { 41, 20 }, { 98, 20 }, { 100, 25 }, { 322, 21 }, { 524, 25 }, { 579, 20 }, { 831, 20 },
-            { 276, 26 }, { 294, 26 }, { 296, 26 }, { 383, 26 }, { 384, 26 }, { 416, 26 },
-            { 515, 26 }, { 813, 26 }, { 851, 26 }, { 832, 26 }, { 834, 26 },
-            { 394, 14 }, { 397, 14 }, { 402, 14 }, { 484, 14 }, { 585, 14 }, { 594, 14 }, { 835, 14 },
-            { 186, 37 }, { 187, 37 }, { 264, 37 }, { 332, 37 }, { 351, 37 }, { 557, 37 }, { 838, 37 },
-            { 78, 39 }, { 189, 39 }, { 325, 39 }, { 470, 39 }, { 783, 39 }, { 784, 39 }, { 846, 39 },
+            // ================================================================
+            // MappingMetaspec: id_metaspecializare -> AnsId (1-40 secvential)
+            // AnsId corespunde pozitiei in DomeniiExcel (1-based)
+            // Generat din lista specializarilor UTBv + N_RAMURA_STIINTA_ANS
+            // ================================================================
+
+            // Matematica (AnsId=1)
+            { 251, 1 }, { 340, 1 },
+
+            // Informatica (AnsId=2)
+            { 35, 2 }, { 101, 2 }, { 102, 2 }, { 104, 2 },
+            { 368, 2 }, { 369, 2 }, { 477, 2 }, { 596, 2 },
+
+            // Inginerie civila (AnsId=6)
+            { 44, 6 }, { 182, 6 }, { 297, 6 },
+            { 837, 6 }, { 847, 6 }, { 848, 6 },
+
+            // Inginerie electrica, electronica si telecomunicatii (AnsId=7)
+            { 18, 7 }, { 82, 7 }, { 84, 7 }, { 162, 7 },
+            { 310, 7 }, { 315, 7 }, { 316, 7 }, { 362, 7 },
+            { 372, 7 }, { 597, 7 }, { 617, 7 },
+
+            // Ingineria transporturilor (AnsId=9)
+            { 23, 9 }, { 24, 9 }, { 27, 9 }, { 28, 9 },
+            { 43, 9 }, { 306, 9 }, { 466, 9 }, { 610, 9 },
+            { 615, 9 }, { 828, 9 },
+
+            // Ingineria resurselor vegetale si animale (AnsId=10)
+            { 46, 10 }, { 72, 10 }, { 90, 10 }, { 118, 10 },
+            { 120, 10 }, { 122, 10 }, { 176, 10 }, { 178, 10 },
+            { 226, 10 }, { 235, 10 }, { 249, 10 }, { 307, 10 },
+            { 437, 10 }, { 458, 10 }, { 517, 10 }, { 566, 10 },
+            { 614, 10 }, { 731, 10 }, { 845, 10 }, { 854, 10 }, { 857, 10 },
+
+            // Ingineria sistemelor, calculatoare si tehnologia informatiei (AnsId=11)
+            { 138, 11 },
+
+            // Inginerie mecanica, mecatronica, inginerie industriala si management (AnsId=12)
+            { 53, 12 }, { 116, 12 }, { 126, 12 }, { 129, 12 },
+            { 139, 12 }, { 142, 12 }, { 156, 12 }, { 171, 12 },
+            { 228, 12 }, { 229, 12 }, { 358, 12 }, { 404, 12 },
+            { 418, 12 }, { 446, 12 }, { 448, 12 }, { 449, 12 },
+            { 450, 12 }, { 451, 12 }, { 464, 12 }, { 496, 12 },
+            { 497, 12 }, { 529, 12 }, { 531, 12 }, { 556, 12 },
+            { 613, 12 }, { 806, 12 }, { 819, 12 }, { 823, 12 }, { 862, 12 },
+
+            // Medicina (AnsId=15)
+            { 13, 15 }, { 394, 15 }, { 397, 15 }, { 402, 15 },
+            { 484, 15 }, { 585, 15 }, { 594, 15 }, { 835, 15 },
+
+            // Stiinte juridice (AnsId=19)
+            { 60, 19 }, { 64, 19 }, { 331, 19 }, { 457, 19 },
+            { 485, 19 }, { 555, 19 }, { 859, 19 },
+
+            // Stiinte ale comunicarii (AnsId=21)
+            { 41, 21 }, { 98, 21 }, { 579, 21 }, { 831, 21 },
+
+            // Sociologie (AnsId=22)
+            { 15, 22 }, { 16, 22 }, { 322, 22 },
+
+            // Stiinte economice - Cibernetica, statistica si informatica economica (AnsId=25)
+            { 112, 25 },
+
+            // Stiinte economice - fara Cibernetica (AnsId=26)
+            { 7, 26 }, { 9, 26 }, { 10, 26 }, { 45, 26 },
+            { 73, 26 }, { 93, 26 }, { 100, 26 }, { 221, 26 },
+            { 223, 26 }, { 227, 26 }, { 242, 26 }, { 283, 26 },
+            { 288, 26 }, { 299, 26 }, { 317, 26 }, { 452, 26 },
+            { 453, 26 }, { 454, 26 }, { 456, 26 }, { 524, 26 },
+            { 595, 26 }, { 821, 26 },
+
+            // Psihologie si stiinte comportamentale (AnsId=27)
+            { 276, 27 }, { 294, 27 }, { 296, 27 }, { 383, 27 },
+            { 384, 27 }, { 416, 27 }, { 515, 27 }, { 600, 27 },
+            { 601, 27 }, { 813, 27 }, { 832, 27 }, { 834, 27 },
+            { 851, 27 }, { 863, 27 }, { 864, 27 }, { 865, 27 },
+
+            // Filologie (AnsId=28)
+            { 47, 28 }, { 196, 28 }, { 197, 28 }, { 200, 28 },
+            { 203, 28 }, { 205, 28 }, { 207, 28 }, { 209, 28 },
+            { 217, 28 }, { 218, 28 }, { 341, 28 }, { 343, 28 },
+            { 463, 28 }, { 511, 28 }, { 512, 28 }, { 513, 28 },
+            { 514, 28 }, { 606, 28 }, { 607, 28 }, { 726, 28 },
+            { 798, 28 }, { 801, 28 },
+
+            // Studii culturale (AnsId=32)
+            { 181, 32 },
+
+            // Muzica - Interpretare muzicala (AnsId=38)
+            { 186, 38 }, { 187, 38 }, { 264, 38 }, { 332, 38 },
+            { 351, 38 }, { 557, 38 }, { 838, 38 },
+
+            // Stiintele Sportului si Educatiei Fizice (AnsId=40)
+            { 78, 40 }, { 189, 40 }, { 325, 40 }, { 470, 40 },
+            { 608, 40 }, { 609, 40 }, { 783, 40 }, { 784, 40 }, { 846, 40 },
         };
 
         private static readonly Dictionary<int, int> AnsIdToCol = new Dictionary<int, int>
@@ -246,11 +315,48 @@ namespace LicentaV1.Controllers
             return nume ?? "";
         }
 
+        // Norma legala per profesor: ISNULL(ExceptiiNormaOreConv.NrOreTitular, NormaOreConv standard)
+        // Aceasta este formula exacta folosita de profa in raportul ANS oficial
+        private readonly Dictionary<int, decimal> _normaPerProf;
+
         public RapoarteController(IConfiguration configuration, IMemoryCache cache)
         {
             _configuration = configuration;
             _connectionString = _configuration.GetConnectionString("DefaultConnection")!;
             _cache = cache;
+            _normaPerProf = IncarcaNormeProf();
+        }
+
+        private Dictionary<int, decimal> IncarcaNormeProf()
+        {
+            var dict = new Dictionary<int, decimal>();
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                // Formula profa: ISNULL(Exceptii.NrOreTitular, NormaStandard.NrOreConventionaleTitular)
+                // Sursa: ExceptiiNormaOreConventionale (norma individuala) + NormaOreConventionale (standard)
+                const string sql = @"
+                    SELECT e.ID_Profesor,
+                           ISNULL(ex.NrOreTitular, n.NrOreConventionaleTitular) AS NormaFinala
+                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] e
+                    LEFT JOIN [AGSIS].[pi].[ExceptiiNormaOreConventionale] ex
+                        ON ex.ID_Profesor = e.ID_Profesor AND ex.ID_AnUniv = 45
+                    INNER JOIN [AGSIS].[pi].[NormaOreConventionale] n
+                        ON n.ID_TipGradDidactic = e.ID_TipGradDidacticAnUniv AND n.ID_AnUniv = 45
+                    WHERE e.ID_AnUnivCatedra = 45";
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.CommandTimeout = 60;
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    int idProf = Convert.ToInt32(r["ID_Profesor"]);
+                    decimal norma = Convert.ToDecimal(r["NormaFinala"]);
+                    if (norma > 0) dict[idProf] = norma;
+                }
+            }
+            catch { /* fallback la GetNormaLegala daca DB-ul nu e accesibil */ }
+            return dict;
         }
 
         private string GetDenumireCatedra(long idCatedra) =>
@@ -796,7 +902,6 @@ namespace LicentaV1.Controllers
         }
 
         #endregion
-
         // ==================== SFARSIT JUMATATE 1 ====================
         // Continua in RapoarteController_part2.cs de la: #region RAPORT 3
         // ==================== JUMATATEA 2 ====================
@@ -1766,6 +1871,7 @@ namespace LicentaV1.Controllers
                         r1["DenumireGradDidactic"]?.ToString() ?? ""));
                 }
             }
+            // FIX BUG 2 (GetDateANS): filtru Titular - doar orele din norma de baza
             string queryOre = @"
                 SELECT vcm.ID_Profesor,
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
@@ -1780,7 +1886,8 @@ namespace LicentaV1.Controllers
                 ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                WHERE vcm.ID_AnUniv=@ID_AnUniv";
+                WHERE vcm.ID_AnUniv=@ID_AnUniv
+                  AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')";
             var orePerProf = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
             using (var cmd2 = new SqlCommand(queryOre, conn))
             {
@@ -1811,19 +1918,17 @@ namespace LicentaV1.Controllers
                         if (!orePerAns.ContainsKey(idAns)) orePerAns[idAns] = 0m;
                         orePerAns[idAns] += ore;
                     }
+                    // Norma exacta per profesor: ISNULL(ExceptiiNormaOreConv, NormaStandard)
+                    decimal normaLegala = _normaPerProf.TryGetValue(id, out decimal nm) ? nm : GetNormaLegala(grad);
                     decimal totalOre = orePerAns.Values.Sum();
-                    if (totalOre > 0)
+                    if (totalOre > 0 && normaLegala > 0)
                     {
-                        int maxKey = orePerAns.OrderByDescending(x => x.Value).First().Key;
-                        decimal sum = 0;
                         foreach (var kv in orePerAns)
                         {
-                            if (kv.Key == maxKey) continue;
-                            decimal frac = Math.Round(kv.Value / totalOre, 2);
-                            fractiuni[DomeniiExcel[AnsIdToCol[kv.Key] - 10]] = frac;
-                            sum += frac;
+                            decimal frac = Math.Round(kv.Value / normaLegala, 2);
+                            if (frac > 0)
+                                fractiuni[DomeniiExcel[AnsIdToCol[kv.Key] - 10]] = frac;
                         }
-                        fractiuni[DomeniiExcel[AnsIdToCol[maxKey] - 10]] = Math.Round(1m - sum, 2);
                     }
                 }
                 profesori.Add(new { NrCrt = nrCrt++, NumeComplet = nume, Facultate = fac, Departament = dept, GradFunctie = MapareGradANS(grad), DomeniiMapate = fractiuni });
@@ -1843,12 +1948,20 @@ namespace LicentaV1.Controllers
                 cmd1.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
                 using var r1 = cmd1.ExecuteReader();
                 while (r1.Read())
+                {
+                    var numeDb1 = r1["NumeIntreg"]?.ToString() ?? "";
+                    // FIX BUG 1: filtrul prin TitulariANS lipsea din ExportRaportANS
+                    // Fara acest filtru, raportul aducea TOTI profesorii din VCM (~1475)
+                    // in loc de doar titularii oficiali ANS (~741)
+                    if (!TitulariANS.Contains(NormalizeName(numeDb1))) continue;
                     totiTitulariiExp.Add((Convert.ToInt32(r1["ID_Profesor"]),
-                        FixNume(r1["NumeIntreg"]?.ToString(), r1["ID_Profesor"]),
+                        FixNume(numeDb1, r1["ID_Profesor"]),
                         r1["DenumireFacultate"]?.ToString() ?? "",
                         r1["DenumireCatedra"]?.ToString() ?? "",
                         r1["DenumireGradDidactic"]?.ToString() ?? ""));
+                }
             }
+            // FIX BUG 2: filtru Titular - orele de suplinitor nu trebuie sa intre in calcul
             string queryOreExp = @"
                 SELECT vcm.ID_Profesor,
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
@@ -1863,7 +1976,8 @@ namespace LicentaV1.Controllers
                 ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                WHERE vcm.ID_AnUniv=@ID_AnUniv";
+                WHERE vcm.ID_AnUniv=@ID_AnUniv
+                  AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')";
             var orePerProfExp = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
             using (var cmd2 = new SqlCommand(queryOreExp, conn))
             {
@@ -1894,18 +2008,16 @@ namespace LicentaV1.Controllers
                         if (!orePerCol.ContainsKey(col)) orePerCol[col] = 0m;
                         orePerCol[col] += ore;
                     }
+                    // Norma exacta per profesor: ISNULL(ExceptiiNormaOreConv, NormaStandard)
+                    decimal normaLegalaExp = _normaPerProf.TryGetValue(id, out decimal nmExp) ? nmExp : GetNormaLegala(grad);
                     decimal totalOre = orePerCol.Values.Sum();
-                    if (totalOre > 0)
+                    if (totalOre > 0 && normaLegalaExp > 0)
                     {
-                        int maxKey = orePerCol.OrderByDescending(x => x.Value).First().Key;
-                        decimal sum = 0;
                         foreach (var kv in orePerCol)
                         {
-                            if (kv.Key == maxKey) continue;
-                            decimal frac = Math.Round(kv.Value / totalOre, 2);
-                            fractiuni[kv.Key] = frac; sum += frac;
+                            decimal frac = Math.Round(kv.Value / normaLegalaExp, 2);
+                            if (frac > 0) fractiuni[kv.Key] = frac;
                         }
-                        fractiuni[maxKey] = Math.Round(1m - sum, 2);
                     }
                 }
                 profesori.Add(new ProfANS { NumeComplet = nume, Departament = dept, Facultate = fac, GradFunctie = MapareGradANS(grad), Fractiuni = fractiuni });
@@ -1944,6 +2056,45 @@ namespace LicentaV1.Controllers
         #endregion
 
         #region ================= HELPERS =================
+
+        // =====================================================================
+        // NormaOreConventionale din AGSIS pentru ID_AnUniv=45:
+        //   ID_TipGradDidactic=1  (Profesor)           -> 11 ore
+        //   ID_TipGradDidactic=2  (Conferentiar)       -> 12 ore
+        //   ID_TipGradDidactic=3  (Lector/Sef Lucrari) -> 14 ore
+        //   ID_TipGradDidactic=4  (Asistent)           -> 15 ore
+        //   ID_TipGradDidactic=7  (Doctorand)          -> 18 ore
+        //   ID_TipGradDidactic=9  (Nespecificat)       -> 15 ore
+        //   ID_TipGradDidactic=10 (Sef Lucrari)        -> 14 ore
+        //   ID_TipGradDidactic=11 (Lector)             -> 14 ore
+        //   ID_TipGradDidactic=18 (Doctorand DCF)      ->  2 ore
+        // Sursa: SELECT * FROM [AGSIS].[pi].[NormaOreConventionale] WHERE ID_AnUniv=45
+        // =====================================================================
+        private static readonly Dictionary<int, decimal> NormaLegalaPerId = new Dictionary<int, decimal>
+        {
+            { 1,  11m }, // Profesor
+            { 2,  12m }, // Conferentiar
+            { 3,  14m }, // Lector/Sef Lucrari
+            { 4,  15m }, // Asistent
+            { 7,  18m }, // Doctorand cu frecventa
+            { 9,  15m }, // Nespecificat
+            { 10, 14m }, // Sef Lucrari
+            { 11, 14m }, // Lector
+            { 18,  2m }, // Doctorand DCF
+        };
+
+        // gradFunctie = string din MapareGradANS() ex: "Prof. dr.", "Conf. dr.", "Șef lucr. dr.", "Asist. dr."
+        private decimal GetNormaLegala(string gradFunctie)
+        {
+            string g = gradFunctie?.ToUpperInvariant() ?? "";
+            if (g.Contains("PROF")) return 11m;       // ID_TipGrad=1
+            if (g.Contains("CONF")) return 12m;       // ID_TipGrad=2
+            if (g.Contains("SEF") || g.Contains("ȘEF") || g.Contains("LECT")) return 14m; // ID_TipGrad=3/10/11
+            if (g.Contains("ASIST")) return 15m;      // ID_TipGrad=4 (era 16, acum CORECT 15!)
+            if (g.Contains("PREPAR")) return 18m;     // ID_TipGrad=7
+            if (g.Contains("CS I") || g.Contains("CS II") || g.Contains("CS III") || g.Contains("CS")) return 14m;
+            return 15m; // fallback
+        }
 
         private string GetDeptIds(string? departament)
         {
