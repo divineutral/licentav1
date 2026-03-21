@@ -48,8 +48,8 @@ namespace LicentaV1.Controllers
             { 251, 1 }, { 340, 1 },
 
             // Informatica (AnsId=2)
-            { 35, 2 }, { 101, 2 }, { 102, 2 }, { 104, 2 },
-            { 368, 2 }, { 369, 2 }, { 477, 2 }, { 596, 2 },
+            { 35, 11 }, { 101, 2 }, { 102, 2 }, { 104, 2 },
+            { 368, 11 }, { 369, 11 }, { 477, 11 }, { 596, 2 },
 
             // Inginerie civila (AnsId=6)
             { 44, 6 }, { 182, 6 }, { 297, 6 },
@@ -57,8 +57,8 @@ namespace LicentaV1.Controllers
 
             // Inginerie electrica, electronica si telecomunicatii (AnsId=7)
             { 18, 7 }, { 82, 7 }, { 84, 7 }, { 162, 7 },
-            { 310, 7 }, { 315, 7 }, { 316, 7 }, { 362, 7 },
-            { 372, 7 }, { 597, 7 }, { 617, 7 },
+            { 310, 11 }, { 315, 7 }, { 316, 7 }, { 362, 11 },
+            { 372, 7 }, { 597, 11 }, { 617, 7 },
 
             // Ingineria transporturilor (AnsId=9)
             { 23, 9 }, { 24, 9 }, { 27, 9 }, { 28, 9 },
@@ -73,6 +73,7 @@ namespace LicentaV1.Controllers
             { 614, 10 }, { 731, 10 }, { 845, 10 }, { 854, 10 }, { 857, 10 },
 
             // Ingineria sistemelor, calculatoare si tehnologia informatiei (AnsId=11)
+            // Include: Calculatoare, Automatica, Tehnologia informatiei, Securitate cibernetica, Tehnologii Internet
             { 138, 11 },
 
             // Inginerie mecanica, mecatronica, inginerie industriala si management (AnsId=12)
@@ -105,7 +106,7 @@ namespace LicentaV1.Controllers
             { 7, 26 }, { 9, 26 }, { 10, 26 }, { 45, 26 },
             { 73, 26 }, { 93, 26 }, { 100, 26 }, { 221, 26 },
             { 223, 26 }, { 227, 26 }, { 242, 26 }, { 283, 26 },
-            { 288, 26 }, { 299, 26 }, { 317, 26 }, { 452, 26 },
+            { 288, 26 }, { 299, 26 }, { 317, 11 }, { 452, 26 },
             { 453, 26 }, { 454, 26 }, { 456, 26 }, { 524, 26 },
             { 595, 26 }, { 821, 26 },
 
@@ -127,8 +128,8 @@ namespace LicentaV1.Controllers
             { 181, 32 },
 
             // Muzica - Interpretare muzicala (AnsId=38)
-            { 186, 38 }, { 187, 38 }, { 264, 38 }, { 332, 38 },
-            { 351, 38 }, { 557, 38 }, { 838, 38 },
+            { 186, 38 }, { 187, 38 }, { 264, 39 }, { 332, 39 },
+            { 351, 39 }, { 557, 39 }, { 838, 38 },
 
             // Stiintele Sportului si Educatiei Fizice (AnsId=40)
             { 78, 40 }, { 189, 40 }, { 325, 40 }, { 470, 40 },
@@ -902,6 +903,7 @@ namespace LicentaV1.Controllers
         }
 
         #endregion
+
         // ==================== SFARSIT JUMATATE 1 ====================
         // Continua in RapoarteController_part2.cs de la: #region RAPORT 3
         // ==================== JUMATATEA 2 ====================
@@ -1872,22 +1874,36 @@ namespace LicentaV1.Controllers
                 }
             }
             // FIX BUG 2 (GetDateANS): filtru Titular - doar orele din norma de baza
+            // FORMULA FINALA: SUM ore per (ID_Profesor, metaspec, semestru, ID_StatDeFunctii)
+            // Grupam pe StatDeFunctii+semestru pentru a elimina duplicatele din JOIN
+            // dar pastram semestre diferite si specializari diferite
             string queryOre = @"
-                SELECT vcm.ID_Profesor,
-                       CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
-                       sf.id_metaspecializare AS IdMetaspec
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                INNER JOIN (
-                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
-                           MAX(id_metaspecializare) AS id_metaspecializare,
-                           MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
-                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
-                    GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
-                ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
-                    AND sf.DenumireSpecializare=vcm.DenumireSpecializare
-                    AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                WHERE vcm.ID_AnUniv=@ID_AnUniv
-                  AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')";
+                SELECT t.ID_Profesor,
+                       t.IdMetaspec,
+                       SUM(t.OreConventionale) AS OreConventionale
+                FROM (
+                    SELECT vcm.ID_Profesor,
+                           sf.id_metaspecializare AS IdMetaspec,
+                           vcm.NrSemestruDinAn,
+                           vcm.ID_StatDeFunctii,
+                           vcm.DenumireMaterie,
+                           MAX(CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))) AS OreConventionale
+                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
+                    INNER JOIN (
+                        SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                               MAX(id_metaspecializare) AS id_metaspecializare,
+                               MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
+                        FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
+                        GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
+                    ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
+                         AND sf.DenumireSpecializare=vcm.DenumireSpecializare
+                         AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
+                    WHERE vcm.ID_AnUniv=@ID_AnUniv
+                      AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
+                    GROUP BY vcm.ID_Profesor, sf.id_metaspecializare, vcm.NrSemestruDinAn,
+                             vcm.ID_StatDeFunctii, vcm.DenumireMaterie
+                ) t
+                GROUP BY t.ID_Profesor, t.IdMetaspec";
             var orePerProf = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
             using (var cmd2 = new SqlCommand(queryOre, conn))
             {
@@ -1918,8 +1934,8 @@ namespace LicentaV1.Controllers
                         if (!orePerAns.ContainsKey(idAns)) orePerAns[idAns] = 0m;
                         orePerAns[idAns] += ore;
                     }
-                    // Norma exacta per profesor: ISNULL(ExceptiiNormaOreConv, NormaStandard)
-                    decimal normaLegala = _normaPerProf.TryGetValue(id, out decimal nm) ? nm : GetNormaLegala(grad);
+                    // Profa foloseste norma STANDARD din NormaOreConventionale (nu din Exceptii)
+                    decimal normaLegala = GetNormaLegala(grad);
                     decimal totalOre = orePerAns.Values.Sum();
                     if (totalOre > 0 && normaLegala > 0)
                     {
@@ -1962,22 +1978,36 @@ namespace LicentaV1.Controllers
                 }
             }
             // FIX BUG 2: filtru Titular - orele de suplinitor nu trebuie sa intre in calcul
+            // FORMULA FINALA: SUM ore per (ID_Profesor, metaspec, semestru, ID_StatDeFunctii)
+            // Grupam pe StatDeFunctii+semestru pentru a elimina duplicatele din JOIN
+            // dar pastram semestre diferite si specializari diferite
             string queryOreExp = @"
-                SELECT vcm.ID_Profesor,
-                       CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
-                       sf.id_metaspecializare AS IdMetaspec
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                INNER JOIN (
-                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
-                           MAX(id_metaspecializare) AS id_metaspecializare,
-                           MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
-                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
-                    GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
-                ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
-                    AND sf.DenumireSpecializare=vcm.DenumireSpecializare
-                    AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                WHERE vcm.ID_AnUniv=@ID_AnUniv
-                  AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')";
+                SELECT t.ID_Profesor,
+                       t.IdMetaspec,
+                       SUM(t.OreConventionale) AS OreConventionale
+                FROM (
+                    SELECT vcm.ID_Profesor,
+                           sf.id_metaspecializare AS IdMetaspec,
+                           vcm.NrSemestruDinAn,
+                           vcm.ID_StatDeFunctii,
+                           vcm.DenumireMaterie,
+                           MAX(CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))) AS OreConventionale
+                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
+                    INNER JOIN (
+                        SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
+                               MAX(id_metaspecializare) AS id_metaspecializare,
+                               MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
+                        FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
+                        GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
+                    ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
+                         AND sf.DenumireSpecializare=vcm.DenumireSpecializare
+                         AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
+                    WHERE vcm.ID_AnUniv=@ID_AnUniv
+                      AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
+                    GROUP BY vcm.ID_Profesor, sf.id_metaspecializare, vcm.NrSemestruDinAn,
+                             vcm.ID_StatDeFunctii, vcm.DenumireMaterie
+                ) t
+                GROUP BY t.ID_Profesor, t.IdMetaspec";
             var orePerProfExp = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
             using (var cmd2 = new SqlCommand(queryOreExp, conn))
             {
@@ -2008,8 +2038,8 @@ namespace LicentaV1.Controllers
                         if (!orePerCol.ContainsKey(col)) orePerCol[col] = 0m;
                         orePerCol[col] += ore;
                     }
-                    // Norma exacta per profesor: ISNULL(ExceptiiNormaOreConv, NormaStandard)
-                    decimal normaLegalaExp = _normaPerProf.TryGetValue(id, out decimal nmExp) ? nmExp : GetNormaLegala(grad);
+                    // Profa foloseste norma STANDARD din NormaOreConventionale (nu din Exceptii)
+                    decimal normaLegalaExp = GetNormaLegala(grad);
                     decimal totalOre = orePerCol.Values.Sum();
                     if (totalOre > 0 && normaLegalaExp > 0)
                     {
