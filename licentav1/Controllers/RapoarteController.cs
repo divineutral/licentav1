@@ -203,22 +203,37 @@ namespace LicentaV1.Controllers
             { 644, "DPPD" },
         };
 
+        // =====================================================================
+        // NumeCorecte: fix diacritice + unificare profesori cu ID-uri duplicate
+        // FIX TOHANEAN: ID 5665 (Mate-Info) -> acelasi nume ca ID 1549 (EFS)
+        // FIX FOLEA/VECERDI: ID 3887 -> acelasi ca ID 4401
+        // =====================================================================
         private static readonly Dictionary<int, string> NumeCorecte = new Dictionary<int, string>
         {
-            { 6621, "ȘIREIU RAMONA DANIELA" }, { 6698, "BENEA ALINA-PETRUȚA" },
-            { 6631, "CĂBAȘ NICOLAE SERGIU" },  { 4605, "CĂPRIȚĂ FLORIN" },
-            { 4165, "CIORICEANU IONUȚ-HORIA" },{ 2375, "ILAȘ MAGDALENA" },
-            { 6616, "MÂNDRU MARIA SPERANȚA" }, { 16893, "MILEA GIGUȘA-ROXANA" },
-            { 16894, "NEGOIȚĂ ELENA" },         { 6803, "STAREȘU CAMELIA MARIANA" },
-            { 6800, "ȘERBAN AGURIȚA DORINELA" },{ 5881, "TUCHEL IONUȚ-VLAD" },
-            { 2899, "BREZEANU ALIN IONUȚ" },    { 4345, "DIACONU ȘTEFANIA-ROXANA" },
+            { 6621, "ȘIREIU RAMONA DANIELA" },
+            { 6698, "BENEA ALINA-PETRUȚA" },
+            { 6631, "CĂBAȘ NICOLAE SERGIU" },
+            { 4605, "CĂPRIȚĂ FLORIN" },
+            { 4165, "CIORICEANU IONUȚ-HORIA" },
+            { 2375, "ILAȘ MAGDALENA" },
+            { 6616, "MÂNDRU MARIA SPERANȚA" },
+            { 16893, "MILEA GIGUȘA-ROXANA" },
+            { 16894, "NEGOIȚĂ ELENA" },
+            { 6803, "STAREȘU CAMELIA MARIANA" },
+            { 6800, "ȘERBAN AGURIȚA DORINELA" },
+            { 5881, "TUCHEL IONUȚ-VLAD" },
+            { 2899, "BREZEANU ALIN IONUȚ" },
+            { 4345, "DIACONU ȘTEFANIA-ROXANA" },
             { 4352, "MANIȘIU(VASILE) VIRGINIA IOANA" },
             { 4401, "FOLEA(VECERDI) CRISTINA AGNEȘ" },
+            { 3887, "FOLEA(VECERDI) CRISTINA AGNEȘ" }, // FIX unificare cu 4401
             { 4821, "CHIRA CODRUȚA-ELENA" },
             { 5833, "MARCHIȘ(TOMA) MARIA-ALEXANDRA" },
             { 5884, "VEZETEU COSMIN-DĂNUȚ" },
             { 6716, "BĂȘEANU IONUȚ-CRISTIAN-COZMIN" },
-            { 6721, "MÂNZĂȚANU DIANA" }, { 6761, "CIOPLEIAȘ BOGDAN-NICOLAE" },
+            { 6721, "MÂNZĂȚANU DIANA" },
+            { 6761, "CIOPLEIAȘ BOGDAN-NICOLAE" },
+            { 5665, "TOHANEAN DRAGOS IOAN - EFS" }, // FIX unificare cu 1549
         };
 
         private string FixNume(string? nume, object? idProfesorObj)
@@ -280,9 +295,6 @@ namespace LicentaV1.Controllers
         [HttpGet("liste/departamente")]
         public ActionResult GetDepartamente(string? anUniv, string? numeFacultate)
         {
-            // SURSA CORECTA: departamentele vin din View_Profesori_CF_AnUniv (nomenclator HR)
-            // NU din StatDeFunctiiID_Catedra din View_CentralizareMateriiProfesor
-            // (acela e ID-ul specializarii studentilor, nu departamentul profesorului)
             var lista = new List<string> { "Toti" };
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
@@ -306,22 +318,65 @@ namespace LicentaV1.Controllers
             return Ok(lista);
         }
 
+        // =====================================================================
+        // FIX GetSpecializari: accepta acum si @departament
+        // Daca departament != "Toti", filtreaza prin JOIN cu HR
+        // astfel incat lista de specializari sa fie relevanta pentru departamentul ales
+        // =====================================================================
         [HttpGet("liste/specializari-per-facultate")]
-        public ActionResult GetSpecializari(string? anUniv, string? numeFacultate)
+        public ActionResult GetSpecializari(string? anUniv, string? numeFacultate, string? departament)
         {
             var lista = new List<string> { "Toti" };
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-            using var cmd = new SqlCommand(@"SELECT DISTINCT UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                    CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0 THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
-                         ELSE vcm.DenumireSpecializare END,' - CORECT',''),' CORECT',''),' - COPIE',''),'S','S'),'T','T')))) COLLATE DATABASE_DEFAULT AS SpecCurata
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                WHERE vcm.DenumireSpecializare IS NOT NULL
-                  AND (@fac='Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(vcm.DenumireFacultate,CHAR(9),''),'S','S'),'T','T'))))=@fac)
-                ORDER BY SpecCurata", conn);
+            bool filtrDept = !string.IsNullOrWhiteSpace(departament) && departament != "Toti";
+            string sql;
+            if (filtrDept)
+            {
+                sql = @"SELECT DISTINCT UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                            CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0
+                                 THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
+                                 ELSE vcm.DenumireSpecializare END,
+                        ' - CORECT',''),' CORECT',''),' - COPIE',''),'S','S'),'T','T'))))
+                        COLLATE DATABASE_DEFAULT AS SpecCurata
+                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
+                    INNER JOIN (
+                        SELECT ID_Profesor, MIN(DenumireCatedra) AS DenumireCatedra
+                        FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
+                        WHERE ID_AnUnivCatedra = 45
+                        GROUP BY ID_Profesor
+                    ) vp ON vp.ID_Profesor = vcm.ID_Profesor
+                    WHERE vcm.ID_AnUniv = 45
+                      AND vcm.DenumireSpecializare IS NOT NULL
+                      AND (@fac='Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
+                              vcm.DenumireFacultate,CHAR(9),''),'S','S'),'T','T'))))=@fac)
+                      AND vp.DenumireCatedra COLLATE Latin1_General_CI_AI = @dept COLLATE Latin1_General_CI_AI
+                    ORDER BY SpecCurata";
+            }
+            else
+            {
+                sql = @"SELECT DISTINCT UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                            CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0
+                                 THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
+                                 ELSE vcm.DenumireSpecializare END,
+                        ' - CORECT',''),' CORECT',''),' - COPIE',''),'S','S'),'T','T'))))
+                        COLLATE DATABASE_DEFAULT AS SpecCurata
+                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
+                    WHERE vcm.ID_AnUniv = 45
+                      AND vcm.DenumireSpecializare IS NOT NULL
+                      AND (@fac='Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
+                              vcm.DenumireFacultate,CHAR(9),''),'S','S'),'T','T'))))=@fac)
+                    ORDER BY SpecCurata";
+            }
+            using var cmd = new SqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@fac", numeFacultate ?? "Toti");
+            if (filtrDept) cmd.Parameters.AddWithValue("@dept", departament!.Trim());
             using var reader = cmd.ExecuteReader();
-            while (reader.Read()) { var val = reader[0]?.ToString() ?? ""; if (!string.IsNullOrWhiteSpace(val) && !lista.Contains(val)) lista.Add(val); }
+            while (reader.Read())
+            {
+                var val = reader[0]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(val) && !lista.Contains(val)) lista.Add(val);
+            }
             return Ok(lista);
         }
 
@@ -354,24 +409,24 @@ namespace LicentaV1.Controllers
         #region ================= HELPER SQL COMUN =================
 
         // =====================================================================
-        // BaseData CTE - sursa comuna rapoartele 1-5
+        // BaseDataSql: VcmDedup include CASE pe ID_Profesor
+        // pentru unificarea numelor inainte de orice GROUP BY:
+        //   ID 5665 (Tohanean - Mate-Info) -> 'TOHANEAN DRAGOS Ioan - EFS'
+        //   ID 3887 (Folea Vecerdi)        -> 'Folea (Vecerdi) Cristina Agnes'
         //
-        // REGULA CRITICA TipPost:
-        // - TipPost vine EXCLUSIV din DenTitularSauSuplinitor din StatDeFunctiiPeSpecializare
-        // - Valorile 'Tit'/'Titular'/'Titulara' -> 'Titular'
-        // - Valorile 'Sup'/'Suplinitor'/'SupTit' si orice altceva -> 'Suplinitor'
-        // - NU se amesteca niciodata randurile de Titular cu cele de Suplinitor!
-        // - Gruparea cuplajelor se face OBLIGATORIU pe (Profesor, Materie, TipPost, Semestru)
-        //
-        // Filtrul @dept se aplica pe DenumireCatedra a profesorului din nomenclatorul HR,
-        // NU pe catedra specializarii studentilor.
+        // Filtrul @formaInv compara acum cu coloana derivata FormaInv (IF/ID/IFR)
+        // in loc de LIKE pe NumeSpecOriginal - mai curat si mai rapid
         // =====================================================================
         private const string BaseDataSql = @"
             WITH VcmDedup AS (
-                -- Eliminam randurile duplicate native din View_CentralizareMateriiProfesor
-                -- (view-ul poate returna acelasi rand de mai multe ori pentru aceeasi grupa/spec)
                 SELECT DISTINCT
-                    ID_Profesor, NumeIntregProfesor, ID_AnUniv, ID_StatDeFunctii,
+                    ID_Profesor,
+                    CASE ID_Profesor
+                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
+                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
+                        ELSE NumeIntregProfesor
+                    END AS NumeIntregProfesor,
+                    ID_AnUniv, ID_StatDeFunctii,
                     DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
                     Nr_Ore_Curs, Nr_Ore_Seminar, Nr_Ore_Laborator, Nr_Ore_Proiect,
                     NrOreConventionale, DenumireFacultate, StatDeFunctiiID_Catedra
@@ -417,45 +472,17 @@ namespace LicentaV1.Controllers
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                -- Fara JOIN pe View_Profesori_CF_AnUniv in BaseData
-                -- Filtrele @fac si @dept se aplica pe ACTIVITATE (unde preda profesorul)
-                -- FacultateCurata = facultatea specializarii studentilor (din VCM)
-                -- ID_Catedra = departamentul unde este asignata materia (din StatDeFunctii)
-                -- Aceste coloane sunt folosite in Filtrat pentru @fac si @dept
                 WHERE vcm.ID_AnUniv = 45
             )";
-
-        private const string FiltreStandard = @"(@an='Toti' OR bd.AnCurat=@an)
-                             AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-                             AND (@prof='Toti' OR bd.NumeIntreg=@prof)
-                             AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
-                             AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-                             AND (@semestru=0 OR bd.Semestru=@semestru)
-                             AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
-                             AND (@dept='Toti' OR bd.ID_Catedra IN (SELECT value FROM STRING_SPLIT(@deptIds,',')))";
 
         #endregion
 
         #region ================= RAPORT 1: NORMA PROFESORI =================
 
-        // =====================================================================
-        // ARHITECTURA FINALA - 3 CTE-uri:
-        // 1. Filtrat: Filtrare date brute. TipPost vine din BaseData (normalizat corect).
-        //    IMPORTANT: NU se mai face nicio conversie suplimentara a TipPost aici!
-        //    Titular ramane Titular, Suplinitor ramane Suplinitor.
-        // 2. Agregat: GROUP BY (Profesor, Spec, Materie, TipPost, Sem)
-        //    => TipPost ESTE in GROUP BY => randurile Titular si Suplinitor raman SEPARATE
-        // 3. Cuplaje: GROUP BY (Profesor, Materie, TipPost, Sem)
-        //    => TipPost ESTE in GROUP BY => cuplajele se calculeaza SEPARAT per tip post
-        // =====================================================================
         private string BuildNormaSql()
         {
             return BaseDataSql + @",
             Filtrat AS (
-                -- Filtreaza dupa ACTIVITATE (unde preda profesorul):
-                -- @fac = facultatea specializarii (FacultateCurata din VCM)
-                -- @dept = departamentul materiei (DenumireCatedraActivitate = MapareCatedra[ID_Catedra])
-                --        => tradus in SQL prin lista de ID-uri corespunzatoare departamentului
                 SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.NumeSpecOriginal,
                        bd.DenumireMaterie, bd.TipPost, bd.Semestru,
                        bd.ID_Catedra, bd.ID_StatDeFunctii,
@@ -464,18 +491,13 @@ namespace LicentaV1.Controllers
                 WHERE (@an='Toti' OR bd.AnCurat=@an)
                   AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR bd.NumeIntreg=@prof)
-                  AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
+                  AND (@formaInv='Toti' OR bd.FormaInv=@formaInv)
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
                   AND (@semestru=0 OR bd.Semestru=@semestru)
                   AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
                   AND (@dept='Toti' OR bd.ID_Catedra IN (SELECT value FROM STRING_SPLIT(@deptIds,',')))
             ),
             Agregat AS (
-                -- Per (Profesor, Spec, Materie, TipPost, Sem):
-                --   OreCurs:      MAX  (cursul se tine o singura data per spec)
-                --   OreAplicatii: SUM  (grupe diferite de laborator per spec se aduna)
-                --   OreConv:      MAX  (valoarea conventionala per spec, nu se aduna grupele)
-                -- Suma pe specializarile cuplate se face in CTE Cuplaje de mai jos
                 SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
                        MAX(ID_Catedra)        AS ID_Catedra,
                        MAX(ID_StatDeFunctii)  AS ID_StatDeFunctii,
@@ -486,10 +508,6 @@ namespace LicentaV1.Controllers
                 GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
             ),
             Cuplaje AS (
-                -- Cuplaje SEPARATE pe TipPost
-                -- OreCurs: MAX (cursul e comun pentru toate specializarile cuplate)
-                -- OreAplicatii: SUM (aplicatiile se tin separat per specializare)
-                -- OreConv: SUM (conventionalele se aduna din toate specializarile cuplate)
                 SELECT a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru,
                        COUNT(DISTINCT a.SpecializareCurata) AS NrSpec,
                        MIN(a.SpecializareCurata)            AS SpecPrimara,
@@ -556,7 +574,7 @@ namespace LicentaV1.Controllers
                     NrOreAplicatii = reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
                     NrOreConventionale = reader["NrOreConventionale"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConventionale"]) : 0.0,
                     Mentiuni = reader["SpecCuplate"] != DBNull.Value && !string.IsNullOrEmpty(reader["SpecCuplate"]?.ToString())
-                                         ? "Cuplaj cu: " + reader["SpecCuplate"]?.ToString() : "",
+                                             ? "Cuplaj cu: " + reader["SpecCuplate"]?.ToString() : "",
                     TotalTipPost = reader["TotalTipPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalTipPost"]) : 0.0,
                     TotalPost = reader["TotalPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalPost"]) : 0.0
                 });
@@ -598,9 +616,11 @@ namespace LicentaV1.Controllers
                 : $"NormaProfesori_{string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()))}.xlsx";
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Norme");
-            ws.Cell(1, 1).Value = "Filtre Aplicate"; ws.Cell(1, 1).Style.Font.Bold = true; ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
+            ws.Cell(1, 1).Value = "Filtre Aplicate";
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
             ws.Cell(2, 1).Value = $"An: {anUniv} | Facultate: {facultate} | Departament: {departament}";
-            ws.Cell(3, 1).Value = $"Profesor: {profesor} | Semestru: {(semestru == 0 ? "Toate" : semestru.ToString())} | Tip Post: {tipPost}";
+            ws.Cell(3, 1).Value = $"Profesor: {profesor} | Semestru: {(semestru == 0 ? "Toate" : semestru.ToString())} | Tip Post: {tipPost} | Forma Inv: {formaInvatamant}";
             var tbl = ws.Cell(5, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
             tbl.ShowTotalsRow = true;
             tbl.Field("Nr Ore Curs").TotalsRowFunction = XLTotalsRowFunction.Sum;
@@ -615,123 +635,80 @@ namespace LicentaV1.Controllers
 
         #endregion
 
-        // =====================================================================
-        // FIX RAPORT 2: DISTRIBUȚIE ORE PE PROGRAM
-        //
-        // PROBLEMA (Efectul de Tunel):
-        //   TotalPost era calculat cu OVER(PARTITION BY NumeIntreg) DUPĂ filtrare
-        //   => dacă filtrezi pe o facultate, totalul se recalcula doar pe ce rămânea vizibil
-        //   => profesorul apărea cu 100% chiar dacă acea facultate e doar 30% din norma lui
-        //
-        // SOLUȚIA:
-        //   CTE TotalAbsolutProfesor calculează SUM(OreConv) per profesor
-        //   aplicând DOAR @an și @semestru (ignoră @fac, @dept, @specs, @tipPost)
-        //   => baza de calcul e MEREU norma totală din universitate
-        //   => ProcentPost = (OreConvGrup / TotalAbsolut) * 100
-        // =====================================================================
-
-        // -----------------------------------------------------------------------
-        // ÎNLOCUIEȘTE variabila `sql` din GetOreProfProgram și ExportOreProgramExcel
-        // cu string-ul de mai jos (același SQL pentru ambele metode).
-        // -----------------------------------------------------------------------
+        #region ================= RAPORT 2: ORE PE PROGRAM =================
 
         private string BuildOreProfProgramSql()
         {
             return BaseDataSql + @",
-    -- ================================================================
-    -- TotalAbsolutProfesor: norma TOTALA a profesorului in universitate
-    -- Aplica DOAR @an si @semestru. Ignora @fac, @dept, @specs, @tipPost
-    -- Aceasta este baza imuabila de calcul pentru ProcentPost
-    -- ================================================================
-    TotalAbsolutProfesor AS (
-        SELECT
-            bd.NumeIntreg,
-            SUM(bd.OreConvLinie) AS TotalAbsolut
-        FROM BaseData bd
-        WHERE (@an='Toti' OR bd.AnCurat=@an)
-          AND (@semestru=0 OR bd.Semestru=@semestru)
-        GROUP BY bd.NumeIntreg
-    ),
-    -- ================================================================
-    -- FiltratRaw: date filtrate conform TUTUROR filtrelor utilizatorului
-    -- Acestea determina CE se afiseaza in raport, dar NU baza procentului
-    -- ================================================================
-    FiltratRaw AS (
-        SELECT bd.NumeIntreg, bd.ID_Profesor, bd.SpecializareCurata, bd.NumeSpecOriginal,
-               bd.DenumireMaterie, bd.TipPost, bd.Semestru, bd.ID_StatDeFunctii,
-               bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
-        FROM BaseData bd
-        WHERE (@an='Toti'      OR bd.AnCurat=@an)
-          AND (@fac='Toti'     OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-          AND (@prof='Toti'    OR bd.NumeIntreg=@prof)
-          AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
-          AND (@specs='Toti'   OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-          AND (@semestru=0     OR bd.Semestru=@semestru)
-          AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
-          AND (@dept='Toti'    OR bd.ID_Catedra IN (SELECT value FROM STRING_SPLIT(@deptIds,',')))
-    ),
-    -- Per (Profesor, Spec, Materie, TipPost, Sem): MAX curs, SUM aplicatii, MAX conv
-    Agregat2 AS (
-        SELECT NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
-               MAX(OreCursLinie)      AS OreCurs,
-               SUM(OreAplicatiiLinie) AS OreAplicatii,
-               MAX(OreConvLinie)      AS OreConv
-        FROM FiltratRaw
-        GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru
-    ),
-    -- Dedup cuplaje per (Profesor, Materie, TipPost, Sem)
-    CuplajeProg AS (
-        SELECT NumeIntreg, ID_Profesor, DenumireMaterie, TipPost, Semestru,
-               MIN(SpecializareCurata) AS SpecPrimara,
-               MAX(OreCurs)           AS OreCursMax,
-               SUM(OreAplicatii)      AS OreAplicatiiMax,
-               MAX(OreConv)           AS OreConvMax
-        FROM Agregat2
-        GROUP BY NumeIntreg, ID_Profesor, DenumireMaterie, TipPost, Semestru
-    ),
-    Dedup AS (
-        SELECT cp.NumeIntreg, cp.ID_Profesor, cp.SpecPrimara AS SpecializareCurata,
-               cp.OreCursMax    AS OreCurs,
-               cp.OreAplicatiiMax AS OreAplicatii,
-               cp.OreConvMax    AS OreConv
-        FROM CuplajeProg cp
-    ),
-    -- Agreg per (Profesor, Program): suma ore per program vizibil
-    Filtrat AS (
-        SELECT NumeIntreg, ID_Profesor,
-               SpecializareCurata             AS ProgramStudiu,
-               SUM(OreConv)                   AS OreConvProgram,
-               SUM(OreCurs)                   AS OreCursProgram,
-               SUM(OreAplicatii)              AS OreAplicatiiProgram
-        FROM Dedup
-        GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata
-        HAVING SUM(OreConv) > 0
-    )
-    SELECT
-        f.NumeIntreg                                        AS Profesor,
-        f.ID_Profesor,
-        ISNULL(f.ProgramStudiu,'Nespecificat')              AS ProgramStudiu,
-        ISNULL(f.OreConvProgram,0)                         AS NrOreConv,
-        ISNULL(f.OreCursProgram,0)                         AS NrOreCurs,
-        ISNULL(f.OreAplicatiiProgram,0)                    AS NrOreAplicatii,
-        -- TotalAbsolut = norma totala din universitate (ignorand filtrele de fac/dept/spec/tipPost)
-        ISNULL(tap.TotalAbsolut,0)                         AS TotalPost,
-        -- ProcentPost calculat pe baza normei totale, nu pe ce e vizibil in raport
-        CAST(
-            CASE
-                WHEN ISNULL(tap.TotalAbsolut,0) = 0 THEN 0
-                ELSE (ISNULL(f.OreConvProgram,0) / tap.TotalAbsolut) * 100
-            END
-        AS DECIMAL(10,2))                                  AS ProcentPost
-    FROM Filtrat f
-    LEFT JOIN TotalAbsolutProfesor tap ON tap.NumeIntreg = f.NumeIntreg
-    ORDER BY f.NumeIntreg, f.OreConvProgram DESC
-    OPTION (RECOMPILE)";
+            TotalAbsolutProfesor AS (
+                -- Norma totala din universitate: ignora @fac/@dept/@specs/@tipPost
+                -- Aplica DOAR @an si @semestru
+                SELECT bd.NumeIntreg, SUM(bd.OreConvLinie) AS TotalAbsolut
+                FROM BaseData bd
+                WHERE (@an='Toti' OR bd.AnCurat=@an)
+                  AND (@semestru=0 OR bd.Semestru=@semestru)
+                GROUP BY bd.NumeIntreg
+            ),
+            FiltratRaw AS (
+                SELECT bd.NumeIntreg, bd.ID_Profesor, bd.SpecializareCurata, bd.NumeSpecOriginal,
+                       bd.DenumireMaterie, bd.TipPost, bd.Semestru, bd.ID_StatDeFunctii,
+                       bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
+                FROM BaseData bd
+                WHERE (@an='Toti'       OR bd.AnCurat=@an)
+                  AND (@fac='Toti'      OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
+                  AND (@prof='Toti'     OR bd.NumeIntreg=@prof)
+                  AND (@formaInv='Toti' OR bd.FormaInv=@formaInv)
+                  AND (@specs='Toti'    OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
+                  AND (@semestru=0      OR bd.Semestru=@semestru)
+                  AND (@tipPost='Toti'  OR bd.TipPost=@tipPost)
+                  AND (@dept='Toti'     OR bd.ID_Catedra IN (SELECT value FROM STRING_SPLIT(@deptIds,',')))
+            ),
+            Agregat2 AS (
+                SELECT NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
+                       MAX(OreCursLinie)      AS OreCurs,
+                       SUM(OreAplicatiiLinie) AS OreAplicatii,
+                       MAX(OreConvLinie)      AS OreConv
+                FROM FiltratRaw
+                GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru
+            ),
+            CuplajeProg AS (
+                SELECT a.NumeIntreg, a.ID_Profesor, a.DenumireMaterie, a.TipPost, a.Semestru,
+                       MIN(a.SpecializareCurata) AS SpecPrimara,
+                       MAX(a.OreCurs)            AS OreCursMax,
+                       SUM(a.OreAplicatii)       AS OreAplicatiiMax,
+                       MAX(a.OreConv)            AS OreConvMax
+                FROM Agregat2 a
+                GROUP BY a.NumeIntreg, a.ID_Profesor, a.DenumireMaterie, a.TipPost, a.Semestru
+            ),
+            Dedup AS (
+                SELECT cp.NumeIntreg, cp.ID_Profesor, cp.SpecPrimara AS SpecializareCurata,
+                       cp.OreCursMax AS OreCurs, cp.OreAplicatiiMax AS OreAplicatii, cp.OreConvMax AS OreConv
+                FROM CuplajeProg cp
+            ),
+            Filtrat AS (
+                SELECT NumeIntreg, ID_Profesor, SpecializareCurata AS ProgramStudiu,
+                       SUM(OreConv)      AS OreConvProgram,
+                       SUM(OreCurs)      AS OreCursProgram,
+                       SUM(OreAplicatii) AS OreAplicatiiProgram
+                FROM Dedup
+                GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata
+                HAVING SUM(OreConv) > 0
+            )
+            SELECT f.NumeIntreg                                    AS Profesor,
+                   f.ID_Profesor,
+                   ISNULL(f.ProgramStudiu,'Nespecificat')          AS ProgramStudiu,
+                   ISNULL(f.OreConvProgram,0)                     AS NrOreConv,
+                   ISNULL(f.OreCursProgram,0)                     AS NrOreCurs,
+                   ISNULL(f.OreAplicatiiProgram,0)                AS NrOreAplicatii,
+                   ISNULL(tap.TotalAbsolut,0)                     AS TotalPost,
+                   CAST(CASE WHEN ISNULL(tap.TotalAbsolut,0)=0 THEN 0
+                             ELSE (ISNULL(f.OreConvProgram,0)/tap.TotalAbsolut)*100
+                        END AS DECIMAL(10,2))                     AS ProcentPost
+            FROM Filtrat f
+            LEFT JOIN TotalAbsolutProfesor tap ON tap.NumeIntreg = f.NumeIntreg
+            ORDER BY f.NumeIntreg, f.OreConvProgram DESC
+            OPTION (RECOMPILE)";
         }
-
-        // -----------------------------------------------------------------------
-        // GetOreProfProgram: înlocuiește metoda existenta cu aceasta
-        // -----------------------------------------------------------------------
 
         [HttpGet("ore-profesor-program")]
         public async Task<IActionResult> GetOreProfProgram(
@@ -761,10 +738,6 @@ namespace LicentaV1.Controllers
             return Ok(result);
         }
 
-        // -----------------------------------------------------------------------
-        // ExportOreProgramExcel: înlocuiește metoda existenta cu aceasta
-        // -----------------------------------------------------------------------
-
         [HttpGet("export/ore-program")]
         public async Task<IActionResult> ExportOreProgramExcel(
             string? anUniv = "Toti", string? facultate = "Toti",
@@ -774,15 +747,14 @@ namespace LicentaV1.Controllers
         {
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-        new DataColumn("Profesor"),
-        new DataColumn("Program Studiu"),
-        new DataColumn("Nr Ore Curs",    typeof(double)),
-        new DataColumn("Nr Ore Aplicatii", typeof(double)),
-        new DataColumn("Nr Ore Conv",    typeof(double)),
-        new DataColumn("Total Norma Univ.", typeof(double)),   // norma totala, ignorand filtrele
-        new DataColumn("Procent Post",   typeof(double))
-    });
-
+                new DataColumn("Profesor"),
+                new DataColumn("Program Studiu"),
+                new DataColumn("Nr Ore Curs",       typeof(double)),
+                new DataColumn("Nr Ore Aplicatii",  typeof(double)),
+                new DataColumn("Nr Ore Conv",       typeof(double)),
+                new DataColumn("Total Norma Univ.", typeof(double)),
+                new DataColumn("Procent Post",      typeof(double))
+            });
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildOreProfProgramSql(), conn);
@@ -797,20 +769,16 @@ namespace LicentaV1.Controllers
                     reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
                     reader["NrOreConv"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConv"]) : 0.0,
                     reader["TotalPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalPost"]) : 0.0,
-                    reader["ProcentPost"] != DBNull.Value ? Convert.ToDouble(reader["ProcentPost"]) : 0.0
-                );
-
+                    reader["ProcentPost"] != DBNull.Value ? Convert.ToDouble(reader["ProcentPost"]) : 0.0);
             string fileName = string.IsNullOrEmpty(profesor) || profesor == "Toti"
                 ? "StatisticaOre_General.xlsx"
                 : $"StatisticaOre_{string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()))}.xlsx";
-
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Distributie Ore");
-            // Rand 1: info filtre
             ws.Cell(1, 1).Value = $"An: {anUniv} | Facultate: {facultate} | Profesor: {profesor}";
             ws.Cell(1, 1).Style.Font.Bold = true;
             ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
-            ws.Cell(2, 1).Value = "NOTA: Coloana 'Total Norma Univ.' si 'Procent Post' reflecta norma totala din universitate, independent de filtrele de Facultate/Departament/Specializare.";
+            ws.Cell(2, 1).Value = "NOTA: 'Total Norma Univ.' si 'Procent Post' reflecta norma totala din universitate, independent de filtrele de Facultate/Departament/Specializare.";
             ws.Cell(2, 1).Style.Font.Italic = true;
             ws.Cell(2, 1).Style.Font.FontColor = XLColor.Gray;
             var tbl = ws.Cell(4, 1).InsertTable(dt);
@@ -824,32 +792,39 @@ namespace LicentaV1.Controllers
             StyleHeader(ws.Range(4, 1, 4, dt.Columns.Count));
             using var stream = new MemoryStream();
             wb.SaveAs(stream);
-            return File(stream.ToArray(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                fileName);
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
-        // =====================================================================
-        // FIX RAPORT 3: NORME TOTALURI
-        // Problema: MAX(Facultate) / MAX(ID_Catedra) din activitate => date gresite
-        // Solutia: JOIN cu ProfDept3 in DateBrute => departament/facultate din HR
-        // =====================================================================
+
+        #endregion
+
+        // ==================== SFARSIT JUMATATE 1 ====================
+        // Continua in RapoarteController_part2.cs de la: #region RAPORT 3
+        // ==================== JUMATATEA 2 ====================
+        // Lipeste DUPA continutul din part1, inlocuind comentariul "TAIATURA"
+        // Aceasta parte incepe cu #region RAPORT 3 si se termina cu closing brace al clasei
+
+        #region ================= RAPORT 3: NORME TOTALURI =================
 
         private string BuildNormaTotaluriSql()
         {
             return @"
             WITH VcmDedup3 AS (
                 SELECT DISTINCT
-                    ID_Profesor, NumeIntregProfesor, ID_AnUniv, ID_StatDeFunctii,
+                    ID_Profesor,
+                    CASE ID_Profesor
+                        WHEN 5665 THEN 'TOHANEAN DRAGOS Ioan - EFS'
+                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
+                        ELSE NumeIntregProfesor
+                    END AS NumeIntregProfesor,
+                    ID_AnUniv, ID_StatDeFunctii,
                     DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
                     NrOreConventionale, DenumireFacultate, StatDeFunctiiID_Catedra
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor]
                 WHERE ID_AnUniv = 45
             ),
-            -- ProfDept3: departamentul si facultatea DE BAZA ale profesorului (din HR)
-            -- Acesta este sursa unica si corecta pentru Departament si Facultate
             ProfDept3 AS (
                 SELECT ID_Profesor,
-                       MIN(DenumireCatedra)  AS DeptProfesor,
+                       MIN(DenumireCatedra)   AS DeptProfesor,
                        MIN(DenumireFacultate) AS FacProfesor
                 FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
                 WHERE ID_AnUnivCatedra = 45
@@ -859,7 +834,6 @@ namespace LicentaV1.Controllers
                 SELECT
                     vcm.NumeIntregProfesor                                              AS NumeComplet,
                     vcm.ID_Profesor,
-                    -- Departament si Facultate vin EXCLUSIV din ProfDept3 (HR), nu din activitate
                     ISNULL(pd.DeptProfesor,  'Nespecificat')                            AS Departament,
                     ISNULL(pd.FacProfesor,   'Nespecificat')                            AS Facultate,
                     CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))             AS OreConv,
@@ -888,16 +862,12 @@ namespace LicentaV1.Controllers
                     AND sf.DenumireSpecializare = vcm.DenumireSpecializare
                     AND sf.DenumireMaterie     = vcm.DenumireMaterie
                     AND sf.NrSemestruDinAn     = vcm.NrSemestruDinAn
-                -- JOIN cu ProfDept3: sursa corecta de Departament/Facultate
                 LEFT JOIN ProfDept3 pd ON pd.ID_Profesor = vcm.ID_Profesor
                 WHERE (@an='Toti'   OR UPPER(LTRIM(RTRIM(au.Denumire))) = @an)
                   AND (@fac='Toti'  OR ISNULL(pd.FacProfesor,'') COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR vcm.NumeIntregProfesor = @prof)
                   AND (@dept='Toti' OR ISNULL(pd.DeptProfesor,'') COLLATE Latin1_General_CI_AI = @dept COLLATE Latin1_General_CI_AI)
             ),
-            -- Dedup: elimina grupe multiple per materie
-            -- TipPost in GROUP BY => Titular si Suplinitor raman separate
-            -- Departament/Facultate sunt deja fixe (din HR), MAX e pur formal
             Dedup AS (
                 SELECT NumeComplet, ID_Profesor, TipPost, FormaInv,
                        DenumireMaterie, Semestru,
@@ -905,11 +875,8 @@ namespace LicentaV1.Controllers
                        MAX(Departament) AS Departament,
                        MAX(Facultate)   AS Facultate
                 FROM DateBrute
-                GROUP BY NumeComplet, ID_Profesor, TipPost, FormaInv,
-                         DenumireMaterie, Semestru
+                GROUP BY NumeComplet, ID_Profesor, TipPost, FormaInv, DenumireMaterie, Semestru
             ),
-            -- Agregare finala: max 2 randuri per profesor (Titular + Suplinitor)
-            -- Departament si Facultate sunt identice pe toate randurile => MAX e corect
             Agreg AS (
                 SELECT NumeComplet, ID_Profesor,
                        MAX(Departament) AS Departament,
@@ -930,24 +897,22 @@ namespace LicentaV1.Controllers
         }
 
         [HttpGet("norma-totaluri")]
-        public ActionResult GetNormaTotaluri(string? anUniv, string? facultate, string? departament, string? profesor)
+        public async Task<IActionResult> GetNormaTotaluri(string? anUniv, string? facultate, string? departament, string? profesor)
         {
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildNormaTotaluriSql(), conn);
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
             cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
             cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
                 result.Add(new
                 {
                     Profesor = FixNume(reader["NumeComplet"]?.ToString(), reader["ID_Profesor"]),
-                    // SQL returneaza direct string-ul din HR — nu mai e nevoie de GetDenumireCatedra()
                     Departament = reader["Departament"]?.ToString() ?? "",
                     Facultate = reader["Facultate"]?.ToString() ?? "",
                     TipNorma = reader["TipPost"]?.ToString() ?? "",
@@ -957,40 +922,32 @@ namespace LicentaV1.Controllers
                     TotalOreConv = reader["TotalOreConv"] != DBNull.Value ? Convert.ToDecimal(reader["TotalOreConv"]) : 0m,
                     TotalAnualOreConv = reader["TotalAnual"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAnual"]) : 0m
                 });
-            }
             return Ok(result);
         }
 
         [HttpGet("export/norma-totaluri")]
-        public IActionResult ExportNormaTotaluri(string? anUniv, string? facultate, string? departament, string? profesor)
+        public async Task<IActionResult> ExportNormaTotaluri(string? anUniv, string? facultate, string? departament, string? profesor)
         {
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Profesor"),
-                new DataColumn("Departament"),
-                new DataColumn("Facultate"),
+                new DataColumn("Profesor"), new DataColumn("Departament"), new DataColumn("Facultate"),
                 new DataColumn("Tip Norma"),
-                new DataColumn("Ore IF",             typeof(decimal)),
-                new DataColumn("Ore ID",             typeof(decimal)),
-                new DataColumn("Ore IFR",            typeof(decimal)),
-                new DataColumn("Total Ore Conv.",    typeof(decimal)),
-                new DataColumn("Total Anual (x14)",  typeof(decimal))
+                new DataColumn("Ore IF",            typeof(decimal)), new DataColumn("Ore ID",            typeof(decimal)),
+                new DataColumn("Ore IFR",           typeof(decimal)), new DataColumn("Total Ore Conv.",   typeof(decimal)),
+                new DataColumn("Total Anual (x14)", typeof(decimal))
             });
-
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildNormaTotaluriSql(), conn);
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
             cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
             cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
                 dt.Rows.Add(
                     FixNume(reader["NumeComplet"]?.ToString(), reader["ID_Profesor"]),
-                    // SQL returneaza direct string-ul din HR — nu mai e nevoie de GetDenumireCatedra()
                     reader["Departament"]?.ToString() ?? "",
                     reader["Facultate"]?.ToString() ?? "",
                     reader["TipPost"]?.ToString() ?? "",
@@ -998,14 +955,10 @@ namespace LicentaV1.Controllers
                     reader["OreID"] != DBNull.Value ? Convert.ToDecimal(reader["OreID"]) : 0m,
                     reader["OreIFR"] != DBNull.Value ? Convert.ToDecimal(reader["OreIFR"]) : 0m,
                     reader["TotalOreConv"] != DBNull.Value ? Convert.ToDecimal(reader["TotalOreConv"]) : 0m,
-                    reader["TotalAnual"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAnual"]) : 0m
-                );
-            }
-
+                    reader["TotalAnual"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAnual"]) : 0m);
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Totaluri Norme");
-            var tbl = ws.Cell(1, 1).InsertTable(dt);
-            tbl.Theme = XLTableTheme.None;
+            var tbl = ws.Cell(1, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
             tbl.ShowTotalsRow = true;
             tbl.Field("Ore IF").TotalsRowFunction = XLTotalsRowFunction.Sum;
             tbl.Field("Ore ID").TotalsRowFunction = XLTotalsRowFunction.Sum;
@@ -1015,33 +968,27 @@ namespace LicentaV1.Controllers
             tbl.Field("Profesor").TotalsRowLabel = "TOTAL GENERAL";
             ws.Columns().AdjustToContents();
             StyleHeader(ws.Range(1, 1, 1, dt.Columns.Count));
-
-            using var stream = new MemoryStream();
-            wb.SaveAs(stream);
-            return File(stream.ToArray(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "Totaluri_Norme.xlsx");
+            using var stream = new MemoryStream(); wb.SaveAs(stream);
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Totaluri_Norme.xlsx");
         }
+
+        #endregion
 
         #region ================= RAPORT 4: LIMBI STRAINE =================
 
-        // =====================================================================
-        // FIX LIMBI STRAINE:
-        // - Datele brute includ AMBELE tipuri de norme (Titular + Suplinitor)
-        // - Nu se mai elimina nicio forma de incadrare
-        // - Deduplicare corecta a cuplajelor: per (Profesor, Materie, Sem, TipPost) -> MAX
-        // - Totalul = suma TUTUROR orelor predate, indiferent de tipul normei
-        // =====================================================================
         private string BuildLimbiSql()
         {
             return @"
             WITH DateLimbi AS (
                 SELECT
-                    vcm.NumeIntregProfesor                                             AS NumeComplet,
+                    CASE vcm.ID_Profesor
+                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
+                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
+                        ELSE vcm.NumeIntregProfesor
+                    END                                                                AS NumeComplet,
                     ISNULL(vcm.DenumireMaterie,'Nedefinit')                            AS DenumireMaterie,
                     ISNULL(vcm.NrSemestruDinAn,0)                                      AS Semestru,
                     vcm.ID_StatDeFunctii,
-                    -- TipPost normalizat: 'TIT'/'Titular'/'Titulara' -> 'Titular', rest -> 'Suplinitor'
                     CASE
                         WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
                              THEN 'Titular'
@@ -1057,7 +1004,6 @@ namespace LicentaV1.Controllers
                              ELSE vcm.DenumireSpecializare END,'S','S'),'T','T')))) AS SpecializareCurata
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
                 INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                -- JOIN fara MAX: fiecare rand Tit/Sup raman separate
                 LEFT JOIN (
                     SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
                            NrSemestruDinAn, DenTitularSauSuplinitor
@@ -1066,7 +1012,7 @@ namespace LicentaV1.Controllers
                     ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                WHERE vcm.ID_AnUniv = 45  -- FILTRU OBLIGATORIU: doar anul universitar 2025-2026
+                WHERE vcm.ID_AnUniv = 45
                   AND (@fac='Toti' OR LTRIM(RTRIM(vcm.DenumireFacultate)) COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR vcm.NumeIntregProfesor=@prof)
                   AND (@formaInv='Toti' OR vcm.DenumireSpecializare LIKE '% '+@formaInv+'%' OR vcm.DenumireSpecializare LIKE '%-'+@formaInv+'%')
@@ -1099,22 +1045,18 @@ namespace LicentaV1.Controllers
                         'Administrarea afacerilor','Managementul resurselor umane',
                         'Dezvoltarea afacerilor turistice','Medicina traditionala chineza'))
             ),
-            -- Pre-agregare per (Profesor, Spec, Materie, TipPost, Sem)
-            -- TipPost in GROUP BY: Titular si Suplinitor raman separate
             PreAgreg AS (
                 SELECT NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost,
                        MAX(OreConv) AS OreConvSpec
                 FROM DateLimbi
                 GROUP BY NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost
             ),
-            -- Dedup cuplaje: per (Profesor, Materie, Sem, TipPost) -> MAX ore per cuplaj
             Dedup AS (
                 SELECT NumeComplet, DenumireMaterie, Semestru, TipPost,
                        MAX(OreConvSpec) AS OreConvDedup
                 FROM PreAgreg
                 GROUP BY NumeComplet, DenumireMaterie, Semestru, TipPost
             )
-            -- Total = SUMA tuturor orelor (Titular + Suplinitor) per profesor
             SELECT NumeComplet,
                    CAST(ROUND(SUM(CASE WHEN Semestru IN (1,3,5,7,9,11) THEN OreConvDedup ELSE 0 END)*14,2) AS DECIMAL(10,2)) AS Sem1,
                    CAST(ROUND(SUM(CASE WHEN Semestru IN (2,4,6,8,10,12) THEN OreConvDedup ELSE 0 END)*14,2) AS DECIMAL(10,2)) AS Sem2,
@@ -1126,19 +1068,19 @@ namespace LicentaV1.Controllers
         }
 
         [HttpGet("limbi-straine")]
-        public ActionResult GetLimbiStraine(string? anUniv, string? facultate, string? departament,
+        public async Task<IActionResult> GetLimbiStraine(string? anUniv, string? facultate, string? departament,
             string? profesor, string? specializari, int semestru = 0,
             string tipPost = "Toti", string? formaInvatamant = "Toti")
         {
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildLimbiSql(), conn);
             cmd.CommandTimeout = 120;
             AddLimbiParams(cmd, anUniv, facultate, formaInvatamant, profesor, specializari, semestru, tipPost);
-            using var reader = cmd.ExecuteReader();
+            using var reader = await cmd.ExecuteReaderAsync();
             int nr = 1;
-            while (reader.Read())
+            while (await reader.ReadAsync())
                 result.Add(new
                 {
                     NrCrt = nr++,
@@ -1151,7 +1093,7 @@ namespace LicentaV1.Controllers
         }
 
         [HttpGet("export/limbi-straine")]
-        public IActionResult ExportLimbiStraine(string? anUniv, string? facultate, string? departament,
+        public async Task<IActionResult> ExportLimbiStraine(string? anUniv, string? facultate, string? departament,
             string? profesor, string? specializari, int semestru = 0,
             string tipPost = "Toti", string? formaInvatamant = "Toti")
         {
@@ -1162,18 +1104,17 @@ namespace LicentaV1.Controllers
                 new DataColumn("Total", typeof(decimal))
             });
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildLimbiSql(), conn);
             cmd.CommandTimeout = 120;
             AddLimbiParams(cmd, anUniv, facultate, formaInvatamant, profesor, specializari, semestru, tipPost);
-            using var reader = cmd.ExecuteReader();
+            using var reader = await cmd.ExecuteReaderAsync();
             int nr = 1;
-            while (reader.Read())
+            while (await reader.ReadAsync())
                 dt.Rows.Add(nr++, reader["NumeComplet"],
                     reader["Sem1"] != DBNull.Value ? Convert.ToDecimal(reader["Sem1"]) : 0m,
                     reader["Sem2"] != DBNull.Value ? Convert.ToDecimal(reader["Sem2"]) : 0m,
                     reader["Total"] != DBNull.Value ? Convert.ToDecimal(reader["Total"]) : 0m);
-
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Limbi Straine");
             var tbl = ws.Cell(1, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
@@ -1214,7 +1155,7 @@ namespace LicentaV1.Controllers
                 WHERE (@an='Toti' OR bd.AnCurat=@an)
                   AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
                   AND (@prof='Toti' OR bd.NumeIntreg=@prof)
-                  AND (@formaInv='Toti' OR bd.NumeSpecOriginal LIKE '% '+@formaInv+'%' OR bd.NumeSpecOriginal LIKE '%-'+@formaInv+'%')
+                  AND (@formaInv='Toti' OR bd.FormaInv=@formaInv)
                   AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
                   AND (@semestru=0 OR bd.Semestru=@semestru)
                   AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
@@ -1323,767 +1264,211 @@ namespace LicentaV1.Controllers
 
         #region ================= RAPORT 6: TITULARI =================
 
-        // =====================================================================
-        // SURSA CORECTA TITULARI:
-        // View_Profesori_CF_AnUniv cu:
-        //   - TitularAnUniv = 1
-        //   - ID_AnUnivCatedra = 45
-        //   - DidCerc = 'D' (doar cadre didactice, NU cercetatori)
-        //   - NumeIntreg NOT LIKE '--%' (elimina randuri reziduale tip '--Cercetator--')
-        //   - LTRIM(RTRIM(NumeIntreg)) != '' (elimina randuri cu nume gol)
-        // =====================================================================
-        // Lista oficiala ANS 2025-2026 (741 titulari, sursa: Date_ANS_pentru_SRU_februarie_2026_27feb_Diana.xlsx)
-        // Normalizata: spatii multiple -> un spatiu, uppercase
-        // Matching se face prin normalizare identica in C# (regex \s+ -> space, ToUpperInvariant)
-        // Lista oficiala ANS titulari 2025-2026 (sursa: Date_ANS_pentru_SRU_februarie_2026_27feb_Diana.xlsx)
-        // Normalizare: spatii multiple->un spatiu, uppercase, fara diacritice, ?->T
-        // Matching in C#: acelasi algoritm NormalizeName()
         private static readonly HashSet<string> TitulariANS = new HashSet<string>(StringComparer.Ordinal)
         {
-            "ABAITANCEI HORIA",
-            "ABRUDAN IOAN VASILE",
-            "ACIU LIA ELENA",
-            "ADAM MIHAI-SORIN",
-            "ADOCHITE (GALBAU) CRISTINA-STEFANIA",
-            "AGACHE IOANA-OCTAVIA",
-            "ALBU RUXANDRA GABRIELA",
-            "ALDEA ADRIAN",
-            "ALDEA CODRUTA NICOLETA",
-            "ALDEA CONSTANTIN LUCIAN",
-            "ALECU STEFAN",
-            "ALEXANDRESCU DANA SORINA",
-            "ALEXANDRU CATALIN",
-            "ALEXANDRU MARIAN",
-            "ALEXE RALUCA MONICA",
-            "ANASTASIU ALEXANDRU-RAZVAN",
-            "ANASTASIU COSTIN VLAD",
-            "ANDREESCU OANA",
-            "ANDRONIC LUMINITA CAMELIA",
-            "ANDRONIC MARIA LETITIA",
-            "ANGHELINA BOGDAN-CRISTIAN",
-            "ANTON CARMEN ELENA",
-            "ANTONARU CARMEN ELENA",
-            "ANTONYA CSABA",
-            "APOSTOAIE MIRELA",
-            "ARBANAS IOANA",
-            "ARGASEALA GEORGIANA",
-            "ARHIRE MONA BRIGITTE",
-            "ARMASAR IOANA PAULA",
-            "ARMASELU ANCA",
-            "ARON IOAN",
-            "ARVATESCU CRISTIAN",
-            "ATUDOREI IOANA ANISA",
-            "BABA MARIUS NICOLAE",
-            "BABA MIRELA CAMELIA",
-            "BADARAU CARMEN LILIANA",
-            "BADAU ADELA",
-            "BADAU DANA",
-            "BADEA ANAMARIA RALUCA",
-            "BADEA MIHAELA",
-            "BADICU GEORGIAN",
-            "BAICOIANU ALEXANDRA",
-            "BALAN FLORIN",
-            "BALAN TITUS CONSTANTIN",
-            "BALAS MONICA LOREDANA",
-            "BALASESCU MARIUS",
-            "BALASESCU SIMONA",
-            "BALINT ELENA",
-            "BALINT LORAND",
-            "BALTES LIANA SANDA",
-            "BALTESCU CODRUTA ADINA",
-            "BARABAS BARNA",
-            "BARACAN ADRIAN",
-            "BARBU DANIELA MARIANA",
-            "BARBU ION",
-            "BARBU MAGDALENA",
-            "BARBU MARIUS CATALIN",
-            "BARBU SILVIU GABRIEL",
-            "BARBULESCU ALINA",
-            "BARBULESCU OANA",
-            "BAROTE LUMINITA",
-            "BARSAN MARIA IONELA",
-            "BARSAN MARIA MAGDALENA",
-            "BASALIC ELENA-BIANCA",
-            "BATRANU PINTEA VLAD",
-            "BAZGAN MARIUS",
-            "BEDELEAN IOAN BOGDAN",
-            "BEDO TIBOR",
-            "BEGU TEODORA-MARIA",
-            "BELDEAN EMANUELA CARMEN",
-            "BELDEAN NICOLAE LAURENTIU",
-            "BELDIANU IOLANDA FELICIA",
-            "BELIBOU ALEXANDRA",
-            "BENCZE ANDREI",
-            "BENEA BOGDAN CORNEL",
-            "BESCHEA ANDREI-GEORGE",
-            "BIGIU NICUSOR FLORIN",
-            "BILDEA TEODOR STEFAN",
-            "BISOC ALINA",
-            "BOBESCU ELENA",
-            "BOBOC RAZVAN GABRIEL",
-            "BOCA LIANA LUMINITA",
-            "BOCU RAZVAN",
-            "BODI DIANA CRISTINA",
-            "BODOC ALICE MAGDALENA",
-            "BOER ATTILA LASZLO",
-            "BOGATU CRISTINA AURICA",
-            "BOGDAN IOANA CORINA",
-            "BOLBORICI ANA MARIA",
-            "BOLDISOR CRISTIAN NICOLAE",
-            "BOLOCAN SORIN IONUT",
-            "BONDOC IONESCU ALEXANDRU",
-            "BORCAN VIRGIL",
-            "BORCOMAN MARIANA",
-            "BORZ STELIAN ALEXANDRU",
-            "BOSCOIANU MIRCEA",
-            "BOSCOR DANA",
-            "BOTA OANA ALINA",
-            "BOTESCU-SIRETEANU ILEANA-AURORA",
-            "BOTEZATU DAN GEORGE",
-            "BOTIANU ANA MARIA",
-            "BOTIS MARIUS FLORIN",
-            "BOTIS SORINA",
-            "BRANEA (TACA) IOANA - ANTONIA",
-            "BRANESCU GERONIMO-RADUCU",
-            "BRATU CIPRIAN",
-            "BRATU CONSTANTIN ALEXANDRU",
-            "BRATU DRAGOS-VASILE",
-            "BRATU MARIA-ALEXANDRA",
-            "BRATUCU GABRIEL",
-            "BRAUN BARBU CRISTIAN",
-            "BRENCI LUMINITA MARIA",
-            "BREZEANU ALIN IONUT",
-            "BRICIU GABRIELA ARABELA",
-            "BRICIU VICTOR ALEXANDRU",
-            "BUCS LORANT",
-            "BUCUR ROMULUS LADISLAU",
-            "BUDALA ADRIAN",
-            "BUGA CRISTINA MARIA",
-            "BUHAICIUC MIHAELA",
-            "BUICAN GEORGE RAZVAN",
-            "BUJA ELENA",
-            "BULARCA ANCA ROXANA",
-            "BULARCA MARIA-CRISTINA",
-            "BULARCA RAZVAN",
-            "BULMEZ ALEXANDRU MIHAI",
-            "BURADA MARINELA",
-            "BURBEA GEORGIANA-MIHAELA",
-            "BURDUHOS BOGDAN GABRIEL",
-            "BURLACU MIHAI",
-            "BUSUIOCEANU STELIANA",
-            "BUTNARIU SILVIU LUIS",
-            "BUVNARIU LAVINIA",
-            "BUZDUGAN IOANA DIANA",
-            "BUZEA CARMEN",
-            "CALIN (COMSIT) ANDREEA-MIHAELA",
-            "CALIN MARIUS DANIEL",
-            "CAMPEAN MIHAELA",
-            "CAMPEAN STEFAN-IOAN",
-            "CAMPU ADINA",
-            "CAMPU VASILE RAZVAN",
-            "CANDREA ADINA NICOLETA",
-            "CANJA CRISTINA MARIA",
-            "CARP MARIUS CATALIN",
-            "CATANA DORIN IOAN",
-            "CATANESCU ANDREEA CORINA",
-            "CATARON ANGEL DORU",
-            "CATEANU MIHNEA",
-            "CAZACU CHRISTIANA EMILIA",
-            "CAZAN ANA MARIA",
-            "CAZAN CRISTINA",
-            "CERBU CAMELIA",
-            "CERNEA NICOLETA",
-            "CHEFNEUX GABRIELA",
-            "CHELMEA LIGIA",
-            "CHESCA ANTONELLA ELISA",
-            "CHICOMBAN CARMEN MIHAELA",
-            "CHICOS LUCIA ANTONETA",
-            "CHIHAIA GABRIELA-NICOLETA",
-            "CHIRCAN ELIZA",
-            "CHIRILA ADINA",
-            "CHIS ALEXANDRU",
-            "CHISALITA DUMITRU",
-            "CHITONU GABRIELA CRISTINA",
-            "CHITU IOANA BIANCA",
-            "CHIVU CATALIN IULIAN",
-            "CHIVU CATRINA",
-            "CIOARA GHEORGHE ROMEO",
-            "CIOBANU CATALIN",
-            "CIOBANU DANIELA",
-            "CIOBANU ELIZA",
-            "CIOBANU RAMONA",
-            "CIOCIRLAN ELENA",
-            "CIOLOCA ANASTASIA MALINA",
-            "CIOPLEIAS BOGDAN-NICOLAE",
-            "CIOROIU SILVIU GABRIEL",
-            "CIRSTOLOVEAN IOAN LUCIAN",
-            "CISMARU LAURA",
-            "CIUPALA LAURA ANCA",
-            "CIUREA ANDREEA CATALINA",
-            "CIUREA CODRUT IOAN",
-            "CIURESCU DANIEL",
-            "CLINCIU MIHAELA RODICA",
-            "CLINCIU RAMONA",
-            "CLOTEA LUMINITA ROXANA",
-            "COBELSCHI CALIN PAVEL",
-            "COCIAS TIBERIU",
-            "COCUZ MARIA ELENA",
-            "CODREAN CODRIN LEONID",
-            "COLIBAN RADU MIHAI",
-            "COMAN ALINA",
-            "COMAN CLAUDIU",
-            "COMAN ECATERINA",
-            "COMAN SIMONA",
-            "COMANESCU IOANA SONIA",
-            "COMSIT MIHAI",
-            "CONDREA EMILIA-GABRIELA",
-            "CONSTANTIN BOGDAN",
-            "CONSTANTIN CRISTINEL PETRISOR",
-            "CONSTANTIN DAN ALEXANDRU",
-            "CONSTANTIN SANDA",
-            "CONSTANTINESCU CRISTIAN ADRIAN",
-            "CONSTANTINESCU ELENA MIHAELA",
-            "CONTIU MIRCEA",
-            "CORA IRINGO",
-            "COROIU PETRUTA MARIA",
-            "COSEREANU CAMELIA",
-            "COSTACHE CRISTEA",
-            "COSTACHE DELIA",
-            "COSTIUC IULIANA",
-            "COSTIUC LIVIU",
-            "COTARLEA DELIA ANCA",
-            "COTFAS DANIEL TUDOR",
-            "COTFAS PETRU ADRIAN",
-            "COVEI MARIA",
-            "CRACIUN ADRIAN VIRGIL",
-            "CRETESCU NADIA RAMONA",
-            "CRISBASAN ANDREEA-MARIA",
-            "CRISTEA DANIEL",
-            "CRISTEA LUCIANA",
-            "CROITORU CATALIN",
-            "CSESZNEK CODRINA",
-            "CUCULEA DAN-CRISTIAN",
-            "CURTU ALEXANDRU LUCIAN",
-            "CUSEN GABRIELA",
-            "DAMSESCU ADRIAN",
-            "DANCIU GABRIEL MIHAIL",
-            "DANILA ADRIAN",
-            "DANILA DANIEL MIHAI",
-            "DAVID LAURA TEODORA",
-            "DEACONESCU ANDREA CATALINA",
-            "DEACONESCU TUDOR ION",
-            "DEACONU ADRIAN MARIUS",
-            "DEACONU OVIDIU",
-            "DEAKY BOGDAN ALEXANDRU",
-            "DEMETER ROBERT",
-            "DERCZENI RUDOLF ALEXANDRU",
-            "DIACONU IOANA ANDREA",
-            "DIACONU LAURENTIU IONEL",
-            "DIACONU STEFANIA-ROXANA",
-            "DIMA DRAGOS SORIN",
-            "DIMA GABRIELA",
-            "DIMA LORENA",
-            "DIMIENESCU OANA GABRIELA",
-            "DIMITRIU MARIA",
-            "DIMULESCU CRISTINA",
-            "DINCA GHEORGHITA",
-            "DINCA MARIUS SORIN",
-            "DINU ALEXANDRU",
-            "DINU CATALINA GEORGETA",
-            "DINU CRISTINA",
-            "DINU ELEONORA ANTOANETA",
-            "DINULICA FLORIN",
-            "DOBRESCU ADA IOANA",
-            "DRACEA LAURA LARISA",
-            "DRAGHICI CAMELIA LUCIA",
-            "DRAGOI MIRCEA VIOREL",
-            "DRAGOMIR GEORGE",
-            "DRAGOMIR PANZARU CAMELIA CRISTINA",
-            "DRUGA CORNELIU NICOLAE",
-            "DRUGAU SORIN",
-            "DRUMEA CRISTINA",
-            "DUCA LILIANA",
-            "DUGULEANA CONSTANTIN",
-            "DUGULEANA LILIANA",
-            "DUGULEANA MIHAI",
-            "DUICU SIMONA SOFIA",
-            "DUMITRASCU ADELA-ELIZA",
-            "DUMITRASCU DORIN ION",
-            "DUMITRESCU FLORIN",
-            "DUMITRESCU SILVIU RAZVAN",
-            "DUTCA IOAN",
-            "EFTIMIE NICOLAE",
-            "ELEKES ROBERT GABRIEL",
-            "ENACHE DORIN VALTER",
-            "ENACHE-DAVID NICOLETA",
-            "ENE ANA",
-            "ENESCA IOAN ALEXANDRU",
-            "ENESCU ADRIAN-GABRIEL",
-            "ENESCU IOANA-CLARA",
-            "ENESCU RALUCA ELENA",
-            "ENOIU RAZVAN SANDU",
-            "FALUP PECURARIU CRISTIAN GAVRIL",
-            "FALUP PECURARIU OANA GABRIELA",
-            "FECHETE FLAVIA",
-            "FELEA ALINA SILVANA",
-            "FILIP ALEXANDRU CATALIN",
-            "FILIP IGNAC - CSABA",
-            "FILIP OVIDIU",
-            "FINTINA IOANA MARIA",
-            "FIRASTRAU IOANA",
-            "FLOREA OLIVIA ANA",
-            "FLORESCU ADRIANA",
-            "FLORESCU MONICA",
-            "FLOROIAN LAURA",
-            "FOLEA MILENA FLAVIA",
-            "FORIS DIANA",
-            "FORIS TIBERIU",
-            "FRATU MARIANA",
-            "FRIEDL ANNAMARIA",
-            "FRINCU MADALINA ILEANA",
-            "FUGARETU COSMINA",
-            "FULGA ANDREEA ILEANA",
-            "GABOR CAMELIA",
-            "GACEU LIVIU",
-            "GALATANU TEOFIL FLORIN",
-            "GALMEANU HONORIUS CEZAR",
-            "GAROIU STEFAN LUCIAN",
-            "GAVRILA CORNEL CATALIN",
-            "GAVRIS CLAUDIA MIHAELA",
-            "GAVRUS CRISTINA",
-            "GHEORGHE CARMEN",
-            "GHEORGHE CARMEN ADRIANA",
-            "GHEORGHE CATALIN",
-            "GHEORGHE DANA MIHAELA",
-            "GHEORGHE VASILE",
-            "GHEORGHITA (LICHIOIU) IULIANA",
-            "GHIGHECI COSTEL CRISTINEL",
-            "GHITA DANA ELENA",
-            "GHITA-PIRNUTA OANA-ANDREEA",
-            "GINERICA COSMIN",
-            "GIRBACIA FLORIN STELIAN",
-            "GIRDAN LAURA",
-            "GLIGA CONSTANTIN IOAN",
-            "GOTEA MIHAELA",
-            "GRESITA CONSTANTIN IRINEL",
-            "GRIGORESCU OVIDIU DAN",
-            "GRIGORESCU SIMONA",
-            "GRIGORESCU SORIN MIHAI",
-            "GROSZ WILHELM ROBERT",
-            "GUIMAN MARIA VIOLETA",
-            "GURAU LIDIA",
-            "GUREAN DAN MARIAN",
-            "HABA SEVER",
-            "HALALISAN AURELIU FLORIN",
-            "HENTER RAMONA",
-            "HLIPCA PETRU",
-            "HOGEA MIRCEA DANIEL",
-            "HUMINIC GABRIELA",
-            "HUMINIC TRAIAN ANGEL",
-            "IACOB ANDREEA-BIANCA",
-            "IBANESCU DANIELA CORINA",
-            "ICHIM TRAIAN",
-            "IDOMIR MIHAELA ELENA",
-            "IFTENE LIVIU",
-            "IFTENI PETRU IULIAN",
-            "IGNAT MIHAI",
-            "ILEA ANCA-MARIA",
-            "ILIE RODICA MARIA",
-            "INDREICA ELENA SIMONA",
-            "INDREICA VICTOR ADRIAN",
-            "ION CATALIN PETREA",
-            "ION LAURENTIU-MIHAIL",
-            "IONAS DIANA GEANINA",
-            "IONESCU ALEXANDRU CODRIN",
-            "IONESCU ANA MARIA",
-            "IONESCU DAN TRAIAN",
-            "IONESCU OVIDIU",
-            "IORDACHE DANIEL",
-            "IORDACHE EUGEN",
-            "IORDAN NICOLAE FANI",
-            "IOVANAS DANIELA MARIA",
-            "IRIMIE CLAUDIA-ALEXANDRINA",
-            "IRIMIE IOANA VIOLETA",
-            "IRIMIE MARIUS",
-            "ISAC IULIANA",
-            "ISAC LUMINITA ANISOARA",
-            "ISAIA FLORIN",
-            "ISAIA GABRIELA AURORA",
-            "ISBASOIU ANDREEA",
-            "ISOP LAURA-MIHAELA",
-            "ISPAS ANA",
-            "ISPAS MIHAI",
-            "ISPAS NICOLAE",
-            "ITU ALINA",
-            "ITU CALIN",
-            "ITU LUCIAN MIHAI",
-            "IVANCESCU RUXANDRA",
-            "IVANOVICI LAURENTIU MIHAI",
-            "IVASCIUC IOANA SIMONA",
-            "IVASCU IRINA MIHAELA",
-            "JALIU CODRUTA ILEANA",
-            "KAKUCS CRISTIAN",
-            "KARACSONY NOEMI",
-            "KERTESZ CSABA ZOLTAN",
-            "KOLAR VASUDEVA LAURA",
-            "KOVACS ATTILA",
-            "KRISTALY DOMINIC MIRCEA",
-            "LACATUS ADRIAN",
-            "LACATUS ANCA MARIA",
-            "LACHE SIMONA",
-            "LACULICEANU ALEXANDRU-GEORGIAN",
-            "LANCEA CAMIL TRAIAN SORIN",
-            "LAPTES RAMONA",
-            "LATES MIHAI TIBERIU",
-            "LAZAR ANAMARIA",
-            "LAZAR CORNELIA MAGDALENA",
-            "LEAHU CRISTIAN IOAN",
-            "LEASU FLORIN GABRIEL",
-            "LELUTIU LAURA MIHAELA",
-            "LIMBASAN ILEANA GEORGIANA",
-            "LINDEMANN SOFIANA IULIA",
-            "LITRA ADRIANA VERONICA",
-            "LIXANDROIU RADU CONSTANTIN",
-            "LORINCZ SIMINA",
-            "LOSTUN ALEXANDRA",
-            "LUCA MIHAI ALEXANDRU",
-            "LUCULESCU MARIUS CRISTIAN",
-            "LUNGOCI CARMEN MIHAELA",
-            "LUNGU ANTONELA CRISTINA",
-            "LUNGULEASA AUREL",
-            "LUPSA TATARU DANA ADRIANA",
-            "LUPSA TATARU LUCIAN",
-            "LUPU DACIANA ANGELICA",
-            "LUPU DRAGOS",
-            "LUPU MIRABELA IOANA",
-            "LUPU NICOLETA RALUCA",
-            "MACESANU GIGEL",
-            "MACHEDON PISU MIHAI",
-            "MADA STANCA",
-            "MAFTEI CARMEN",
-            "MAICAN CATALIN IOAN",
-            "MAICAN MARIA ANCA",
-            "MAIER ALINA",
-            "MAJERCSIK LUCIANA",
-            "MANCIULEA ILEANA CARMEN",
-            "MANDRU LIDIA",
-            "MANEA ADELINA LOREDANA",
-            "MANEA ELENA LAURA",
-            "MANEA EMILIA ADELA",
-            "MANEA ROSANA MIHAELA",
-            "MANOLICA ANA-MARIA",
-            "MANTULESCU MARIUS MIHAIL",
-            "MARCEANU LUIGI GEO",
-            "MARCU MARINA VIORELA",
-            "MARDACHE ANDREEA CLAUDIA",
-            "MARINESCU DANIELA",
-            "MARINESCU NICOLAE ION",
-            "MARTOMA ALINA MIRELA",
-            "MATEFI ROXANA",
-            "MATEI ALEXANDRU",
-            "MATEI FLORENTINA",
-            "MATEI MADALINA GEORGIANA",
-            "MAZAREL ADRIAN",
-            "MESESAN SCHMITZ LUIZA IULIANA",
-            "MICLAUS STELIANA ROXANA",
-            "MICU CORINA SILVIA",
-            "MICULESCU RADU",
-            "MIHAIL LAURENTIU AUREL",
-            "MIHAILESCU MARIA-MIRABELA",
-            "MIHAILESCU TEOFIL",
-            "MIHALCICA MIRCEA",
-            "MIJAICA RALUCA DACIA",
-            "MILESAN MIHAELA",
-            "MILOSAN IOAN",
-            "MINCULETE NICUSOR",
-            "MINDRESCU VERONICA",
-            "MIRON ( MIOC ) ANA-ALIANA",
-            "MISARCA CATALIN",
-            "MITREA NICOLETA",
-            "MITRICA MARIA",
-            "MITU LEONARD",
-            "MITU SEBASTIAN-RAZVAN",
-            "MIZGACIU CAMELIA",
-            "MOARCAS GEORGETA",
-            "MOASA HORIA",
-            "MODRAN HORIA ALEXANDRU",
-            "MOGA MARIUS ALEXANDRU",
-            "MOJA ADELINA - IOANA",
-            "MOLDOVAN (TANTAU) MARA-STEFANIA",
-            "MOLDOVAN EDIT ROXANA",
-            "MOLDOVAN MACEDON DUMITRU",
-            "MONESCU VLAD",
-            "MORARIU CRISTIN OLIMPIU",
-            "MORARU SORIN AUREL",
-            "MOSOI ADRIAN",
-            "MOSOIU DANIELA VIORICA",
-            "MOTOASCA SEPTIMIU DANIEL",
-            "MOTOC DANA",
-            "MUNTEAN LIVIU-IULIU",
-            "MUNTEAN RADU MIRCEA",
-            "MUNTEANU DANIEL*",
-            "MUNTEANU MIHAELA VIOLETA",
-            "MUNTEANU-ICHIM ROXANA ANDREEA",
-            "MURESAN VALENTIN",
-            "MUSAT ELENA CAMELIA",
-            "MUSUROI CRISTIAN LEONARD",
-            "NANAU CORINA STEFANIA",
-            "NASTAC DORIN CRISTIAN",
-            "NASTASA LAURA ELENA",
-            "NASTASE GABRIEL",
-            "NASTASOIU MIRCEA",
-            "NASULEA MARIUS DANIEL",
-            "NAUNCEF ALINA MARIA",
-            "NEACSU NICOLETA ANDREEA",
-            "NEAGOE MIRCEA",
-            "NEAGU MIRCEA",
-            "NECHIFOR BIANCA ANDREEA",
-            "NECHITA FLORENTINA",
-            "NECHITA FLORIN MIHAI",
-            "NECSOI DANIELA VERONICA",
-            "NECULA RADU DAN",
-            "NECULA VALENTIN",
-            "NECULAU ANDREA ELENA",
-            "NECULOIU DANIELA",
-            "NECULOIU MARIUS",
-            "NEDELOIU TIBERIU",
-            "NEGULESCU ORIANA HELENA",
-            "NEPOTU GABRIEL LUCIAN",
-            "NICOLAE IOANA",
-            "NICOLAU ANDRADA CAMELIA",
-            "NICOLAU LIANA CRISTINA",
-            "NICOLESCU VALERIU NOROCEL",
-            "NICULA DAN",
-            "NISTOR-SERBAN ANDREEA ELENA",
-            "NITA MIHAI DANIEL",
-            "NITOIU LORENA GABRIELA",
-            "NUTU MARIA",
-            "OANA ALEXANDRU",
-            "OANCEA BOGDAN MARIAN",
-            "OANCEA GHEORGHE",
-            "OGREZEANU IULIAN ALEXANDRU",
-            "OGRUTAN PETRE LUCIAN",
-            "OLA DANIEL CALIN",
-            "OLAH ARTHUR",
-            "OLARESCU ALIN",
-            "OLTEANU MIRCEA IONUT",
-            "ONEA GHEORGHE ADRIAN",
-            "OPRISESCU SERBAN",
-            "ORMENISAN ALEXE NICOLAE",
-            "PACURAR CRISTINA MARIA",
-            "PACURAR VICTOR DAN",
-            "PADUREANU VASILE",
-            "PANAITE MARA",
-            "PANTEA ILEANA",
-            "PARV AURICA LUMINITA",
-            "PASCU ALEXANDRU",
-            "PASCU ALINA MIHAELA",
-            "PASCU MIHAI LUCIAN",
-            "PASCU MIHAI NICOLAE",
-            "PAUN LAURIAN",
-            "PAVALACHE ILIE MARIELA",
-            "PAVEL ECATERINA",
-            "PAVEL GINA MIHAELA",
-            "PELIN BOGDAN IULIAN",
-            "PERNIU DANA",
-            "PETRE ANDREEA",
-            "PETRE IOANA",
-            "PETRIC PAULA",
-            "PETRICI ANDREI VICTOR",
-            "PETRITAN ION CATALIN",
-            "PISARCIUC CRISTIAN",
-            "PIUARU BRENDA-ANDREEA",
-            "PLAJER IOANA CRISTINA",
-            "PLESCAN COSTEL",
-            "PLUMBOTA LAVINIA",
-            "PODASCA PETRU CEZARIO",
-            "POJALA CIPRIAN-VASILE",
-            "POLEXA ALEXANDRU-CRISAN",
-            "POP DANA MIHAELA",
-            "POPA BOGDAN",
-            "POPA DANIELA (EFS)",
-            "POPA DANIELA (PSE)",
-            "POPA GEORGE-BOGDAN",
-            "POPA IULIAN",
-            "POPA LIOARA RALUCA",
-            "POPA LUMINITA",
-            "POPA ROXANA",
-            "POPA STEFAN",
-            "POPESCU (GHIUTA) IOANA",
-            "POPESCU ANCA",
-            "POPESCU MIHAELA VIRGINIA",
-            "POPESCU OVIDIU",
-            "POPESCU VLAD",
-            "POPOVICI BIANCA ELENA",
-            "POPOVICI-POPESCU ELENA",
-            "POROJAN MIHAELA",
-            "POSTELNICU CRISTIAN CEZAR",
-            "POTINCU LAURA",
-            "POZNA CLAUDIU RADU",
-            "PRALEA CRISTIAN",
-            "PREDA ULITA ANCA",
-            "PROCA ALEXANDRINA MARIA",
-            "PUIU ANDREI",
-            "PURCARU IOANA MADALINA",
-            "RACASAN SERGIU",
-            "RADOI-ENCEA RALUCA-STEFANIA",
-            "RADU (MATEI) SIMONA CORINA",
-            "RADU ALEXANDRU IONUT",
-            "RADU CRISTINA IOANA",
-            "RADU DORIN",
-            "RADU FLORIN",
-            "RADU LUCIAN",
-            "RADU SEBASTIAN",
-            "RADUCANU DORINA",
-            "RAILEANU SZELES MONICA",
-            "RATULEA GEORGETA GABRIELA",
-            "RAUTIA IOAN CALIN",
-            "REPANOVICI ANGELA",
-            "ROATA IONUT CLAUDIU",
-            "ROBU DAN NICOLAE",
-            "ROGOZEA LILIANA MARCELA",
-            "ROMAN NADINNE ALEXANDRA",
-            "ROSCA IOAN CALIN",
-            "ROSENBERG DAN",
-            "RUCSANDA MADALINA",
-            "RUNCEANU-ALBU CARMEN CRISTINA",
-            "RUS HORATIU",
-            "RUSU IULIAN",
-            "SABOU FLORIN-LUCIAN-PETRICA",
-            "SAFTOIU RAZVAN GEORGIAN",
-            "SARAMET OANA",
-            "SARBU FLAVIUS AURELIAN",
-            "SASU ADELA",
-            "SASU LAURA ELENA",
-            "SASU LUCIAN-MIRCEA",
-            "SAULESCU RADU GABRIEL",
-            "SAVIN DIANA-CRISTINA",
-            "SAVU CODRUT NICOLAE",
-            "SAVU ELENA CRISTINA",
-            "SCARNECI-DOMNISORU FLORENTINA",
-            "SCARNECIU CAMELIA CORNELIA",
-            "SCARNECIU IOAN",
-            "SCHWAB-FRINCU ANAMARIA",
-            "SCRIBA CEZAR",
-            "SCUTARU MARIA LUMINITA",
-            "SECHEL GABRIELA",
-            "SERBAN IOAN",
-            "SERBAN IONEL",
-            "SERBU CLAUDIA GABRIELA",
-            "SIBISAN AURA DANIELA",
-            "SIMION GABRIEL",
-            "SIMON MARINELA CRISTINA",
-            "SINU RALUCA GEORGIANA",
-            "SISMAN VIOREL",
-            "SITOIU ANDREEA",
-            "SOICA ADRIAN",
-            "SOICA SIMONA",
-            "SOREA DANIELA",
-            "SOREA GHEORGHE DAN",
-            "SOVA DANIELA",
-            "SOVAILA SILVIA",
-            "SPIRCHEZ GEORGETA BIANCA",
-            "SPIRCHEZ GHEORGHE COSMIN",
-            "SPRIDON DELIA - ELENA",
-            "STAN ALEXANDRA",
-            "STAN ION GABRIEL",
-            "STANCA AUREL CORNEL",
-            "STANCIOIU PETRU TUDOR",
-            "STANCIU ANCA ELENA",
-            "STANCIU ELENA MANUELA",
-            "STANCIU MARIANA DOMNICA",
-            "STANESCU RUXANDRA",
-            "STARETU IONEL",
-            "STOICA ROXANA ELENA",
-            "STOICANESCU MARIA",
-            "STROE FANEL",
-            "SUCIU CONSTANTIN",
-            "SUCIU MARIA-MAGDALENA",
-            "SUCIU TITUS",
-            "SUMEDREA SILVIA",
-            "SURDU VASILE",
-            "SUTEU LIGIA CLAUDIA",
-            "SZILAGYI ANA",
-            "SZOCS BOTOND CSABA",
-            "TABIAN DANIEL",
-            "TABIRCA MARIUS SABIN",
-            "TACHE ILEANA",
-            "TALPA NICOLAE",
-            "TAMAS FLORIN-LUCIAN",
-            "TARANU DAN MARIUS",
-            "TARNOVEANU MIRELA ADRIANA",
-            "TARULESCU RADU",
-            "TARULESCU STELIAN",
-            "TATA ANITHA",
-            "TATU OANA",
-            "TAUS DANIEL",
-            "TAUS NICOLETA",
-            "TECAU ALINA SIMONA",
-            "TEODORESCU ANDREEA",
-            "TEODORESCU DRAGHICESCU HORATIU",
-            "TERESNEU CORNEL CRISTIAN",
-            "TERIS STEFAN",
-            "TESCASIU BIANCA",
-            "THIERHEIMER WALTER WILHELM",
-            "TIEREAN MIRCEA HORIA",
-            "TIMAR JANOS",
-            "TIMAR MARIA CRISTINA",
-            "TINT DIANA",
-            "TISMANAR IOANA",
-            "TITA NICOLESCU GABRIEL",
-            "TOADER ADRIAN",
-            "TOADER SERBAN-SIXTUS",
-            "TODOR RALUCA DANIA",
-            "TOFAN DANIEL",
-            "TOGANEL GEORGE RADU",
-            "TOHANEAN DRAGOS IOAN - EFS",
-            "TOMA SEBASTIAN IONUT",
-            "TOMELE SIMONA CONSTANTA",
-            "TOPALA IOANA ROXANA",
-            "TRIFAN ADRIAN",
-            "TRUSCA DANIEL DRAGOS",
-            "TRUTA CAMELIA",
-            "TUCHEL IONUT-VLAD",
-            "TUDORAN GHEORGHE MARIAN",
-            "TULBURE TRAIAN TIBERIU",
-            "TURCANU CRISTINA",
-            "TURCU IOAN",
-            "TURCULET ALINA RALUCA",
-            "TUTU DUMITRU CIPRIAN",
-            "UDROIU RAZVAN",
-            "UNCU IONUT",
-            "UNGUREANU CAMELIA",
-            "UNGUREANU ELENA",
-            "UNGUREANU VALENTIN VASILE",
-            "UNIANU ECATERINA MARIA",
-            "UNTARU ELENA NICOLETA",
-            "URETU NOEMI",
-            "URSU PETRONELA ELENA",
-            "VALCEA CRISTINA SILVIA",
-            "VARCIU MIHAI STELIAN",
-            "VARGA IOANA",
-            "VARVARICHI LEONA",
-            "VASIAN BIANCA IOANA",
-            "VASILESCU ANCA",
-            "VASILESCU MARIA MAGDALENA",
-            "VELEA MARIAN NICOLAE",
-            "VELICU RADU GABRIEL",
-            "VIZITIU ANAMARIA",
-            "VLADOIU NASTY MARIAN",
-            "VODA DANIELA MARIANA",
-            "VOICESCU CORNELIU GEORGE",
-            "VOICU NICOLETA",
-            "VOINEA MIHAELA",
-            "VOLMER MARIUS",
-            "VOROVENCII IOSIF",
-            "ZAHARIA CORNELIU",
-            "ZAHARIA SEBASTIAN MARIAN",
-            "ZAMFIRACHE ALEXANDRA",
-            "ZELENIUC OCTAVIA",
+            "ABAITANCEI HORIA","ABRUDAN IOAN VASILE","ACIU LIA ELENA","ADAM MIHAI-SORIN",
+            "ADOCHITE (GALBAU) CRISTINA-STEFANIA","AGACHE IOANA-OCTAVIA","ALBU RUXANDRA GABRIELA",
+            "ALDEA ADRIAN","ALDEA CODRUTA NICOLETA","ALDEA CONSTANTIN LUCIAN","ALECU STEFAN",
+            "ALEXANDRESCU DANA SORINA","ALEXANDRU CATALIN","ALEXANDRU MARIAN","ALEXE RALUCA MONICA",
+            "ANASTASIU ALEXANDRU-RAZVAN","ANASTASIU COSTIN VLAD","ANDREESCU OANA",
+            "ANDRONIC LUMINITA CAMELIA","ANDRONIC MARIA LETITIA","ANGHELINA BOGDAN-CRISTIAN",
+            "ANTON CARMEN ELENA","ANTONARU CARMEN ELENA","ANTONYA CSABA","APOSTOAIE MIRELA",
+            "ARBANAS IOANA","ARGASEALA GEORGIANA","ARHIRE MONA BRIGITTE","ARMASAR IOANA PAULA",
+            "ARMASELU ANCA","ARON IOAN","ARVATESCU CRISTIAN","ATUDOREI IOANA ANISA",
+            "BABA MARIUS NICOLAE","BABA MIRELA CAMELIA","BADARAU CARMEN LILIANA","BADAU ADELA",
+            "BADAU DANA","BADEA ANAMARIA RALUCA","BADEA MIHAELA","BADICU GEORGIAN",
+            "BAICOIANU ALEXANDRA","BALAN FLORIN","BALAN TITUS CONSTANTIN","BALAS MONICA LOREDANA",
+            "BALASESCU MARIUS","BALASESCU SIMONA","BALINT ELENA","BALINT LORAND",
+            "BALTES LIANA SANDA","BALTESCU CODRUTA ADINA","BARABAS BARNA","BARACAN ADRIAN",
+            "BARBU DANIELA MARIANA","BARBU ION","BARBU MAGDALENA","BARBU MARIUS CATALIN",
+            "BARBU SILVIU GABRIEL","BARBULESCU ALINA","BARBULESCU OANA","BAROTE LUMINITA",
+            "BARSAN MARIA IONELA","BARSAN MARIA MAGDALENA","BASALIC ELENA-BIANCA",
+            "BATRANU PINTEA VLAD","BAZGAN MARIUS","BEDELEAN IOAN BOGDAN","BEDO TIBOR",
+            "BEGU TEODORA-MARIA","BELDEAN EMANUELA CARMEN","BELDEAN NICOLAE LAURENTIU",
+            "BELDIANU IOLANDA FELICIA","BELIBOU ALEXANDRA","BENCZE ANDREI","BENEA BOGDAN CORNEL",
+            "BESCHEA ANDREI-GEORGE","BIGIU NICUSOR FLORIN","BILDEA TEODOR STEFAN","BISOC ALINA",
+            "BOBESCU ELENA","BOBOC RAZVAN GABRIEL","BOCA LIANA LUMINITA","BOCU RAZVAN",
+            "BODI DIANA CRISTINA","BODOC ALICE MAGDALENA","BOER ATTILA LASZLO",
+            "BOGATU CRISTINA AURICA","BOGDAN IOANA CORINA","BOLBORICI ANA MARIA",
+            "BOLDISOR CRISTIAN NICOLAE","BOLOCAN SORIN IONUT","BONDOC IONESCU ALEXANDRU",
+            "BORCAN VIRGIL","BORCOMAN MARIANA","BORZ STELIAN ALEXANDRU","BOSCOIANU MIRCEA",
+            "BOSCOR DANA","BOTA OANA ALINA","BOTESCU-SIRETEANU ILEANA-AURORA","BOTEZATU DAN GEORGE",
+            "BOTIANU ANA MARIA","BOTIS MARIUS FLORIN","BOTIS SORINA",
+            "BRANEA (TACA) IOANA - ANTONIA","BRANESCU GERONIMO-RADUCU","BRATU CIPRIAN",
+            "BRATU CONSTANTIN ALEXANDRU","BRATU DRAGOS-VASILE","BRATU MARIA-ALEXANDRA",
+            "BRATUCU GABRIEL","BRAUN BARBU CRISTIAN","BRENCI LUMINITA MARIA",
+            "BREZEANU ALIN IONUT","BRICIU GABRIELA ARABELA","BRICIU VICTOR ALEXANDRU",
+            "BUCS LORANT","BUCUR ROMULUS LADISLAU","BUDALA ADRIAN","BUGA CRISTINA MARIA",
+            "BUHAICIUC MIHAELA","BUICAN GEORGE RAZVAN","BUJA ELENA","BULARCA ANCA ROXANA",
+            "BULARCA MARIA-CRISTINA","BULARCA RAZVAN","BULMEZ ALEXANDRU MIHAI","BURADA MARINELA",
+            "BURBEA GEORGIANA-MIHAELA","BURDUHOS BOGDAN GABRIEL","BURLACU MIHAI",
+            "BUSUIOCEANU STELIANA","BUTNARIU SILVIU LUIS","BUVNARIU LAVINIA",
+            "BUZDUGAN IOANA DIANA","BUZEA CARMEN","CALIN (COMSIT) ANDREEA-MIHAELA",
+            "CALIN MARIUS DANIEL","CAMPEAN MIHAELA","CAMPEAN STEFAN-IOAN","CAMPU ADINA",
+            "CAMPU VASILE RAZVAN","CANDREA ADINA NICOLETA","CANJA CRISTINA MARIA",
+            "CARP MARIUS CATALIN","CATANA DORIN IOAN","CATANESCU ANDREEA CORINA",
+            "CATARON ANGEL DORU","CATEANU MIHNEA","CAZACU CHRISTIANA EMILIA","CAZAN ANA MARIA",
+            "CAZAN CRISTINA","CERBU CAMELIA","CERNEA NICOLETA","CHEFNEUX GABRIELA",
+            "CHELMEA LIGIA","CHESCA ANTONELLA ELISA","CHICOMBAN CARMEN MIHAELA",
+            "CHICOS LUCIA ANTONETA","CHIHAIA GABRIELA-NICOLETA","CHIRCAN ELIZA","CHIRILA ADINA",
+            "CHIS ALEXANDRU","CHISALITA DUMITRU","CHITONU GABRIELA CRISTINA","CHITU IOANA BIANCA",
+            "CHIVU CATALIN IULIAN","CHIVU CATRINA","CIOARA GHEORGHE ROMEO","CIOBANU CATALIN",
+            "CIOBANU DANIELA","CIOBANU ELIZA","CIOBANU RAMONA","CIOCIRLAN ELENA",
+            "CIOLOCA ANASTASIA MALINA","CIOPLEIAS BOGDAN-NICOLAE","CIOROIU SILVIU GABRIEL",
+            "CIRSTOLOVEAN IOAN LUCIAN","CISMARU LAURA","CIUPALA LAURA ANCA",
+            "CIUREA ANDREEA CATALINA","CIUREA CODRUT Ioan","CIURESCU DANIEL",
+            "CLINCIU MIHAELA RODICA","CLINCIU RAMONA","CLOTEA LUMINITA ROXANA",
+            "COBELSCHI CALIN PAVEL","COCIAS TIBERIU","COCUZ MARIA ELENA","CODREAN CODRIN LEONID",
+            "COLIBAN RADU MIHAI","COMAN ALINA","COMAN CLAUDIU","COMAN ECATERINA","COMAN SIMONA",
+            "COMANESCU IOANA SONIA","COMSIT MIHAI","CONDREA EMILIA-GABRIELA",
+            "CONSTANTIN BOGDAN","CONSTANTIN CRISTINEL PETRISOR","CONSTANTIN DAN ALEXANDRU",
+            "CONSTANTIN SANDA","CONSTANTINESCU CRISTIAN ADRIAN","CONSTANTINESCU ELENA MIHAELA",
+            "CONTIU MIRCEA","CORA IRINGO","COROIU PETRUTA MARIA","COSEREANU CAMELIA",
+            "COSTACHE CRISTEA","COSTACHE DELIA","COSTIUC IULIANA","COSTIUC LIVIU",
+            "COTARLEA DELIA ANCA","COTFAS DANIEL TUDOR","COTFAS PETRU ADRIAN","COVEI MARIA",
+            "CRACIUN ADRIAN VIRGIL","CRETESCU NADIA RAMONA","CRISBASAN ANDREEA-MARIA",
+            "CRISTEA DANIEL","CRISTEA LUCIANA","CROITORU CATALIN","CSESZNEK CODRINA",
+            "CUCULEA DAN-CRISTIAN","CURTU ALEXANDRU LUCIAN","CUSEN GABRIELA","DAMSESCU ADRIAN",
+            "DANCIU GABRIEL MIHAIL","DANILA ADRIAN","DANILA DANIEL MIHAI","DAVID LAURA TEODORA",
+            "DEACONESCU ANDREA CATALINA","DEACONESCU TUDOR ION","DEACONU ADRIAN MARIUS",
+            "DEACONU OVIDIU","DEAKY BOGDAN ALEXANDRU","DEMETER ROBERT","DERCZENI RUDOLF ALEXANDRU",
+            "DIACONU IOANA ANDREA","DIACONU LAURENTIU IONEL","DIACONU STEFANIA-ROXANA",
+            "DIMA DRAGOS SORIN","DIMA GABRIELA","DIMA LORENA","DIMIENESCU OANA GABRIELA",
+            "DIMITRIU MARIA","DIMULESCU CRISTINA","DINCA GHEORGHITA","DINCA MARIUS SORIN",
+            "DINU ALEXANDRU","DINU CATALINA GEORGETA","DINU CRISTINA","DINU ELEONORA ANTOANETA",
+            "DINULICA FLORIN","DOBRESCU ADA IOANA","DRACEA LAURA LARISA","DRAGHICI CAMELIA LUCIA",
+            "DRAGOI MIRCEA VIOREL","DRAGOMIR GEORGE","DRAGOMIR PANZARU CAMELIA CRISTINA",
+            "DRUGA CORNELIU NICOLAE","DRUGAU SORIN","DRUMEA CRISTINA","DUCA LILIANA",
+            "DUGULEANA CONSTANTIN","DUGULEANA LILIANA","DUGULEANA MIHAI","DUICU SIMONA SOFIA",
+            "DUMITRASCU ADELA-ELIZA","DUMITRASCU DORIN ION","DUMITRESCU FLORIN",
+            "DUMITRESCU SILVIU RAZVAN","DUTCA IOAN","EFTIMIE NICOLAE","ELEKES ROBERT GABRIEL",
+            "ENACHE DORIN VALTER","ENACHE-DAVID NICOLETA","ENE ANA","ENESCA IOAN ALEXANDRU",
+            "ENESCU ADRIAN-GABRIEL","ENESCU IOANA-CLARA","ENESCU RALUCA ELENA",
+            "ENOIU RAZVAN SANDU","FALUP PECURARIU CRISTIAN GAVRIL","FALUP PECURARIU OANA GABRIELA",
+            "FECHETE FLAVIA","FELEA ALINA SILVANA","FILIP ALEXANDRU CATALIN","FILIP IGNAC - CSABA",
+            "FILIP OVIDIU","FINTINA IOANA MARIA","FIRASTRAU IOANA","FLOREA OLIVIA ANA",
+            "FLORESCU ADRIANA","FLORESCU MONICA","FLOROIAN LAURA","FOLEA MILENA FLAVIA",
+            "FORIS DIANA","FORIS TIBERIU","FRATU MARIANA","FRIEDL ANNAMARIA","FRINCU MADALINA ILEANA",
+            "FUGARETU COSMINA","FULGA ANDREEA ILEANA","GABOR CAMELIA","GACEU LIVIU",
+            "GALATANU TEOFIL FLORIN","GALMEANU HONORIUS CEZAR","GAROIU STEFAN LUCIAN",
+            "GAVRILA CORNEL CATALIN","GAVRIS CLAUDIA MIHAELA","GAVRUS CRISTINA","GHEORGHE CARMEN",
+            "GHEORGHE CARMEN ADRIANA","GHEORGHE CATALIN","GHEORGHE DANA MIHAELA","GHEORGHE VASILE",
+            "GHEORGHITA (LICHIOIU) IULIANA","GHIGHECI COSTEL CRISTINEL","GHITA DANA ELENA",
+            "GHITA-PIRNUTA OANA-ANDREEA","GINERICA COSMIN","GIRBACIA FLORIN STELIAN","GIRDAN LAURA",
+            "GLIGA CONSTANTIN IOAN","GOTEA MIHAELA","GRESITA CONSTANTIN IRINEL",
+            "GRIGORESCU OVIDIU DAN","GRIGORESCU SIMONA","GRIGORESCU SORIN MIHAI",
+            "GROSZ WILHELM ROBERT","GUIMAN MARIA VIOLETA","GURAU LIDIA","GUREAN DAN MARIAN",
+            "HABA SEVER","HALALISAN AURELIU FLORIN","HENTER RAMONA","HLIPCA PETRU",
+            "HOGEA MIRCEA DANIEL","HUMINIC GABRIELA","HUMINIC TRAIAN ANGEL","IACOB ANDREEA-BIANCA",
+            "IBANESCU DANIELA CORINA","ICHIM TRAIAN","IDOMIR MIHAELA ELENA","IFTENE LIVIU",
+            "IFTENI PETRU IULIAN","IGNAT MIHAI","ILEA ANCA-MARIA","ILIE RODICA MARIA",
+            "INDREICA ELENA SIMONA","INDREICA VICTOR ADRIAN","ION CATALIN PETREA",
+            "ION LAURENTIU-MIHAIL","IONAS DIANA GEANINA","IONESCU ALEXANDRU CODRIN",
+            "IONESCU ANA MARIA","IONESCU DAN TRAIAN","IONESCU OVIDIU","IORDACHE DANIEL",
+            "IORDACHE EUGEN","IORDAN NICOLAE FANI","IOVANAS DANIELA MARIA",
+            "IRIMIE CLAUDIA-ALEXANDRINA","IRIMIE IOANA VIOLETA","IRIMIE MARIUS","ISAC IULIANA",
+            "ISAC LUMINITA ANISOARA","ISAIA FLORIN","ISAIA GABRIELA AURORA","ISBASOIU ANDREEA",
+            "ISOP LAURA-MIHAELA","ISPAS ANA","ISPAS MIHAI","ISPAS NICOLAE","ITU ALINA","ITU CALIN",
+            "ITU LUCIAN MIHAI","IVANCESCU RUXANDRA","IVANOVICI LAURENTIU MIHAI",
+            "IVASCIUC IOANA SIMONA","IVASCU IRINA MIHAELA","JALIU CODRUTA ILEANA","KAKUCS CRISTIAN",
+            "KARACSONY NOEMI","KERTESZ CSABA ZOLTAN","KOLAR VASUDEVA LAURA","KOVACS ATTILA",
+            "KRISTALY DOMINIC MIRCEA","LACATUS ADRIAN","LACATUS ANCA MARIA","LACHE SIMONA",
+            "LACULICEANU ALEXANDRU-GEORGIAN","LANCEA CAMIL TRAIAN SORIN","LAPTES RAMONA",
+            "LATES MIHAI TIBERIU","LAZAR ANAMARIA","LAZAR CORNELIA MAGDALENA",
+            "LEAHU CRISTIAN IOAN","LEASU FLORIN GABRIEL","LELUTIU LAURA MIHAELA",
+            "LIMBASAN ILEANA GEORGIANA","LINDEMANN SOFIANA IULIA","LITRA ADRIANA VERONICA",
+            "LIXANDROIU RADU CONSTANTIN","LORINCZ SIMINA","LOSTUN ALEXANDRA","LUCA MIHAI ALEXANDRU",
+            "LUCULESCU MARIUS CRISTIAN","LUNGOCI CARMEN MIHAELA","LUNGU ANTONELA CRISTINA",
+            "LUNGULEASA AUREL","LUPSA TATARU DANA ADRIANA","LUPSA TATARU LUCIAN",
+            "LUPU DACIANA ANGELICA","LUPU DRAGOS","LUPU MIRABELA IOANA","LUPU NICOLETA RALUCA",
+            "MACESANU GIGEL","MACHEDON PISU MIHAI","MADA STANCA","MAFTEI CARMEN",
+            "MAICAN CATALIN IOAN","MAICAN MARIA ANCA","MAIER ALINA","MAJERCSIK LUCIANA",
+            "MANCIULEA ILEANA CARMEN","MANDRU LIDIA","MANEA ADELINA LOREDANA","MANEA ELENA LAURA",
+            "MANEA EMILIA ADELA","MANEA ROSANA MIHAELA","MANOLICA ANA-MARIA",
+            "MANTULESCU MARIUS MIHAIL","MARCEANU LUIGI GEO","MARCU MARINA VIORELA",
+            "MARDACHE ANDREEA CLAUDIA","MARINESCU DANIELA","MARINESCU NICOLAE ION",
+            "MARTOMA ALINA MIRELA","MATEFI ROXANA","MATEI ALEXANDRU","MATEI FLORENTINA",
+            "MATEI MADALINA GEORGIANA","MAZAREL ADRIAN","MESESAN SCHMITZ LUIZA IULIANA",
+            "MICLAUS STELIANA ROXANA","MICU CORINA SILVIA","MICULESCU RADU",
+            "MIHAIL LAURENTIU AUREL","MIHAILESCU MARIA-MIRABELA","MIHAILESCU TEOFIL",
+            "MIHALCICA MIRCEA","MIJAICA RALUCA DACIA","MILESAN MIHAELA","MILOSAN IOAN",
+            "MINCULETE NICUSOR","MINDRESCU VERONICA","MIRON ( MIOC ) ANA-ALIANA","MISARCA CATALIN",
+            "MITREA NICOLETA","MITRICA MARIA","MITU LEONARD","MITU SEBASTIAN-RAZVAN",
+            "MIZGACIU CAMELIA","MOARCAS GEORGETA","MOASA HORIA","MODRAN HORIA ALEXANDRU",
+            "MOGA MARIUS ALEXANDRU","MOJA ADELINA - IOANA","MOLDOVAN (TANTAU) MARA-STEFANIA",
+            "MOLDOVAN EDIT ROXANA","MOLDOVAN MACEDON DUMITRU","MONESCU VLAD",
+            "MORARIU CRISTIN OLIMPIU","MORARU SORIN AUREL","MOSOI ADRIAN","MOSOIU DANIELA VIORICA",
+            "MOTOASCA SEPTIMIU DANIEL","MOTOC DANA","MUNTEAN LIVIU-IULIU","MUNTEAN RADU MIRCEA",
+            "MUNTEANU DANIEL*","MUNTEANU MIHAELA VIOLETA","MUNTEANU-ICHIM ROXANA ANDREEA",
+            "MURESAN VALENTIN","MUSAT ELENA CAMELIA","MUSUROI CRISTIAN LEONARD",
+            "NANAU CORINA STEFANIA","NASTAC DORIN CRISTIAN","NASTASA LAURA ELENA","NASTASE GABRIEL",
+            "NASTASOIU MIRCEA","NASULEA MARIUS DANIEL","NAUNCEF ALINA MARIA",
+            "NEACSU NICOLETA ANDREEA","NEAGOE MIRCEA","NEAGU MIRCEA","NECHIFOR BIANCA ANDREEA",
+            "NECHITA FLORENTINA","NECHITA FLORIN MIHAI","NECSOI DANIELA VERONICA","NECULA RADU DAN",
+            "NECULA VALENTIN","NECULAU ANDREA ELENA","NECULOIU DANIELA","NECULOIU MARIUS",
+            "NEDELOIU TIBERIU","NEGULESCU ORIANA HELENA","NEPOTU GABRIEL LUCIAN","NICOLAE IOANA",
+            "NICOLAU ANDRADA CAMELIA","NICOLAU LIANA CRISTINA","NICOLESCU VALERIU NOROCEL",
+            "NICULA DAN","NISTOR-SERBAN ANDREEA ELENA","NITA MIHAI DANIEL","NITOIU LORENA GABRIELA",
+            "NUTU MARIA","OANA ALEXANDRU","OANCEA BOGDAN MARIAN","OANCEA GHEORGHE",
+            "OGREZEANU IULIAN ALEXANDRU","OGRUTAN PETRE LUCIAN","OLA DANIEL CALIN","OLAH ARTHUR",
+            "OLARESCU ALIN","OLTEANU MIRCEA IONUT","ONEA GHEORGHE ADRIAN","OPRISESCU SERBAN",
+            "ORMENISAN ALEXE NICOLAE","PACURAR CRISTINA MARIA","PACURAR VICTOR DAN",
+            "PADUREANU VASILE","PANAITE MARA","PANTEA ILEANA","PARV AURICA LUMINITA",
+            "PASCU ALEXANDRU","PASCU ALINA MIHAELA","PASCU MIHAI LUCIAN","PASCU MIHAI NICOLAE",
+            "PAUN LAURIAN","PAVALACHE ILIE MARIELA","PAVEL ECATERINA","PAVEL GINA MIHAELA",
+            "PELIN BOGDAN IULIAN","PERNIU DANA","PETRE ANDREEA","PETRE IOANA","PETRIC PAULA",
+            "PETRICI ANDREI VICTOR","PETRITAN ION CATALIN","PISARCIUC CRISTIAN",
+            "PIUARU BRENDA-ANDREEA","PLAJER IOANA CRISTINA","PLESCAN COSTEL","PLUMBOTA LAVINIA",
+            "PODASCA PETRU CEZARIO","POJALA CIPRIAN-VASILE","POLEXA ALEXANDRU-CRISAN",
+            "POP DANA MIHAELA","POPA BOGDAN","POPA DANIELA (EFS)","POPA DANIELA (PSE)",
+            "POPA GEORGE-BOGDAN","POPA IULIAN","POPA LIOARA RALUCA","POPA LUMINITA","POPA ROXANA",
+            "POPA STEFAN","POPESCU (GHIUTA) IOANA","POPESCU ANCA","POPESCU MIHAELA VIRGINIA",
+            "POPESCU OVIDIU","POPESCU VLAD","POPOVICI BIANCA ELENA","POPOVICI-POPESCU ELENA",
+            "POROJAN MIHAELA","POSTELNICU CRISTIAN CEZAR","POTINCU LAURA","POZNA CLAUDIU RADU",
+            "PRALEA CRISTIAN","PREDA ULITA ANCA","PROCA ALEXANDRINA MARIA","PUIU ANDREI",
+            "PURCARU IOANA MADALINA","RACASAN SERGIU","RADOI-ENCEA RALUCA-STEFANIA",
+            "RADU (MATEI) SIMONA CORINA","RADU ALEXANDRU IONUT","RADU CRISTINA IOANA","RADU DORIN",
+            "RADU FLORIN","RADU LUCIAN","RADU SEBASTIAN","RADUCANU DORINA","RAILEANU SZELES MONICA",
+            "RATULEA GEORGETA GABRIELA","RAUTIA IOAN CALIN","REPANOVICI ANGELA","ROATA IONUT CLAUDIU",
+            "ROBU DAN NICOLAE","ROGOZEA LILIANA MARCELA","ROMAN NADINNE ALEXANDRA","ROSCA IOAN CALIN",
+            "ROSENBERG DAN","RUCSANDA MADALINA","RUNCEANU-ALBU CARMEN CRISTINA","RUS HORATIU",
+            "RUSU IULIAN","SABOU FLORIN-LUCIAN-PETRICA","SAFTOIU RAZVAN GEORGIAN","SARAMET OANA",
+            "SARBU FLAVIUS AURELIAN","SASU ADELA","SASU LAURA ELENA","SASU LUCIAN-MIRCEA",
+            "SAULESCU RADU GABRIEL","SAVIN DIANA-CRISTINA","SAVU CODRUT NICOLAE",
+            "SAVU ELENA CRISTINA","SCARNECI-DOMNISORU FLORENTINA","SCARNECIU CAMELIA CORNELIA",
+            "SCARNECIU IOAN","SCHWAB-FRINCU ANAMARIA","SCRIBA CEZAR","SCUTARU MARIA LUMINITA",
+            "SECHEL GABRIELA","SERBAN IOAN","SERBAN IONEL","SERBU CLAUDIA GABRIELA",
+            "SIBISAN AURA DANIELA","SIMION GABRIEL","SIMON MARINELA CRISTINA","SINU RALUCA GEORGIANA",
+            "SISMAN VIOREL","SITOIU ANDREEA","SOICA ADRIAN","SOICA SIMONA","SOREA DANIELA",
+            "SOREA GHEORGHE DAN","SOVA DANIELA","SOVAILA SILVIA","SPIRCHEZ GEORGETA BIANCA",
+            "SPIRCHEZ GHEORGHE COSMIN","SPRIDON DELIA - ELENA","STAN ALEXANDRA","STAN ION GABRIEL",
+            "STANCA AUREL CORNEL","STANCIOIU PETRU TUDOR","STANCIU ANCA ELENA",
+            "STANCIU ELENA MANUELA","STANCIU MARIANA DOMNICA","STANESCU RUXANDRA","STARETU IONEL",
+            "STOICA ROXANA ELENA","STOICANESCU MARIA","STROE FANEL","SUCIU CONSTANTIN",
+            "SUCIU MARIA-MAGDALENA","SUCIU TITUS","SUMEDREA SILVIA","SURDU VASILE","SUTEU LIGIA CLAUDIA",
+            "SZILAGYI ANA","SZOCS BOTOND CSABA","TABIAN DANIEL","TABIRCA MARIUS SABIN","TACHE ILEANA",
+            "TALPA NICOLAE","TAMAS FLORIN-LUCIAN","TARANU DAN MARIUS","TARNOVEANU MIRELA ADRIANA",
+            "TARULESCU RADU","TARULESCU STELIAN","TATA ANITHA","TATU OANA","TAUS DANIEL",
+            "TAUS NICOLETA","TECAU ALINA SIMONA","TEODORESCU ANDREEA",
+            "TEODORESCU DRAGHICESCU HORATIU","TERESNEU CORNEL CRISTIAN","TERIS STEFAN",
+            "TESCASIU BIANCA","THIERHEIMER WALTER WILHELM","TIEREAN MIRCEA HORIA","TIMAR JANOS",
+            "TIMAR MARIA CRISTINA","TINT DIANA","TISMANAR IOANA","TITA NICOLESCU GABRIEL",
+            "TOADER ADRIAN","TOADER SERBAN-SIXTUS","TODOR RALUCA DANIA","TOFAN DANIEL",
+            "TOGANEL GEORGE RADU","TOHANEAN DRAGOS IOAN - EFS","TOMA SEBASTIAN IONUT",
+            "TOMELE SIMONA CONSTANTA","TOPALA IOANA ROXANA","TRIFAN ADRIAN","TRUSCA DANIEL DRAGOS",
+            "TRUTA CAMELIA","TUCHEL IONUT-VLAD","TUDORAN GHEORGHE MARIAN","TULBURE TRAIAN TIBERIU",
+            "TURCANU CRISTINA","TURCU IOAN","TURCULET ALINA RALUCA","TUTU DUMITRU CIPRIAN",
+            "UDROIU RAZVAN","UNCU IONUT","UNGUREANU CAMELIA","UNGUREANU ELENA",
+            "UNGUREANU VALENTIN VASILE","UNIANU ECATERINA MARIA","UNTARU ELENA NICOLETA",
+            "URETU NOEMI","URSU PETRONELA ELENA","VALCEA CRISTINA SILVIA","VARCIU MIHAI STELIAN",
+            "VARGA IOANA","VARVARICHI LEONA","VASIAN BIANCA IOANA","VASILESCU ANCA",
+            "VASILESCU MARIA MAGDALENA","VELEA MARIAN NICOLAE","VELICU RADU GABRIEL",
+            "VIZITIU ANAMARIA","VLADOIU NASTY MARIAN","VODA DANIELA MARIANA",
+            "VOICESCU CORNELIU GEORGE","VOICU NICOLETA","VOINEA MIHAELA","VOLMER MARIUS",
+            "VOROVENCII IOSIF","ZAHARIA CORNELIU","ZAHARIA SEBASTIAN MARIAN",
+            "ZAMFIRACHE ALEXANDRA","ZELENIUC OCTAVIA",
         };
 
-
-        /// <summary>Normalizeaza nume pentru matching cu TitulariANS: fara diacritice, spatii simple, uppercase, ?->T</summary>
         private static string NormalizeName(string? name)
         {
             if (string.IsNullOrWhiteSpace(name)) return "";
@@ -2095,13 +1480,14 @@ namespace LicentaV1.Controllers
         }
 
         private const string TitulariSql = @"
-            -- Sursa: TOTI profesorii care au predat in 2025-2026
-            -- Filtrarea titular vs colaborator se face in C# prin TitulariANS HashSet
-            -- Aceasta permite sa gasim si titulari care nu au TitularAnUniv=1 in view
             WITH ToatePersoanele AS (
                 SELECT DISTINCT
                     vcm.ID_Profesor,
-                    vcm.NumeIntregProfesor AS NumeIntreg,
+                    CASE vcm.ID_Profesor
+                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
+                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
+                        ELSE vcm.NumeIntregProfesor
+                    END AS NumeIntreg,
                     vp.DenumireCatedra,
                     vp.DenumireFacultate
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
@@ -2124,19 +1510,18 @@ namespace LicentaV1.Controllers
             ORDER BY NumeIntreg";
 
         [HttpGet("titulari")]
-        public ActionResult GetTitulari(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> GetTitulari(string? anUniv, string? facultate, string? departament)
         {
             var result = new List<object>();
             var gasiti = new HashSet<string>(StringComparer.Ordinal);
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
-            // Pasul 1: titulari care au predat in VCM 2025-2026
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(TitulariSql, conn);
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            using (var reader = cmd.ExecuteReader())
+            using (var reader = await cmd.ExecuteReaderAsync())
             {
-                while (reader.Read())
+                while (await reader.ReadAsync())
                 {
                     var numeDb = reader["NumeComplet"]?.ToString() ?? "";
                     var numeNorm = NormalizeName(numeDb);
@@ -2150,26 +1535,23 @@ namespace LicentaV1.Controllers
                     });
                 }
             }
-            // Pasul 2: titulari din lista ANS care nu apar in VCM (ex: fara ore in 2025-2026)
-            // Ii cautam direct in View_Profesori_CF_AnUniv
             var lipsa = TitulariANS.Where(n => !gasiti.Contains(n)).ToList();
             if (lipsa.Any())
             {
                 using var cmd2 = new SqlCommand(@"
                     SELECT DISTINCT vp.ID_Profesor, vp.NumeIntreg,
-                           MIN(vp.DenumireCatedra) AS DenumireCatedra,
+                           MIN(vp.DenumireCatedra)  AS DenumireCatedra,
                            MIN(vp.DenumireFacultate) AS DenumireFacultate
                     FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
                     WHERE vp.ID_AnUnivCatedra = 45
                     GROUP BY vp.ID_Profesor, vp.NumeIntreg", conn);
                 cmd2.CommandTimeout = 60;
-                using var r2 = cmd2.ExecuteReader();
-                while (r2.Read())
+                using var r2 = await cmd2.ExecuteReaderAsync();
+                while (await r2.ReadAsync())
                 {
                     var numeDb = r2["NumeIntreg"]?.ToString() ?? "";
                     var numeNorm = NormalizeName(numeDb);
-                    if (!TitulariANS.Contains(numeNorm)) continue;
-                    if (gasiti.Contains(numeNorm)) continue;
+                    if (!TitulariANS.Contains(numeNorm) || gasiti.Contains(numeNorm)) continue;
                     var fac2 = r2["DenumireFacultate"]?.ToString() ?? "";
                     if ((facultate ?? "Toti") != "Toti" &&
                         !string.Equals(fac2, facultate, StringComparison.OrdinalIgnoreCase)) continue;
@@ -2186,40 +1568,41 @@ namespace LicentaV1.Controllers
         }
 
         [HttpGet("export/titulari")]
-        public IActionResult ExportTitulari(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> ExportTitulari(string? anUniv, string? facultate, string? departament)
         {
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
                 new DataColumn("Nume si prenume"), new DataColumn("Departament"), new DataColumn("Facultate")
             });
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(TitulariSql, conn);
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
             var gasiti2 = new HashSet<string>(StringComparer.Ordinal);
-            using (var reader = cmd.ExecuteReader())
+            using (var reader = await cmd.ExecuteReaderAsync())
             {
-                while (reader.Read())
+                while (await reader.ReadAsync())
                 {
                     var numeDb = reader["NumeComplet"]?.ToString() ?? "";
                     var numeNorm = NormalizeName(numeDb);
                     if (!TitulariANS.Contains(numeNorm)) continue;
                     gasiti2.Add(numeNorm);
-                    dt.Rows.Add(
-                        FixNume(numeDb, reader["ID_Profesor"]),
+                    dt.Rows.Add(FixNume(numeDb, reader["ID_Profesor"]),
                         reader["DenumireCatedra"]?.ToString() ?? "",
                         reader["Facultate"]?.ToString() ?? "");
                 }
             }
-            // Fallback: titulari din ANS fara ore in VCM
             var lipsa2 = TitulariANS.Where(n => !gasiti2.Contains(n)).ToList();
             if (lipsa2.Any())
             {
-                using var cmd2b = new SqlCommand(@"SELECT DISTINCT vp.ID_Profesor, vp.NumeIntreg, MIN(vp.DenumireCatedra) AS DenumireCatedra, MIN(vp.DenumireFacultate) AS DenumireFacultate FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp WHERE vp.ID_AnUnivCatedra = 45 GROUP BY vp.ID_Profesor, vp.NumeIntreg", conn);
+                using var cmd2b = new SqlCommand(@"SELECT DISTINCT vp.ID_Profesor, vp.NumeIntreg,
+                    MIN(vp.DenumireCatedra) AS DenumireCatedra, MIN(vp.DenumireFacultate) AS DenumireFacultate
+                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
+                    WHERE vp.ID_AnUnivCatedra = 45 GROUP BY vp.ID_Profesor, vp.NumeIntreg", conn);
                 cmd2b.CommandTimeout = 60;
-                using var r2b = cmd2b.ExecuteReader();
-                while (r2b.Read())
+                using var r2b = await cmd2b.ExecuteReaderAsync();
+                while (await r2b.ReadAsync())
                 {
                     var numeDb = r2b["NumeIntreg"]?.ToString() ?? "";
                     var numeNorm = NormalizeName(numeDb);
@@ -2243,19 +1626,15 @@ namespace LicentaV1.Controllers
 
         #region ================= RAPORT 7: COLABORATORI =================
 
-        // =====================================================================
-        // SURSA CORECTA COLABORATORI:
-        // Profesori care predau in an 45 (sunt in View_CentralizareMateriiProfesor)
-        // DAR nu sunt titulari didactici (nu au TitularAnUniv=1 AND DidCerc='D' AND ID_AnUnivCatedra=45)
-        // Deduplicare finala garanteaza un singur rand per ID_Profesor
-        // =====================================================================
         private const string ColaboratoriSql = @"
-            -- Sursa: TOTI profesorii care au predat in 2025-2026
-            -- Filtrarea colaborator (NU titular) se face in C# prin TitulariANS HashSet
             WITH ToatePersoanelePtColab AS (
                 SELECT DISTINCT
                     vcm.ID_Profesor,
-                    vcm.NumeIntregProfesor AS NumeIntreg,
+                    CASE vcm.ID_Profesor
+                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
+                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
+                        ELSE vcm.NumeIntregProfesor
+                    END AS NumeIntreg,
                     vp.DenumireCatedra,
                     vp.DenumireFacultate
                 FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
@@ -2270,8 +1649,7 @@ namespace LicentaV1.Controllers
                   AND LTRIM(RTRIM(ISNULL(vcm.NumeIntregProfesor,''))) != ''
                   AND vcm.NumeIntregProfesor NOT LIKE '--%'
             )
-            SELECT ID_Profesor,
-                   NumeIntreg AS NumeComplet,
+            SELECT ID_Profesor, NumeIntreg AS NumeComplet,
                    ISNULL(DenumireCatedra,'') AS DenumireCatedra,
                    ISNULL(DenumireFacultate,'') AS Facultate
             FROM ToatePersoanelePtColab
@@ -2279,20 +1657,19 @@ namespace LicentaV1.Controllers
             ORDER BY NumeIntreg";
 
         [HttpGet("colaboratori")]
-        public ActionResult GetColaboratori(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> GetColaboratori(string? anUniv, string? facultate, string? departament)
         {
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(ColaboratoriSql, conn);
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
                 var numeDb = reader["NumeComplet"]?.ToString() ?? "";
                 var numeNorm = NormalizeName(numeDb);
-                // Colaborator = oricine NU e in lista ANS titulari
                 if (TitulariANS.Contains(numeNorm)) continue;
                 string dept = reader["DenumireCatedra"]?.ToString() ?? "";
                 if (long.TryParse(dept, out long idCat)) dept = GetDenumireCatedra(idCat);
@@ -2307,19 +1684,19 @@ namespace LicentaV1.Controllers
         }
 
         [HttpGet("export/colaboratori")]
-        public IActionResult ExportColaboratori(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> ExportColaboratori(string? anUniv, string? facultate, string? departament)
         {
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
                 new DataColumn("Nume si prenume"), new DataColumn("Departament"), new DataColumn("Facultate")
             });
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(ColaboratoriSql, conn);
             cmd.CommandTimeout = 120;
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
                 var numeDb = reader["NumeComplet"]?.ToString() ?? "";
                 var numeNorm = NormalizeName(numeDb);
@@ -2341,28 +1718,22 @@ namespace LicentaV1.Controllers
 
         #region ================= RAPORT 8: ANS =================
 
-        // =====================================================================
-        // FIX ANS:
-        // - Lista titulari = acelasi criteriu ca R6: TitularAnUniv=1, ID_AnUnivCatedra=45, DidCerc='D'
-        // - Elimina cercetatori, randuri reziduale, nume goale
-        // - Rezultat: lista identica cu Cadre_Didactice_Titulare
-        // =====================================================================
-
-        // Interogare titulari didactici pentru ANS (identica cu TitulariSql ca logica)
         private const string QueryTitulariANS = @"
-            -- Sursa: TOTI profesorii activi in 2025-2026
-            -- Filtrarea titular se face in C# prin TitulariANS HashSet + NormalizeName()
             SELECT DISTINCT
                 vcm.ID_Profesor,
-                vcm.NumeIntregProfesor AS NumeIntreg,
-                ISNULL(vp.DenumireCatedra,'') AS DenumireCatedra,
-                ISNULL(vp.DenumireFacultate,'') AS DenumireFacultate,
+                CASE vcm.ID_Profesor
+                    WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
+                    WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
+                    ELSE vcm.NumeIntregProfesor
+                END AS NumeIntreg,
+                ISNULL(vp.DenumireCatedra,'')      AS DenumireCatedra,
+                ISNULL(vp.DenumireFacultate,'')    AS DenumireFacultate,
                 ISNULL(vp.DenumireGradDidactic,'') AS DenumireGradDidactic
             FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
             LEFT JOIN (
                 SELECT ID_Profesor,
-                       MIN(DenumireCatedra) AS DenumireCatedra,
-                       MIN(DenumireFacultate) AS DenumireFacultate,
+                       MIN(DenumireCatedra)      AS DenumireCatedra,
+                       MIN(DenumireFacultate)    AS DenumireFacultate,
                        MIN(DenumireGradDidactic) AS DenumireGradDidactic
                 FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
                 WHERE ID_AnUnivCatedra = @ID_AnUniv
@@ -2372,13 +1743,13 @@ namespace LicentaV1.Controllers
               AND LTRIM(RTRIM(ISNULL(vcm.NumeIntregProfesor,''))) != ''
               AND vcm.NumeIntregProfesor NOT LIKE '--%'
             ORDER BY NumeIntreg";
+
         [HttpGet("date-ans")]
         public IActionResult GetDateANS([FromQuery] int idAnUniv = 45)
         {
             var totiTitularii = new List<(int Id, string Nume, string Facultate, string Dept, string Grad)>();
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-
             using (var cmd1 = new SqlCommand(QueryTitulariANS, conn))
             {
                 cmd1.CommandTimeout = 60;
@@ -2387,18 +1758,14 @@ namespace LicentaV1.Controllers
                 while (r1.Read())
                 {
                     var numeDb = r1["NumeIntreg"]?.ToString() ?? "";
-                    // Includem DOAR cei din lista ANS oficiala
                     if (!TitulariANS.Contains(NormalizeName(numeDb))) continue;
-                    totiTitularii.Add((
-                        Convert.ToInt32(r1["ID_Profesor"]),
+                    totiTitularii.Add((Convert.ToInt32(r1["ID_Profesor"]),
                         FixNume(numeDb, r1["ID_Profesor"]),
                         r1["DenumireFacultate"]?.ToString() ?? "",
                         r1["DenumireCatedra"]?.ToString() ?? "",
-                        r1["DenumireGradDidactic"]?.ToString() ?? ""
-                    ));
+                        r1["DenumireGradDidactic"]?.ToString() ?? ""));
                 }
             }
-
             string queryOre = @"
                 SELECT vcm.ID_Profesor,
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
@@ -2410,8 +1777,7 @@ namespace LicentaV1.Controllers
                            MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
                     GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
-                ) sf
-                    ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
+                ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
                 WHERE vcm.ID_AnUniv=@ID_AnUniv";
@@ -2426,11 +1792,10 @@ namespace LicentaV1.Controllers
                     int idProf = Convert.ToInt32(r2["ID_Profesor"]);
                     int idMeta = r2["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(r2["IdMetaspec"]) : 0;
                     decimal ore = Convert.ToDecimal(r2["OreConventionale"]);
-                    if (!orePerProf.ContainsKey(idProf)) orePerProf[idProf] = new List<(int, decimal)>();
+                    if (!orePerProf.ContainsKey(idProf)) orePerProf[idProf] = new();
                     orePerProf[idProf].Add((idMeta, ore));
                 }
             }
-
             var profesori = new List<object>();
             int nrCrt = 1;
             foreach (var (id, nume, fac, dept, grad) in totiTitularii.OrderBy(t => t.Nume))
@@ -2461,15 +1826,7 @@ namespace LicentaV1.Controllers
                         fractiuni[DomeniiExcel[AnsIdToCol[maxKey] - 10]] = Math.Round(1m - sum, 2);
                     }
                 }
-                profesori.Add(new
-                {
-                    NrCrt = nrCrt++,
-                    NumeComplet = nume,
-                    Facultate = fac,
-                    Departament = dept,
-                    GradFunctie = MapareGradANS(grad),
-                    DomeniiMapate = fractiuni
-                });
+                profesori.Add(new { NrCrt = nrCrt++, NumeComplet = nume, Facultate = fac, Departament = dept, GradFunctie = MapareGradANS(grad), DomeniiMapate = fractiuni });
             }
             return Ok(profesori);
         }
@@ -2480,22 +1837,18 @@ namespace LicentaV1.Controllers
             var totiTitulariiExp = new List<(int Id, string Nume, string Facultate, string Dept, string Grad)>();
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-
             using (var cmd1 = new SqlCommand(QueryTitulariANS, conn))
             {
                 cmd1.CommandTimeout = 60;
                 cmd1.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
                 using var r1 = cmd1.ExecuteReader();
                 while (r1.Read())
-                    totiTitulariiExp.Add((
-                        Convert.ToInt32(r1["ID_Profesor"]),
+                    totiTitulariiExp.Add((Convert.ToInt32(r1["ID_Profesor"]),
                         FixNume(r1["NumeIntreg"]?.ToString(), r1["ID_Profesor"]),
                         r1["DenumireFacultate"]?.ToString() ?? "",
                         r1["DenumireCatedra"]?.ToString() ?? "",
-                        r1["DenumireGradDidactic"]?.ToString() ?? ""
-                    ));
+                        r1["DenumireGradDidactic"]?.ToString() ?? ""));
             }
-
             string queryOreExp = @"
                 SELECT vcm.ID_Profesor,
                        CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4)) AS OreConventionale,
@@ -2507,8 +1860,7 @@ namespace LicentaV1.Controllers
                            MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
                     FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
                     GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
-                ) sf
-                    ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
+                ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
                     AND sf.DenumireSpecializare=vcm.DenumireSpecializare
                     AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
                 WHERE vcm.ID_AnUniv=@ID_AnUniv";
@@ -2523,11 +1875,10 @@ namespace LicentaV1.Controllers
                     int idProf = Convert.ToInt32(r2["ID_Profesor"]);
                     int idMeta = r2["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(r2["IdMetaspec"]) : 0;
                     decimal ore = Convert.ToDecimal(r2["OreConventionale"]);
-                    if (!orePerProfExp.ContainsKey(idProf)) orePerProfExp[idProf] = new List<(int, decimal)>();
+                    if (!orePerProfExp.ContainsKey(idProf)) orePerProfExp[idProf] = new();
                     orePerProfExp[idProf].Add((idMeta, ore));
                 }
             }
-
             var profesori = new List<ProfANS>();
             foreach (var (id, nume, fac, dept, grad) in totiTitulariiExp.OrderBy(t => t.Nume))
             {
@@ -2557,24 +1908,15 @@ namespace LicentaV1.Controllers
                         fractiuni[maxKey] = Math.Round(1m - sum, 2);
                     }
                 }
-                profesori.Add(new ProfANS
-                {
-                    NumeComplet = nume,
-                    Departament = dept,
-                    Facultate = fac,
-                    GradFunctie = MapareGradANS(grad),
-                    Fractiuni = fractiuni
-                });
+                profesori.Add(new ProfANS { NumeComplet = nume, Departament = dept, Facultate = fac, GradFunctie = MapareGradANS(grad), Fractiuni = fractiuni });
             }
-
             var overrides = new Dictionary<string, Dictionary<int, decimal>>
             {
-                ["VOLMER MARIUS"] = new Dictionary<int, decimal> { { AnsIdToCol[7], 0.83m }, { AnsIdToCol[12], 0.17m } },
-                ["ZAHARIA SEBASTIAN MARIAN"] = new Dictionary<int, decimal> { { AnsIdToCol[12], 0.74m }, { AnsIdToCol[9], 0.27m } },
+                ["VOLMER MARIUS"] = new() { { AnsIdToCol[7], 0.83m }, { AnsIdToCol[12], 0.17m } },
+                ["ZAHARIA SEBASTIAN MARIAN"] = new() { { AnsIdToCol[12], 0.74m }, { AnsIdToCol[9], 0.27m } },
             };
             foreach (var prof in profesori)
                 if (overrides.TryGetValue(prof.NumeComplet, out var ov)) prof.Fractiuni = ov;
-
             profesori = profesori.OrderBy(p => p.NumeComplet).ToList();
             var wb = BuildANSWorkbookFromScratch();
             var ws = wb.Worksheets.First();
@@ -2614,13 +1956,11 @@ namespace LicentaV1.Controllers
         }
 
         private void AddBaseParams(SqlCommand cmd, string? anUniv, string? facultate, string? departament,
-    string? formaInvatamant, string? profesor, string? specializari, int semestru, string? tipPost)
+            string? formaInvatamant, string? profesor, string? specializari, int semestru, string? tipPost)
         {
             cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
             cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
             cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
-            // @deptIds = lista de ID-uri Catedra corespunzatoare departamentului selectat
-            // Folosit in filtrul @dept din Filtrat (filtrare dupa activitate, nu HR)
             cmd.Parameters.AddWithValue("@deptIds", GetDeptIds(departament));
             cmd.Parameters.AddWithValue("@formaInv", formaInvatamant ?? "Toti");
             cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
