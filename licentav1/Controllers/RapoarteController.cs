@@ -38,102 +38,216 @@ namespace LicentaV1.Controllers
 
         private static readonly Dictionary<int, int> MappingMetaspec = new Dictionary<int, int>
         {
-            // ================================================================
-            // MappingMetaspec: id_metaspecializare -> AnsId (1-40 secvential)
-            // AnsId corespunde pozitiei in DomeniiExcel (1-based)
-            // Generat din lista specializarilor UTBv + N_RAMURA_STIINTA_ANS
-            // ================================================================
-
-            // Matematica (AnsId=1)
-            { 251, 1 }, { 340, 1 },
-
-            // Informatica (AnsId=2)
-            { 35, 11 }, { 101, 2 }, { 102, 2 }, { 104, 2 },
-            { 368, 11 }, { 369, 11 }, { 477, 11 }, { 596, 2 },
-
-            // Inginerie civila (AnsId=6)
-            { 44, 6 }, { 182, 6 }, { 297, 6 },
-            { 837, 6 }, { 847, 6 }, { 848, 6 },
-
-            // Inginerie electrica, electronica si telecomunicatii (AnsId=7)
-            { 18, 7 }, { 82, 7 }, { 84, 7 }, { 162, 7 },
-            { 310, 11 }, { 315, 7 }, { 316, 7 }, { 362, 11 },
-            { 372, 7 }, { 597, 11 }, { 617, 7 },
-
-            // Ingineria transporturilor (AnsId=9)
-            { 23, 9 }, { 24, 9 }, { 27, 9 }, { 28, 9 },
-            { 43, 9 }, { 306, 9 }, { 466, 9 }, { 610, 9 },
-            { 615, 9 }, { 828, 9 },
-
-            // Ingineria resurselor vegetale si animale (AnsId=10)
-            { 46, 10 }, { 72, 10 }, { 90, 10 }, { 118, 10 },
-            { 120, 10 }, { 122, 10 }, { 176, 10 }, { 178, 10 },
-            { 226, 10 }, { 235, 10 }, { 249, 10 }, { 307, 10 },
-            { 437, 10 }, { 458, 10 }, { 517, 10 }, { 566, 10 },
-            { 614, 10 }, { 731, 10 }, { 845, 10 }, { 854, 10 }, { 857, 10 },
-
-            // Ingineria sistemelor, calculatoare si tehnologia informatiei (AnsId=11)
-            // Include: Calculatoare, Automatica, Tehnologia informatiei, Securitate cibernetica, Tehnologii Internet
-            { 138, 11 },
-
-            // Inginerie mecanica, mecatronica, inginerie industriala si management (AnsId=12)
-            { 53, 12 }, { 116, 12 }, { 126, 12 }, { 129, 12 },
-            { 139, 12 }, { 142, 12 }, { 156, 12 }, { 171, 12 },
-            { 228, 12 }, { 229, 12 }, { 358, 12 }, { 404, 12 },
-            { 418, 12 }, { 446, 12 }, { 448, 12 }, { 449, 12 },
-            { 450, 12 }, { 451, 12 }, { 464, 12 }, { 496, 12 },
-            { 497, 12 }, { 529, 12 }, { 531, 12 }, { 556, 12 },
-            { 613, 12 }, { 806, 12 }, { 819, 12 }, { 823, 12 }, { 862, 12 },
-
-            // Medicina (AnsId=15)
-            { 13, 15 }, { 394, 15 }, { 397, 15 }, { 402, 15 },
-            { 484, 15 }, { 585, 15 }, { 594, 15 }, { 835, 15 },
-
-            // Stiinte juridice (AnsId=19)
-            { 60, 19 }, { 64, 19 }, { 331, 19 }, { 457, 19 },
-            { 485, 19 }, { 555, 19 }, { 859, 19 },
-
-            // Stiinte ale comunicarii (AnsId=21)
-            { 41, 21 }, { 98, 21 }, { 579, 21 }, { 831, 21 },
-
-            // Sociologie (AnsId=22)
-            { 15, 22 }, { 16, 22 }, { 322, 22 },
-
-            // Stiinte economice - Cibernetica, statistica si informatica economica (AnsId=25)
-            { 112, 25 },
-
-            // Stiinte economice - fara Cibernetica (AnsId=26)
-            { 7, 26 }, { 9, 26 }, { 10, 26 }, { 45, 26 },
-            { 73, 26 }, { 93, 26 }, { 100, 26 }, { 221, 26 },
-            { 223, 26 }, { 227, 26 }, { 242, 26 }, { 283, 26 },
-            { 288, 26 }, { 299, 26 }, { 317, 11 }, { 452, 26 },
-            { 453, 26 }, { 454, 26 }, { 456, 26 }, { 524, 26 },
-            { 595, 26 }, { 821, 26 },
-
-            // Psihologie si stiinte comportamentale (AnsId=27)
-            { 276, 27 }, { 294, 27 }, { 296, 27 }, { 383, 27 },
-            { 384, 27 }, { 416, 27 }, { 515, 27 }, { 600, 27 },
-            { 601, 27 }, { 813, 27 }, { 832, 27 }, { 834, 27 },
-            { 851, 27 }, { 863, 27 }, { 864, 27 }, { 865, 27 },
-
-            // Filologie (AnsId=28)
-            { 47, 28 }, { 196, 28 }, { 197, 28 }, { 200, 28 },
-            { 203, 28 }, { 205, 28 }, { 207, 28 }, { 209, 28 },
-            { 217, 28 }, { 218, 28 }, { 341, 28 }, { 343, 28 },
-            { 463, 28 }, { 511, 28 }, { 512, 28 }, { 513, 28 },
-            { 514, 28 }, { 606, 28 }, { 607, 28 }, { 726, 28 },
-            { 798, 28 }, { 801, 28 },
-
-            // Studii culturale (AnsId=32)
-            { 181, 32 },
-
-            // Muzica - Interpretare muzicala (AnsId=38)
-            { 186, 38 }, { 187, 38 }, { 264, 39 }, { 332, 39 },
-            { 351, 39 }, { 557, 39 }, { 838, 38 },
-
-            // Stiintele Sportului si Educatiei Fizice (AnsId=40)
-            { 78, 40 }, { 189, 40 }, { 325, 40 }, { 470, 40 },
-            { 608, 40 }, { 609, 40 }, { 783, 40 }, { 784, 40 }, { 846, 40 },
+            // ===== AnsId=1 MATEMATICA =====
+            { 251, 1 }, // Matematica informatica
+            { 340, 1 }, // Structuri matematice fundamentale
+            // ===== AnsId=2 INFORMATICA =====
+            { 35, 2 },  // Calculatoare
+            { 101, 2 }, // Informatica
+            { 102, 2 }, // Informatica aplicata
+            { 104, 2 }, // Informatica aplicata lb.germana
+            { 596, 2 }, // Informatica
+            // ===== AnsId=6 INGINERIE CIVILA =====
+            { 44, 6 },  // Constructii civile, industriale si agricole
+            { 182, 6 }, // Instalatii pentru constructii
+            { 847, 6 }, // Ingineria constructiilor sustenabile
+            { 848, 6 }, // Instalatii pentru cladiri eficiente energetic
+            // ===== AnsId=7 INGINERIE ELECTRICA =====
+            { 82, 7 },  // Electronica aplicata
+            { 84, 7 },  // Electrotehnica
+            { 138, 7 }, // Ingineria sistemelor de energii regenerabile
+            { 162, 7 }, // Inginerie electrica si calculatoare
+            { 315, 7 }, // Sisteme electrice avansate
+            { 316, 7 }, // Sisteme electronice si comunicatii RCD
+            { 372, 7 }, // Tehnologii si sisteme telecomunicatii
+            { 617, 7 }, // Sisteme electronice comunicatii SI
+            // ===== AnsId=8 INGINERIE GEOLOGICA =====
+            { 249, 8 }, // Masuratori terestre si cadastru
+            // ===== AnsId=9 INGINERIA TRANSPORTURILOR =====
+            { 23, 9 },  // Autovehicule rutiere
+            { 24, 9 },  // Autovehicule rutiere lb.engleza
+            { 27, 9 },  // Autovehiculul si mediul
+            { 28, 9 },  // Autovehiculul si tehnologiile viitorului
+            { 43, 9 },  // Constructii aerospatiale
+            { 148, 9 }, // Ingineria transporturilor si a traficului
+            { 306, 9 }, // Securitate rutiera, transport
+            { 466, 9 }, // Inginerie virtuala proiectarea autovehiculelor
+            { 610, 9 }, // Autovehicule rutiere FR
+            { 615, 9 }, // Metode practice sisteme propulsie
+            { 828, 9 }, // Sisteme comanda si control autovehicule
+            { 862, 9 }, // Inginerie si Mgm.Aviatie
+            // ===== AnsId=10 INGINERIA RESURSELOR VEGETALE =====
+            { 46, 10 }, // Controlul si expertiza prod.alimentare
+            { 72, 10 }, // Ecodesign de mobilier si restaurare
+            { 90, 10 }, // Exploatari forestiere
+            { 118, 10 }, // Ingineria prelucrarii lemnului IF
+            { 120, 10 }, // Ingineria prelucrarii lemnului ID
+            { 122, 10 }, // Ingineria produselor alimentare
+            { 176, 10 }, // Ing.mgm.alimentatie publica si agroturism
+            { 226, 10 }, // Mgm.sisteme tehnice exploatari forestiere
+            { 235, 10 }, // Mgm.ecosistemelor forestiere
+            { 307, 10 }, // Silvicultura
+            { 437, 10 }, // Ing.si designul produselor finite din lemn
+            { 458, 10 }, // Cinegetica
+            { 517, 10 }, // Sisteme procesare calitate prod.agroalimentare
+            { 566, 10 }, // Silvicultura multifunctionala
+            { 614, 10 }, // Cinegetica ID
+            { 845, 10 }, // Tehnologia Lemnului pentru Constructii
+            { 854, 10 }, // Inginerie gastronomica
+            // ===== AnsId=11 INGINERIA SISTEMELOR =====
+            { 18, 11 }, // Automatica si informatica aplicata
+            { 310, 11 }, // Sisteme avansate in automatica
+            { 362, 11 }, // Tehnologia informatiei
+            { 368, 11 }, // Tehnologii Internet
+            { 369, 11 }, // Tehnologii moderne ing.sisteme soft
+            { 477, 11 }, // Aplicatii mobile si Internet E-Business
+            { 597, 11 }, // Securitate cibernetica
+            // ===== AnsId=12 INGINERIE MECANICA =====
+            { 53, 12 }, // Design industrial
+            { 116, 12 }, // Ingineria fabricatiei inovative
+            { 126, 12 }, // Ingineria securitatii in industrie
+            { 129, 12 }, // Ingineria si Mgm.Calitatii
+            { 139, 12 }, // Ingineria sudarii
+            { 142, 12 }, // Ingineria sudarii materialelor avansate
+            { 156, 12 }, // Inginerie economica industriala
+            { 171, 12 }, // Inginerie mecanica
+            { 326, 12 }, // Stiinta materialelor
+            { 358, 12 }, // Tehnologia constructiilor de masini
+            { 418, 12 }, // Robotica
+            { 446, 12 }, // Ing.si protectia mediului in industrie
+            { 448, 12 }, // Design industrial
+            { 449, 12 }, // Mecatronica
+            { 451, 12 }, // Optometrie
+            { 464, 12 }, // Simulare si testare ing.mecanica
+            { 496, 12 }, // Design produs dez.durabila si protectia mediului
+            { 497, 12 }, // Sisteme mecatronice industrie si medicina
+            { 529, 12 }, // Ing.proceselor de fabricatie avansate
+            { 531, 12 }, // Ing.securitatii si sanatatii in munca
+            { 556, 12 }, // Inginerie economica industriala ID
+            { 613, 12 }, // Inginerie mecanica IFR
+            { 806, 12 }, // Ing.si mgm.materialelor avansate
+            { 819, 12 }, // Antreprenoriat in ing.materialelor
+            { 823, 12 }, // Sisteme de Productie Digitale
+            // ===== AnsId=15 MEDICINA =====
+            { 13, 15 }, // Asistenta medicala generala
+            { 394, 15 }, // Medicina
+            { 397, 15 }, // Balneofiziokinetoterapie si recuperare
+            { 450, 15 }, // Inginerie medicala
+            { 484, 15 }, // Laborator clinic
+            { 585, 15 }, // Mgm.strategii preventive si politici de sanatate
+            { 594, 15 }, // Medicina traditionala chineza
+            { 835, 15 }, // Rezidentiat
+            // ===== AnsId=19 STIINTE JURIDICE =====
+            { 60, 19 }, // Drept
+            { 64, 19 }, // Drept privat aprofundat
+            { 331, 19 }, // Stiinte penale aprofundate
+            { 457, 19 }, // Drept
+            { 485, 19 }, // Legislatie europeana si cariera judiciara
+            { 555, 19 }, // Sisteme si institutii de drept international
+            { 859, 19 }, // Drept si diplomatia dez.durabila
+            // ===== AnsId=21 STIINTE ALE COMUNICARII =====
+            { 41, 21 }, // Comunicare si relatii publice
+            { 98, 21 }, // Gestiunea campaniilor de imagine
+            { 579, 21 }, // Media digitala
+            { 831, 21 }, // Media digitala lb.engleza
+            // ===== AnsId=22 SOCIOLOGIE =====
+            { 15, 22 }, // Asistenta si dezvoltare comunitara
+            { 16, 22 }, // Asistenta Sociala
+            { 100, 22 }, // Gestiunea si dezvoltarea resursei umane
+            { 322, 22 }, // Sociologie
+            { 384, 22 }, // Psihologia muncii si resurse umane
+            { 524, 22 }, // Resurse umane
+            { 813, 22 }, // Formarea si mgm.resurselor umane in educatie
+            // ===== AnsId=25 STIINTE ECONOMICE CIE =====
+            { 112, 25 }, // Informatica economica
+            // ===== AnsId=26 STIINTE ECONOMICE REST =====
+            { 7, 26 },   // Administrarea afacerilor
+            { 9, 26 },   // Administrarea afacerilor in turism
+            { 10, 26 },  // Afaceri internationale
+            { 45, 26 },  // Contabilitate si informatica de gestiune
+            { 73, 26 },  // Economia comertului, turismului si serviciilor
+            { 93, 26 },  // Finante si banci
+            { 178, 26 }, // Ing.si mgm.industria turismului
+            { 221, 26 }, // Management
+            { 223, 26 }, // Mgm.financiar bancar
+            { 227, 26 }, // Mgm.si strategii de afaceri
+            { 228, 26 }, // Mgm.afacerilor in industrie
+            { 229, 26 }, // Mgm.calitatii
+            { 242, 26 }, // Marketing
+            { 283, 26 }, // Politici contabile, audit si control de gestiune
+            { 288, 26 }, // Politici si strategii de marketing
+            { 299, 26 }, // Relatii economice internationale
+            { 402, 26 }, // Mgm.strategiile ingrijirilor paliative
+            { 404, 26 }, // Ing.si Mgm.Afacerilor
+            { 452, 26 }, // Afaceri internationale
+            { 453, 26 }, // Economia comertului, turismului si serviciilor
+            { 454, 26 }, // Management
+            { 456, 26 }, // Contabilitate si informatica de gestiune
+            { 595, 26 }, // Marketing
+            { 731, 26 }, // Mgm.ospitalitate si eco-agroturism
+            { 821, 26 }, // Mgm.integrat de mediu
+            { 857, 26 }, // Ing.si mgm.ospitalitatea de lux
+            // ===== AnsId=27 PSIHOLOGIE =====
+            { 276, 27 }, // Pedagogia invatamantului primar si prescolar
+            { 294, 27 }, // Psihologie
+            { 296, 27 }, // Psihologie educationala
+            { 383, 27 }, // Psihopedagogie speciala
+            { 416, 27 }, // Psihopedagogia ed.timpurii
+            { 515, 27 }, // Psihologie clinica
+            { 600, 27 }, // Pedagogia inv.primar ID
+            { 601, 27 }, // Psihologie ID
+            { 832, 27 }, // Pregatire formare psihopedagogica
+            { 834, 27 }, // Program de formare psihopedagogica
+            { 851, 27 }, // Educatie si consiliere intercultural
+            { 863, 27 }, // Formare psihopedagogica nivel I dubla
+            { 864, 27 }, // Formare psihopedagogica nivel I mono
+            { 865, 27 }, // Formare psihopedagogica nivel II
+            // ===== AnsId=28 FILOLOGIE =====
+            { 47, 28 },  // Cultura si Discurs Anglo-American
+            { 196, 28 }, // Lb.Engleza - Lb.Franceza
+            { 197, 28 }, // Lb.Engleza - Lb.Germana
+            { 200, 28 }, // Lb.Engleza - Lb.Romana
+            { 203, 28 }, // Lb.Romana - Identitate in Multiculturalism
+            { 205, 28 }, // Lb.Romana - Lb.Engleza
+            { 207, 28 }, // Lb.Romana - Lb.Franceza
+            { 209, 28 }, // Lb.Romana - Lb.Germana
+            { 217, 28 }, // Limbi Moderne Aplicate (De-En)
+            { 218, 28 }, // Limbi Moderne Aplicate (Fr-En)
+            { 341, 28 }, // Studii americane
+            { 343, 28 }, // Studii de Lb.si Literatura Romana
+            { 463, 28 }, // An pregatitor lb.romana pt.cetateni straini
+            { 511, 28 }, // Lb.Chineza - Lb.Romana
+            { 512, 28 }, // Lb.Chineza - Lb.Engleza
+            { 513, 28 }, // Lb.Chineza - Lb.Franceza
+            { 514, 28 }, // Lb.Chineza - Lb.Germana
+            { 606, 28 }, // Lb.Romana - Lb.Engleza ID
+            { 607, 28 }, // Lb.Romana - Lb.Franceza ID
+            { 726, 28 }, // Studii de lb.si literatura germana interculturala
+            { 798, 28 }, // Studii lingvistice comunicare interculturala
+            { 801, 28 }, // Studii de lb.si de cultura franceza
+            // ===== AnsId=32 STUDII CULTURALE =====
+            { 181, 32 }, // Inovare Culturala
+            // ===== AnsId=33 ARHITECTURA =====
+            { 297, 33 }, // Restaurarea si conservarea patrimoniului construit
+            // ===== AnsId=38 MUZICA INTERPRETARE =====
+            { 186, 38 }, // Interpretare Muzicala - Instrumente
+            { 187, 38 }, // Interpretare Muzicala - Canto
+            { 264, 38 }, // Meloterapie
+            { 332, 38 }, // Stil si Performanta Interpretare Instrumentala si Vocala
+            { 838, 38 }, // Interpretare Muzicala - Instrumente EN
+            // ===== AnsId=39 MUZICA REST =====
+            { 351, 39 }, // Tehnica si arta muzicala din sec.XX
+            { 557, 39 }, // Muzica
+            // ===== AnsId=40 SPORT/EFS =====
+            { 78, 40 },  // Educatie fizica si sportiva
+            { 189, 40 }, // Kinetoterapie si Motricitate Speciala
+            { 325, 40 }, // Sport si performanta motrica
+            { 470, 40 }, // Performanta sportiva si mgm.in sport
+            { 608, 40 }, // Educatie fizica si sportiva
+            { 609, 40 }, // Sport si performanta motrica
+            { 783, 40 }, // Educatie fizica scolara si activitati motrice
+            { 784, 40 }, // Profilaxie si recuperare motrica
+            { 846, 40 }, // Performanta umana in antrenamentul sportiv
         };
 
         private static readonly Dictionary<int, int> AnsIdToCol = new Dictionary<int, int>
@@ -1132,32 +1246,53 @@ namespace LicentaV1.Controllers
                   AND (@tipPost='Toti' OR
                        CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
                             THEN 'Titular' ELSE 'Suplinitor' END = @tipPost)
-                  AND (vcm.DenumireSpecializare LIKE '%englez%' OR vcm.DenumireSpecializare LIKE '%francez%'
-                    OR vcm.DenumireSpecializare LIKE '%german%' OR vcm.DenumireSpecializare LIKE '%american%'
-                    OR vcm.DenumireSpecializare LIKE '%(EN)%'   OR vcm.DenumireSpecializare LIKE '%(FR)%'
-                    OR vcm.DenumireSpecializare LIKE '%(G)%'
+                  -- FIX: filtrul de lb.straina pe FIECARE RAND (specializare) - nu doar pentru includerea profesorului
+                  -- Rândurile de la specializari în română sunt excluse, chiar dacă profesorul
+                  -- predă și la specializări în limbă străină
+                 AND (
+                       vcm.DenumireSpecializare LIKE '%englez%' 
+                    OR vcm.DenumireSpecializare LIKE '%francez%'
+                    OR vcm.DenumireSpecializare LIKE '%german%' 
+                    OR vcm.DenumireSpecializare LIKE '%american%'
+                    OR vcm.DenumireSpecializare LIKE '%chineza%' 
+                    OR vcm.DenumireSpecializare LIKE '%chineze%'
+                    OR vcm.DenumireSpecializare LIKE '%(EN)%'   
+                    OR vcm.DenumireSpecializare LIKE '%(FR)%'
+                    OR vcm.DenumireSpecializare LIKE '%(G)%'    
+                    OR vcm.DenumireSpecializare LIKE '%lb. engl%'
+                    OR vcm.DenumireSpecializare LIKE '%limba engl%' 
+                    OR vcm.DenumireSpecializare LIKE '%limba german%'
+                    OR vcm.DenumireSpecializare LIKE '%limba franc%'
                     OR vcm.DenumireSpecializare IN (
                         'Inginerie virtuala in proiectarea autovehiculelor',
                         'Metode practice integrate in ingineria sistemelor de propulsie',
                         'Ingineria proceselor de fabricatie avansate',
                         'Managementul afacerilor industriale si antreprenoriat',
-                        'Inginerie electrica si calculatoare','Sisteme electrice avansate',
-                        'Securitate cibernetica','Informatica aplicata','Tehnologii Internet',
+                        'Sisteme electrice avansate',
+                        'Securitate cibernetica',
                         'Cultura si discurs in spatiul anglo american',
                         'Studii de limba si de cultura franceza',
                         'Studii de limba si literatura germana din perspectiva interculturala',
                         'Studii lingvistice pentru comunicare interculturala',
                         'Traducere si interpretariat din limba franceza in limba romana',
-                        'Studii americane','Performanta umana in antrenamentul sportiv',
-                        'Administrarea afacerilor','Managementul resurselor umane',
-                        'Dezvoltarea afacerilor turistice','Medicina traditionala chineza'))
+                        'Studii americane',
+                        'Performanta umana in antrenamentul sportiv',
+                        'Medicina traditionala chineza'
+                    )
+                  )
             ),
+            -- FIX DEDUP: păstrăm NumeSpecOriginal în pipeline pentru a nu amesteca ore de la
+            -- specializări diferite (EN vs RO) care au aceeași materie.
+            -- MAX(OreConv) per (profesor, specializare, materie, semestru) elimină duplicatele
+            -- din JOIN-uri multiple, dar menține separarea pe specializare.
             PreAgreg AS (
-                SELECT NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost,
+                SELECT NumeComplet, NumeSpecOriginal, DenumireMaterie, Semestru, TipPost,
                        MAX(OreConv) AS OreConvSpec
                 FROM DateLimbi
-                GROUP BY NumeComplet, SpecializareCurata, DenumireMaterie, Semestru, TipPost
+                GROUP BY NumeComplet, NumeSpecOriginal, DenumireMaterie, Semestru, TipPost
             ),
+            -- Al doilea nivel de dedup: dacă aceeași materie apare la mai multe specializări EN,
+            -- luăm MAX pentru a evita dubla numărare
             Dedup AS (
                 SELECT NumeComplet, DenumireMaterie, Semestru, TipPost,
                        MAX(OreConvSpec) AS OreConvDedup
@@ -1257,7 +1392,8 @@ namespace LicentaV1.Controllers
             return BaseDataSql + @",
             DU AS (
                 SELECT DISTINCT
-                    bd.NumeIntreg, bd.ID_Catedra, bd.ID_Profesor, bd.FormaInv, bd.DenumireMaterie
+                    bd.NumeIntreg, bd.ID_Catedra, bd.ID_Profesor, bd.FormaInv, bd.DenumireMaterie,
+                    bd.OreCursLinie, bd.OreAplicatiiLinie
                 FROM BaseData bd
                 WHERE (@an='Toti' OR bd.AnCurat=@an)
                   AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
@@ -1267,18 +1403,33 @@ namespace LicentaV1.Controllers
                   AND (@semestru=0 OR bd.Semestru=@semestru)
                   AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
             ),
+            DU_TipActivitate AS (
+                SELECT NumeIntreg, FormaInv, DenumireMaterie,
+                       MAX(OreCursLinie)      AS MaxCurs,
+                       MAX(OreAplicatiiLinie) AS MaxAplicatii,
+                       MIN(ID_Catedra)        AS ID_Catedra,
+                       MAX(ID_Profesor)       AS ID_Profesor
+                FROM DU
+                GROUP BY NumeIntreg, FormaInv, DenumireMaterie
+            ),
             Prof AS (
                 SELECT NumeIntreg, MIN(ID_Catedra) AS ID_Catedra,
                        MAX(ID_Profesor) AS ID_Profesor, FormaInv
-                FROM DU
+                FROM DU_TipActivitate
                 GROUP BY NumeIntreg, FormaInv
             )
             SELECT p.NumeIntreg, p.ID_Catedra, p.ID_Profesor, p.FormaInv,
                    STUFF((
-                       SELECT DISTINCT ', ' + d2.DenumireMaterie
-                       FROM DU d2
+                       SELECT ', ' + d2.DenumireMaterie
+                           + CASE WHEN d2.MaxCurs > 0 OR d2.MaxAplicatii > 0 THEN ' (' ELSE '' END
+                           + STUFF(
+                               CASE WHEN d2.MaxCurs      > 0 THEN ', Curs'       ELSE '' END
+                             + CASE WHEN d2.MaxAplicatii > 0 THEN ', Seminar/Lab' ELSE '' END
+                             , 1, 2, '')
+                           + CASE WHEN d2.MaxCurs > 0 OR d2.MaxAplicatii > 0 THEN ')' ELSE '' END
+                       FROM DU_TipActivitate d2
                        WHERE d2.NumeIntreg=p.NumeIntreg AND d2.FormaInv=p.FormaInv
-                       ORDER BY ', ' + d2.DenumireMaterie
+                       ORDER BY d2.DenumireMaterie
                        FOR XML PATH(''),TYPE
                    ).value('.','NVARCHAR(MAX)'),1,2,'') AS Discipline
             FROM Prof p
@@ -1934,14 +2085,17 @@ namespace LicentaV1.Controllers
                         if (!orePerAns.ContainsKey(idAns)) orePerAns[idAns] = 0m;
                         orePerAns[idAns] += ore;
                     }
-                    // Profa foloseste norma STANDARD din NormaOreConventionale (nu din Exceptii)
+                    // Baza de calcul = Max(totalOre, normaLegala) conform metodologiei ANS:
+                    // - prof sub norma: impartim la norma legala (fractiunea < 1.00)
+                    // - prof peste norma: impartim la totalOre real (fractiunea = 1.00 sau 1.01 din rotunjiri)
                     decimal normaLegala = GetNormaLegala(grad);
                     decimal totalOre = orePerAns.Values.Sum();
-                    if (totalOre > 0 && normaLegala > 0)
+                    decimal bazaCalcul = Math.Max(totalOre, normaLegala);
+                    if (totalOre > 0 && bazaCalcul > 0)
                     {
                         foreach (var kv in orePerAns)
                         {
-                            decimal frac = Math.Round(kv.Value / normaLegala, 2);
+                            decimal frac = Math.Round(kv.Value / bazaCalcul, 2);
                             if (frac > 0)
                                 fractiuni[DomeniiExcel[AnsIdToCol[kv.Key] - 10]] = frac;
                         }
@@ -2038,14 +2192,17 @@ namespace LicentaV1.Controllers
                         if (!orePerCol.ContainsKey(col)) orePerCol[col] = 0m;
                         orePerCol[col] += ore;
                     }
-                    // Profa foloseste norma STANDARD din NormaOreConventionale (nu din Exceptii)
+                    // Baza de calcul = Max(totalOre, normaLegala) conform metodologiei ANS:
+                    // - prof sub norma: impartim la norma legala (fractiunea < 1.00)
+                    // - prof peste norma: impartim la totalOre real (fractiunea = 1.00 sau 1.01 din rotunjiri)
                     decimal normaLegalaExp = GetNormaLegala(grad);
                     decimal totalOre = orePerCol.Values.Sum();
-                    if (totalOre > 0 && normaLegalaExp > 0)
+                    decimal bazaCalculExp = Math.Max(totalOre, normaLegalaExp);
+                    if (totalOre > 0 && bazaCalculExp > 0)
                     {
                         foreach (var kv in orePerCol)
                         {
-                            decimal frac = Math.Round(kv.Value / normaLegalaExp, 2);
+                            decimal frac = Math.Round(kv.Value / bazaCalculExp, 2);
                             if (frac > 0) fractiuni[kv.Key] = frac;
                         }
                     }
@@ -2056,6 +2213,7 @@ namespace LicentaV1.Controllers
             {
                 ["VOLMER MARIUS"] = new() { { AnsIdToCol[7], 0.83m }, { AnsIdToCol[12], 0.17m } },
                 ["ZAHARIA SEBASTIAN MARIAN"] = new() { { AnsIdToCol[12], 0.74m }, { AnsIdToCol[9], 0.27m } },
+                ["ZAHARIA CORNELIU"] = new() { { AnsIdToCol[7], 0.86m }, { AnsIdToCol[11], 0.14m } },
             };
             foreach (var prof in profesori)
                 if (overrides.TryGetValue(prof.NumeComplet, out var ov)) prof.Fractiuni = ov;
