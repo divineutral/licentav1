@@ -394,7 +394,7 @@ namespace LicentaV1.Controllers
         // =====================================================================
         private static readonly Dictionary<int, string> NumeCorecte = new Dictionary<int, string>
         {
-            { 6621, "ȘIREIU RAMONA DANIELA" },
+            { 6621, "TITEIU RAMONA DANIELA" },
             { 6698, "BENEA ALINA-PETRUȚA" },
             { 6631, "CĂBAȘ NICOLAE SERGIU" },
             { 4605, "CĂPRIȚĂ FLORIN" },
@@ -410,7 +410,7 @@ namespace LicentaV1.Controllers
             { 4345, "DIACONU ȘTEFANIA-ROXANA" },
             { 4352, "MANIȘIU(VASILE) VIRGINIA IOANA" },
             { 4401, "FOLEA(VECERDI) CRISTINA AGNEȘ" },
-            { 3887, "FOLEA(VECERDI) CRISTINA AGNEȘ" }, // FIX unificare cu 4401
+            { 3887, "VECERDI(FOLEA) CRISTINA AGNEȘ" }, // FIX unificare cu 4401
             { 4821, "CHIRA CODRUȚA-ELENA" },
             { 5833, "MARCHIȘ(TOMA) MARIA-ALEXANDRA" },
             { 5884, "VEZETEU COSMIN-DĂNUȚ" },
@@ -629,14 +629,6 @@ namespace LicentaV1.Controllers
 
         #region ================= HELPER SQL COMUN =================
 
-        // =====================================================================
-        // BaseDataSql: VcmDedup include CASE pe ID_Profesor
-        // pentru unificarea numelor inainte de orice GROUP BY:
-        //   ID 5665 (Tohanean - Mate-Info) -> 'TOHANEAN DRAGOS Ioan - EFS'
-        //   ID 3887 (Folea Vecerdi)        -> 'Folea (Vecerdi) Cristina Agnes'
-        //
-        // Filtrul @formaInv compara acum cu coloana derivata FormaInv (IF/ID/IFR)
-        // in loc de LIKE pe NumeSpecOriginal - mai curat si mai rapid
         // =====================================================================
         private const string BaseDataSql = @"
             WITH VcmDedup AS (
@@ -1249,37 +1241,37 @@ namespace LicentaV1.Controllers
                   -- FIX: filtrul de lb.straina pe FIECARE RAND (specializare) - nu doar pentru includerea profesorului
                   -- Rândurile de la specializari în română sunt excluse, chiar dacă profesorul
                   -- predă și la specializări în limbă străină
-                 AND (
-                       vcm.DenumireSpecializare LIKE '%englez%' 
-                    OR vcm.DenumireSpecializare LIKE '%francez%'
-                    OR vcm.DenumireSpecializare LIKE '%german%' 
-                    OR vcm.DenumireSpecializare LIKE '%american%'
-                    OR vcm.DenumireSpecializare LIKE '%chineza%' 
-                    OR vcm.DenumireSpecializare LIKE '%chineze%'
-                    OR vcm.DenumireSpecializare LIKE '%(EN)%'   
-                    OR vcm.DenumireSpecializare LIKE '%(FR)%'
-                    OR vcm.DenumireSpecializare LIKE '%(G)%'    
-                    OR vcm.DenumireSpecializare LIKE '%lb. engl%'
-                    OR vcm.DenumireSpecializare LIKE '%limba engl%' 
-                    OR vcm.DenumireSpecializare LIKE '%limba german%'
-                    OR vcm.DenumireSpecializare LIKE '%limba franc%'
-                    OR vcm.DenumireSpecializare IN (
+                  -- COLLATE Latin1_General_CI_AI: ignoră majuscule SI diacritice
+                  -- (prinde atât 'engleza' cât și 'engleză', 'ENGLEZA', etc.)
+                  AND (vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%englez%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%francez%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%german%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%american%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%chineza%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%chineze%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%(EN)%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%(FR)%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%(G)%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%lb. engl%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%limba engl%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%limba german%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%limba franc%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%in limba engl%'
+                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI IN (
                         'Inginerie virtuala in proiectarea autovehiculelor',
                         'Metode practice integrate in ingineria sistemelor de propulsie',
                         'Ingineria proceselor de fabricatie avansate',
                         'Managementul afacerilor industriale si antreprenoriat',
-                        'Sisteme electrice avansate',
-                        'Securitate cibernetica',
+                        'Inginerie electrica si calculatoare','Sisteme electrice avansate',
+                        'Securitate cibernetica','Informatica aplicata','Tehnologii Internet',
                         'Cultura si discurs in spatiul anglo american',
                         'Studii de limba si de cultura franceza',
                         'Studii de limba si literatura germana din perspectiva interculturala',
                         'Studii lingvistice pentru comunicare interculturala',
                         'Traducere si interpretariat din limba franceza in limba romana',
-                        'Studii americane',
-                        'Performanta umana in antrenamentul sportiv',
-                        'Medicina traditionala chineza'
-                    )
-                  )
+                        'Studii americane','Performanta umana in antrenamentul sportiv',
+                        'Administrarea afacerilor','Managementul resurselor umane',
+                        'Dezvoltarea afacerilor turistice','Medicina traditionala chineza'))
             ),
             -- FIX DEDUP: păstrăm NumeSpecOriginal în pipeline pentru a nu amesteca ore de la
             -- specializări diferite (EN vs RO) care au aceeași materie.
@@ -1404,6 +1396,7 @@ namespace LicentaV1.Controllers
                   AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
             ),
             DU_TipActivitate AS (
+                -- Agregam tipul activitatii per materie+forma: Curs si/sau Seminar/Lab/Proiect
                 SELECT NumeIntreg, FormaInv, DenumireMaterie,
                        MAX(OreCursLinie)      AS MaxCurs,
                        MAX(OreAplicatiiLinie) AS MaxAplicatii,
@@ -1421,12 +1414,12 @@ namespace LicentaV1.Controllers
             SELECT p.NumeIntreg, p.ID_Catedra, p.ID_Profesor, p.FormaInv,
                    STUFF((
                        SELECT ', ' + d2.DenumireMaterie
-                           + CASE WHEN d2.MaxCurs > 0 OR d2.MaxAplicatii > 0 THEN ' (' ELSE '' END
+                           + ' ('
                            + STUFF(
-                               CASE WHEN d2.MaxCurs      > 0 THEN ', Curs'       ELSE '' END
+                               CASE WHEN d2.MaxCurs      > 0 THEN ', Curs'      ELSE '' END
                              + CASE WHEN d2.MaxAplicatii > 0 THEN ', Seminar/Lab' ELSE '' END
                              , 1, 2, '')
-                           + CASE WHEN d2.MaxCurs > 0 OR d2.MaxAplicatii > 0 THEN ')' ELSE '' END
+                           + ')'
                        FROM DU_TipActivitate d2
                        WHERE d2.NumeIntreg=p.NumeIntreg AND d2.FormaInv=p.FormaInv
                        ORDER BY d2.DenumireMaterie
@@ -2214,6 +2207,9 @@ namespace LicentaV1.Controllers
                 ["VOLMER MARIUS"] = new() { { AnsIdToCol[7], 0.83m }, { AnsIdToCol[12], 0.17m } },
                 ["ZAHARIA SEBASTIAN MARIAN"] = new() { { AnsIdToCol[12], 0.74m }, { AnsIdToCol[9], 0.27m } },
                 ["ZAHARIA CORNELIU"] = new() { { AnsIdToCol[7], 0.86m }, { AnsIdToCol[11], 0.14m } },
+                // Vorovencii: 18 ore titular / Max(18,11)=18 -> teoretic 1.00, dar mici
+                // diferente de pontaj in AGSIS pot da 0.99. Override garanteaza 1.00.
+                ["VOROVENCII IOSIF"] = new() { { AnsIdToCol[10], 1.00m } },
             };
             foreach (var prof in profesori)
                 if (overrides.TryGetValue(prof.NumeComplet, out var ov)) prof.Fractiuni = ov;
