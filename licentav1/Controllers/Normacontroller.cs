@@ -54,6 +54,11 @@ namespace LicentaV1.Controllers
                      OR p.ID_Catedra = TRY_CAST(@dept AS INT)
                      OR ppm.DenumireCatedra COLLATE DATABASE_DEFAULT
                       = @dept COLLATE DATABASE_DEFAULT)
+                AND (@specs = N'Toti' OR EXISTS (
+                    SELECT 1 FROM STRING_SPLIT(@specs, ',') s 
+                    WHERE ppm.DenumireSpecializare LIKE s.value + '%' 
+                       OR ppm.DenumireSpecializare LIKE '%' + s.value + '%'
+                ))
                 AND (@prof = N'Toti'
                      OR p.NumeIntreg COLLATE DATABASE_DEFAULT
                       = @prof COLLATE DATABASE_DEFAULT)
@@ -64,6 +69,7 @@ namespace LicentaV1.Controllers
                 AND (@tipPost = N'Toti'
                      OR (@tipPost = N'Titular'    AND ppm.TitularSauSuplinitor = 1)
                      OR (@tipPost = N'Suplinitor' AND ppm.TitularSauSuplinitor = 0))
+
             ORDER BY NumeIntreg, ppm.DenumireSpecializare, ppm.Denumire, ppm.NrSemestruDinAn";
 
         private void AddParams(SqlCommand cmd, int id, string fac, string dept,

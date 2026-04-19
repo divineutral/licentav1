@@ -19,55 +19,65 @@ namespace LicentaV1.Controllers
 
         // Sincronizat cu Excel: adaugam Nr Ore Curs si Nr Ore Aplicatii per program
         private const string SqlOreProgram = @"
-            WITH OrePerProgram AS (
-                SELECT
-                    ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20)))   AS IdentificatorUnic,
-                    MIN(p.NumeIntreg) OVER
-                        (PARTITION BY ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20))))
-                                                                         AS NumeIntreg,
-                    ppm.DenumireSpecializare,
-                    SUM(ppm.NrOreConventionale)                          AS OreConvProgram,
-                    SUM(ppm.Nr_Ore_Curs)                                 AS OreCursProgram,
-                    SUM(ppm.Nr_Ore_Seminar + ppm.Nr_Ore_Laborator + ppm.Nr_Ore_Proiect)
-                                                                         AS OreAplicatiiProgram
-                FROM [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
-                INNER JOIN [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
-                    ON ppm.ID_Profesor = p.ID_Profesor
-                    AND p.ID_AnUnivCatedra = @ID_AnUniv
-                WHERE ppm.ID_AnUniv = @ID_AnUniv
-                    AND (@fac = N'Toti'
-                         OR p.ID_Facultate = TRY_CAST(@fac AS INT)
-                         OR ppm.DenumireFacultate COLLATE DATABASE_DEFAULT
-                          = @fac COLLATE DATABASE_DEFAULT)
-                    AND (@dept = N'Toti'
-                         OR p.ID_Catedra = TRY_CAST(@dept AS INT)
-                         OR ppm.DenumireCatedra COLLATE DATABASE_DEFAULT
-                          = @dept COLLATE DATABASE_DEFAULT)
-                    AND (@prof = N'Toti'
-                         OR p.NumeIntreg COLLATE DATABASE_DEFAULT
-                          = @prof COLLATE DATABASE_DEFAULT)
-                GROUP BY
-                    ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20))),
-                    p.ID_Profesor,
-                    ppm.DenumireSpecializare
-            ),
-            TotalPerProfesor AS (
-                SELECT IdentificatorUnic, SUM(OreConvProgram) AS TotalPost
-                FROM OrePerProgram GROUP BY IdentificatorUnic
-            )
-            SELECT
-                o.NumeIntreg                                             AS Profesor,
-                o.DenumireSpecializare                                   AS ProgramStudiu,
-                CAST(o.OreCursProgram       AS DECIMAL(10,2))            AS NrOreCurs,
-                CAST(o.OreAplicatiiProgram  AS DECIMAL(10,2))            AS NrOreAplicatii,
-                CAST(o.OreConvProgram       AS DECIMAL(10,2))            AS OreConvProgram,
-                CAST(t.TotalPost            AS DECIMAL(10,2))            AS TotalPost,
-                CAST(CASE WHEN t.TotalPost > 0
-                     THEN o.OreConvProgram * 100.0 / t.TotalPost
-                     ELSE 0 END AS DECIMAL(10,2))                        AS ProcentPost
-            FROM OrePerProgram o
-            INNER JOIN TotalPerProfesor t ON t.IdentificatorUnic = o.IdentificatorUnic
-            ORDER BY o.NumeIntreg, o.OreConvProgram DESC";
+    WITH OrePerProgram AS (
+        SELECT
+            ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20)))   AS IdentificatorUnic,
+            p.NumeIntreg,
+            -- Curatam denumirea specializarii (taiem dupa '...')
+            LTRIM(RTRIM(
+                CASE 
+                    WHEN CHARINDEX('...', ppm.DenumireSpecializare) > 0 
+                    THEN LEFT(ppm.DenumireSpecializare, CHARINDEX('...', ppm.DenumireSpecializare) - 1)
+                    ELSE ppm.DenumireSpecializare 
+                END
+            )) AS ProgramStudiuCurat,
+            SUM(ppm.Nr_Ore_Curs)                                 AS OreCursProgram,
+            SUM(ppm.Nr_Ore_Seminar + ppm.Nr_Ore_Laborator + ppm.Nr_Ore_Proiect) AS OreAplicatiiProgram,
+            SUM(ppm.NrOreConventionale)                          AS OreConvProgram
+        FROM [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
+        INNER JOIN [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p 
+            ON ppm.ID_Profesor = p.ID_Profesor
+        WHERE ppm.ID_AnUniv = @ID_AnUniv
+            -- Filtram dupa BIROUL profesorului (p), nu dupa unde tine cursul (ppm)
+            -- Asta rezolva cazul Baicoianu (apare la Mate-Info chiar daca preda la Stiinte Ec.)
+            AND (@fac = N'Toti' 
+                 OR p.ID_Facultate = TRY_CAST(@fac AS INT) 
+                 OR p.DenumireFacultate COLLATE DATABASE_DEFAULT = @fac COLLATE DATABASE_DEFAULT)
+            AND (@dept = N'Toti' 
+                 OR p.ID_Catedra = TRY_CAST(@dept AS INT) 
+                 OR p.DenumireCatedra COLLATE DATABASE_DEFAULT = @dept COLLATE DATABASE_DEFAULT)
+            AND (@prof = N'Toti' 
+                 OR p.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
+            
+            -- IATA UNDE VINE FILTRUL DE SPECIALIZARI (Smart Match):
+            AND (@specs = N'Toti' OR EXISTS (
+                SELECT 1 FROM STRING_SPLIT(@specs, ',') s 
+                WHERE ppm.DenumireSpecializare LIKE s.value + '%' 
+                   OR ppm.DenumireSpecializare LIKE '%' + s.value + '%'
+            ))
+        GROUP BY 
+            ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20))), 
+            p.NumeIntreg,
+            CASE 
+                WHEN CHARINDEX('...', ppm.DenumireSpecializare) > 0 
+                THEN LEFT(ppm.DenumireSpecializare, CHARINDEX('...', ppm.DenumireSpecializare) - 1)
+                ELSE ppm.DenumireSpecializare 
+            END
+    ),
+    TotalPerProfesor AS (
+        SELECT IdentificatorUnic, SUM(OreConvProgram) AS TotalPost FROM OrePerProgram GROUP BY IdentificatorUnic
+    )
+    SELECT
+        o.NumeIntreg                                       AS Profesor,
+        o.ProgramStudiuCurat                               AS ProgramStudiu,
+        CAST(o.OreCursProgram AS DECIMAL(10,2))           AS NrOreCurs,
+        CAST(o.OreAplicatiiProgram AS DECIMAL(10,2))      AS NrOreAplicatii,
+        CAST(o.OreConvProgram AS DECIMAL(10,2))           AS OreConvProgram,
+        CAST(t.TotalPost AS DECIMAL(10,2))                AS TotalPost,
+        CAST(CASE WHEN t.TotalPost > 0 THEN (o.OreConvProgram * 100.0) / t.TotalPost ELSE 0 END AS DECIMAL(10,2)) AS ProcentPost
+    FROM OrePerProgram o
+    INNER JOIN TotalPerProfesor t ON t.IdentificatorUnic = o.IdentificatorUnic
+    ORDER BY o.NumeIntreg ASC";
 
         private void AddParams(SqlCommand cmd, int id, string fac, string dept, string prof)
         {

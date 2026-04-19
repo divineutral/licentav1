@@ -244,51 +244,27 @@ namespace LicentaV1.Controllers
         // (string, pentru compatibilitate cu rapoartele existente).
         // -------------------------------------------------------------------------
         [HttpGet("liste/departamente")]
-        public ActionResult GetDepartamente(
-            [FromQuery] int? idAnUniv = null,
-            [FromQuery] int? idFacultate = null,
-            [FromQuery] string? numeFacultate = null)  // pastrat pentru compatibilitate
+        public ActionResult GetDepartamente([FromQuery] int idAnUniv, [FromQuery] string numeFacultate)
         {
-            int idAn = idAnUniv ?? _idAnUnivCurent;
-            var lista = new List<object> {
-                new { id = (int?)null, nume = "Toti" }
-            };
+            var lista = new List<object> { new { id = 0, nume = "Toti" } };
+            using var conn = new SqlConnection(_connectionString);
+            conn.Open();
+            // Folosim View-ul de profesori pentru a extrage DOAR departamentele facultatii selectate
+            string sql = @"
+        SELECT DISTINCT ID_Catedra, DenumireCatedra 
+        FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
+        WHERE ID_AnUnivCatedra = @idAn 
+          AND (ID_Facultate = TRY_CAST(@fac AS INT) OR DenumireFacultate = @fac)
+        ORDER BY DenumireCatedra ASC";
 
-            try
-            {
-                using var conn = new SqlConnection(_connectionString);
-                conn.Open();
-                using var cmd = new SqlCommand("[dbo].[CatedraListByFacultateAnUniv]", conn)
-                {
-                    CommandType = CommandType.StoredProcedure,
-                    CommandTimeout = 30
-                };
-                cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int)
-                { Value = idAn });
-                cmd.Parameters.Add(new SqlParameter("@ID_Facultate", SqlDbType.Int)
-                { Value = idFacultate.HasValue ? (object)idFacultate.Value : DBNull.Value });
-
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    int? id = TryGetInt(reader, "ID_Catedra") ?? TryGetInt(reader, "id");
-                    string den = TryGetString(reader, "Denumire")
-                              ?? TryGetString(reader, "DenumireCatedra")
-                              ?? reader[0]?.ToString() ?? "";
-                    if (!string.IsNullOrWhiteSpace(den))
-                        lista.Add(new { id, nume = den.Trim() });
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(
-                    $"[RapoarteController] GetDepartamente SP EROARE: {ex.Message}. Fallback SELECT DISTINCT.");
-                lista = DepartamenteFallback(idAn, numeFacultate);
-            }
-
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@idAn", idAnUniv);
+            cmd.Parameters.AddWithValue("@fac", numeFacultate);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(new { id = reader["ID_Catedra"], nume = reader["DenumireCatedra"].ToString() });
             return Ok(lista);
         }
-
         private List<object> DepartamenteFallback(int idAn, string? numeFacultate)
         {
             var lista = new List<object> { new { id = (int?)null, nume = "Toti" } };
@@ -329,51 +305,27 @@ namespace LicentaV1.Controllers
         // Params SP: @ID_AnUniv INT, @ID_Facultate INT
         // -------------------------------------------------------------------------
         [HttpGet("liste/specializari")]
-        public ActionResult GetSpecializari(
-            [FromQuery] int? idAnUniv = null,
-            [FromQuery] int? idFacultate = null,
-            [FromQuery] string? numeFacultate = null)  // pastrat pentru compatibilitate
+        public ActionResult GetSpecializari([FromQuery] int? idFacultate = null)
         {
-            int idAn = idAnUniv ?? _idAnUnivCurent;
-            var lista = new List<object> {
-                new { id = (int?)null, nume = "Toti" }
-            };
+            var lista = new List<object> { new { id = 0, nume = "Toti" } };
+            if (!idFacultate.HasValue || idFacultate == 0) return Ok(lista);
 
-            try
-            {
-                using var conn = new SqlConnection(_connectionString);
-                conn.Open();
-                using var cmd = new SqlCommand("[dbo].[SpecializareListByFacultateAnUniv]", conn)
+            using var conn = new SqlConnection(_connectionString);
+            conn.Open();
+            // Folosim procedura IL care a functionat in testul tau
+            using var cmd = new SqlCommand("[IL].[SpecializareListByAnUnivCurentSiIdFacultate]", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.Parameters.AddWithValue("@ID_Facultate", idFacultate.Value);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(new
                 {
-                    CommandType = CommandType.StoredProcedure,
-                    CommandTimeout = 30
-                };
-                cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int)
-                { Value = idAn });
-                cmd.Parameters.Add(new SqlParameter("@ID_Facultate", SqlDbType.Int)
-                { Value = idFacultate.HasValue ? (object)idFacultate.Value : DBNull.Value });
-
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    int? id = TryGetInt(reader, "ID_Specializare") ?? TryGetInt(reader, "id");
-                    string den = TryGetString(reader, "Denumire")
-                              ?? TryGetString(reader, "DenumireSpecializare")
-                              ?? reader[0]?.ToString() ?? "";
-                    if (!string.IsNullOrWhiteSpace(den))
-                        lista.Add(new { id, nume = den.Trim() });
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(
-                    $"[RapoarteController] GetSpecializari SP EROARE: {ex.Message}. Fallback SELECT DISTINCT.");
-                lista = SpecializariFallback(idAn, numeFacultate);
-            }
-
+                    id = reader["ID_Specializare"],
+                    // Folosim DenumireDomeniu pentru a avea numele curat (ex: ADMINISTRAREA AFACERILOR)
+                    nume = reader["DenumireDomeniu"].ToString()
+                });
             return Ok(lista);
         }
-
         private List<object> SpecializariFallback(int idAn, string? numeFacultate)
         {
             var lista = new List<object> { new { id = (int?)null, nume = "Toti" } };
@@ -415,47 +367,27 @@ namespace LicentaV1.Controllers
         // Filtrat optional dupa facultate si departament (string, pentru compatibilitate rapoarte)
         // -------------------------------------------------------------------------
         [HttpGet("liste/profesori")]
-        public ActionResult GetProfesori(
-            [FromQuery] int? idAnUniv = null,
-            [FromQuery] string? facultate = null,
-            [FromQuery] string? departament = null)
+        public ActionResult GetProfesori([FromQuery] int idAnUniv, [FromQuery] string facultate, [FromQuery] string departament)
         {
-            int idAn = idAnUniv ?? _idAnUnivCurent;
             var lista = new List<string> { "Toti" };
-
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-            using var cmd = new SqlCommand(@"
-                SELECT DISTINCT
-                    LTRIM(RTRIM(p.NumeIntreg)) COLLATE DATABASE_DEFAULT AS NumeIntreg
-                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
-                WHERE p.ID_AnUnivCatedra = @idAn
-                  AND p.NumeIntreg IS NOT NULL
-                  AND LTRIM(RTRIM(p.NumeIntreg)) != ''
-                  AND (
-                      @fac = N'Toti'
-                      OR p.DenumireFacultate COLLATE DATABASE_DEFAULT
-                       = @fac                COLLATE DATABASE_DEFAULT
-                  )
-                  AND (
-                      @dept = N'Toti'
-                      OR p.DenumireCatedra COLLATE DATABASE_DEFAULT
-                       = @dept             COLLATE DATABASE_DEFAULT
-                  )
-                ORDER BY NumeIntreg", conn);
-            cmd.Parameters.Add(new SqlParameter("@idAn", SqlDbType.Int) { Value = idAn });
-            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200)
-            { Value = string.IsNullOrWhiteSpace(facultate) ? "Toti" : facultate.Trim() });
-            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200)
-            { Value = string.IsNullOrWhiteSpace(departament) ? "Toti" : departament.Trim() });
+            // Folosim TRY_CAST pentru a vedea dacă parametrul primit e ID sau Nume
+            string sql = @"
+        SELECT DISTINCT LTRIM(RTRIM(p.NumeIntreg)) COLLATE DATABASE_DEFAULT AS Nume
+        FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
+        WHERE p.ID_AnUnivCatedra = @idAn
+          AND (@fac = 'Toti' OR p.ID_Facultate = TRY_CAST(@fac AS INT) OR p.DenumireFacultate = @fac)
+          AND (@dept = 'Toti' OR p.ID_Catedra = TRY_CAST(@dept AS INT) OR p.DenumireCatedra = @dept)
+        ORDER BY Nume";
+
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@idAn", idAnUniv);
+            cmd.Parameters.AddWithValue("@fac", facultate);
+            cmd.Parameters.AddWithValue("@dept", departament);
 
             using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var n = reader[0]?.ToString() ?? "";
-                if (!string.IsNullOrWhiteSpace(n)) lista.Add(n);
-            }
-
+            while (reader.Read()) lista.Add(reader[0].ToString());
             return Ok(lista);
         }
 

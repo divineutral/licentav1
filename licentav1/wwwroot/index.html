@@ -578,43 +578,49 @@
             $('#departamentSelect, #formaInvSelect, #semestruSelect, #tipPostSelect, #profesorSelect').on('change', resetView);
 
             $('#facultateSelect').on('change', function () {
-                resetView();
-                const an = $('#anUnivSelect').val() || 'Toti', fac = $(this).val() || 'Toti';
+                const idAn = $('#anUnivSelect').val();
+                const idFac = $(this).val(); // Acesta este ID-ul (ex: 14)
 
-                // --- FIX DEPARTAMENTE ---
-                $('#departamentSelect').empty().append(new Option('Se incarca...', ''));
-                fetch(`/api/Rapoarte/liste/departamente?idAnUniv=${an}&idFacultate=${fac}`) // Folosim parametrii noi
+                // Incarca Departamente (folosind ID-ul facultatii pentru filtrare)
+                fetch(`/api/Rapoarte/liste/departamente?idAnUniv=${idAn}&numeFacultate=${idFac}`)
                     .then(r => r.json()).then(data => {
-                        $('#departamentSelect').empty();
-                        data.forEach(u => {
-                            // Dacă e obiect (de la SP), luăm proprietățile corecte
-                            const nume = (u && typeof u === 'object') ? u.nume : u;
-                            const id = (u && typeof u === 'object') ? (u.id || u.nume) : u;
-                            $('#departamentSelect').append(new Option(nume === 'Toti' ? 'Toate' : nume, id));
-                        });
-                        $('#departamentSelect').val('Toti');
-                    }).catch(() => $('#departamentSelect').empty().append(new Option('Toate', 'Toti')));
+                        const $d = $('#departamentSelect').empty();
+                        data.forEach(d => $d.append(new Option(d.nume, d.id)));
+                        $d.trigger('change');
+                    });
 
-                // --- FIX SPECIALIZARI ---
-                $('#specializareSelect').empty();
-                fetch(`/api/Rapoarte/liste/specializari?idAnUniv=${an}&idFacultate=${fac}`)
+                // Incarca Specializari (folosind procedura IL cu ID_Facultate)
+                fetch(`/api/Rapoarte/liste/specializari?idFacultate=${idFac}`)
                     .then(r => r.json()).then(data => {
-                        data.forEach(u => {
-                            const nume = (u && typeof u === 'object') ? u.nume : u;
-                            const id = (u && typeof u === 'object') ? (u.id || u.nume) : u;
-                            $('#specializareSelect').append(new Option(nume, id));
-                        });
-                        $('#specializareSelect').trigger('change');
+                        const $s = $('#specializareSelect').empty();
+                        data.forEach(s => $s.append(new Option(s.nume, s.id)));
+                        $s.trigger('change');
                     });
             });
+            // La schimbarea specializării, facultății sau departamentului, reîncărcăm lista de profesori
+            $('#facultateSelect, #departamentSelect, #specializareSelect').on('change', function () {
+                const p = getP();
+                resetView(); // Opțional: ascunde tabelele deschise când se schimbă filtrele
 
-            $('#specializareSelect').on('change', function () {
-                resetView();
-                fetch(`/api/Rapoarte/liste/profesori-per-specializari?${new URLSearchParams(getP())}`)
-                    .then(r => r.json()).then(data => {
-                        const $p = $('#profesorSelect').empty(); $p.append(new Option('', ''));
-                        data.forEach(p => { if (p !== 'Toti') $p.append(new Option(p, p)); });
-                    });
+                // Folosim noua rută care acceptă ID-uri numerice sau "Toti"
+                const url = `/api/Rapoarte/liste/profesori?idAnUniv=${p.idAnUniv}&facultate=${p.facultate}&departament=${p.departament}`;
+
+                fetch(url)
+                    .then(r => r.json())
+                    .then(data => {
+                        const $prof = $('#profesorSelect').empty();
+                        // Adăugăm prima opțiune implicită
+                        $prof.append(new Option('Toți profesorii', 'Toti'));
+
+                        data.forEach(nume => {
+                            if (nume !== 'Toti') {
+                                $prof.append(new Option(nume, nume));
+                            }
+                        });
+                        // CRITIC: Anunțăm Select2 că datele s-au schimbat pentru a se randa corect
+                        $prof.trigger('change.select2');
+                    })
+                    .catch(err => console.error("Eroare la incarcarea profesorilor:", err));
             });
 
             // Accordion listeners
