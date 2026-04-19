@@ -3,85 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Licență - Transilvania</title>
+    <title>BI Dashboard - Transilvania</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     <style>
         :root {
-            --sidebar-width: 250px;
-            --bg-light: #f8f9fa;
-            --sidebar-dark: #212529;
-            --accent-color: #56723e;
+            --sidebar-w: 250px;
+            --accent: #56723e;
+            --accent-light: #e8efe1;
+            --accent-dark: #3d5229;
         }
 
         body {
-            background-color: var(--bg-light);
-            font-family: 'Segoe UI', sans-serif;
+            background: #f8f9fa;
+            font-family: 'Segoe UI',sans-serif;
         }
 
+        /* Sidebar */
         .sidebar {
-            width: var(--sidebar-width);
-            background: var(--sidebar-dark);
+            width: var(--sidebar-w);
+            background: #212529;
             min-height: 100vh;
             position: fixed;
-            color: white;
             z-index: 1000;
         }
 
             .sidebar .nav-link {
-                color: rgba(255,255,255,0.7);
-                margin: 5px 15px;
+                color: rgba(255,255,255,.7);
+                margin: 4px 12px;
                 border-radius: 8px;
-                transition: 0.3s;
+                transition: .25s;
+                font-size: .88rem;
             }
 
-                .sidebar .nav-link.active {
-                    background: var(--accent-color);
-                    color: white;
-                    font-weight: bold;
+                .sidebar .nav-link.active, .sidebar .nav-link:hover {
+                    background: var(--accent);
+                    color: #fff;
+                    font-weight: 600;
                 }
 
+            .sidebar .logo-box {
+                padding: 18px;
+                background: rgba(255,255,255,.05);
+                border-radius: 10px;
+                margin: 12px;
+            }
+
         .main-content {
-            margin-left: var(--sidebar-width);
-            padding: 30px;
+            margin-left: var(--sidebar-w);
+            padding: 28px;
         }
 
-        .filter-section {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border-top: 5px solid var(--accent-color);
+        /* Filter bar */
+        .filter-bar {
+            background: #fff;
+            padding: 18px 20px;
+            border-radius: 14px;
+            margin-bottom: 22px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+            border-top: 5px solid var(--accent);
         }
 
+        /* Accordion */
         .accordion-item {
             border: none;
-            border-radius: 15px;
+            border-radius: 14px;
             overflow: hidden;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 18px;
+            box-shadow: 0 3px 10px rgba(0,0,0,.06);
         }
 
         .accordion-button {
-            background-color: white;
+            background: #fff;
             font-weight: 600;
             color: #495057;
         }
 
             .accordion-button:not(.collapsed) {
-                background-color: #f1f3ee;
-                color: var(--accent-color);
+                background: #f1f3ee;
+                color: var(--accent);
                 box-shadow: none;
             }
 
             .accordion-button:focus {
                 box-shadow: none;
-                border-color: rgba(0,0,0,.125);
             }
 
+        /* Select2 */
         .select2-container .select2-selection--single {
             height: 38px !important;
             border: 1px solid #dee2e6 !important;
@@ -98,767 +107,850 @@
             min-height: 38px;
         }
 
-        .logo-container {
-            padding: 20px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            margin-bottom: 20px;
+        /* ============ EXCEL PREVIEW BOX ============ */
+        .excel-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            background: #f1f3ee;
+            border-radius: 8px 8px 0 0;
+            border-bottom: 2px solid var(--accent);
+            user-select: none;
+            flex-wrap: wrap;
+        }
+
+            .excel-toolbar .lbl {
+                font-size: .75rem;
+                color: var(--accent);
+                font-weight: 600;
+                white-space: nowrap;
+            }
+
+            .excel-toolbar input[type=range] {
+                width: 100px;
+                accent-color: var(--accent);
+                cursor: pointer;
+            }
+
+            .excel-toolbar .zval {
+                font-size: .75rem;
+                font-weight: 700;
+                color: #495057;
+                min-width: 36px;
+                text-align: center;
+            }
+
+            .excel-toolbar .zbtn {
+                background: #fff;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 1px 7px;
+                font-size: .85rem;
+                cursor: pointer;
+                color: var(--accent);
+                font-weight: bold;
+                line-height: 1.5;
+            }
+
+                .excel-toolbar .zbtn:hover {
+                    background: var(--accent-light);
+                }
+
+        .excel-preview-box {
+            overflow: auto;
+            border: 1px solid #c8d4b8;
+            border-radius: 0 0 8px 8px;
+            background: #fff;
+            max-height: 480px;
+            position: relative;
+        }
+
+            .excel-preview-box::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            .excel-preview-box::-webkit-scrollbar-track {
+                background: #f1f3ee;
+                border-radius: 5px;
+            }
+
+            .excel-preview-box::-webkit-scrollbar-thumb {
+                background: var(--accent);
+                border-radius: 5px;
+                border: 2px solid #f1f3ee;
+            }
+
+                .excel-preview-box::-webkit-scrollbar-thumb:hover {
+                    background: var(--accent-dark);
+                }
+
+            .excel-preview-box::-webkit-scrollbar-corner {
+                background: #f1f3ee;
+            }
+
+        .excel-preview-box {
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent) #f1f3ee;
+        }
+
+        .scale-wrap {
+            transform-origin: top left;
+            display: inline-block;
+            min-width: 100%;
+        }
+
+        /* ============ TABLE STYLES ============ */
+        .etbl {
+            border-collapse: separate;
+            border-spacing: 0;
+            white-space: nowrap;
+            font-size: .79rem;
+        }
+
+            .etbl th, .etbl td {
+                border: 1px solid #dee2e6;
+                padding: 5px 8px;
+            }
+
+            .etbl thead th {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                background: var(--accent);
+                color: #fff;
+                font-weight: bold;
+                text-align: center;
+            }
+            /* Sticky col 1 */
+            .etbl th:nth-child(1), .etbl td:nth-child(1) {
+                position: sticky;
+                left: 0;
+                z-index: 9;
+                background: var(--accent);
+                color: #fff;
+                min-width: 42px;
+                text-align: center;
+            }
+            /* Sticky col 2 */
+            .etbl th:nth-child(2), .etbl td:nth-child(2) {
+                position: sticky;
+                left: 42px;
+                z-index: 9;
+                background: #fff;
+                min-width: 200px;
+                font-weight: 600;
+                border-right: 2px solid #c8d4b8;
+            }
+
+            .etbl thead th:nth-child(1), .etbl thead th:nth-child(2) {
+                background: var(--accent);
+                color: #fff;
+                z-index: 12;
+            }
+
+            .etbl tbody tr:nth-child(even) td {
+                background: #f9fafb;
+            }
+
+                .etbl tbody tr:nth-child(even) td:nth-child(2) {
+                    background: #f9fafb;
+                }
+
+            .etbl tbody tr:hover td {
+                background: var(--accent-light) !important;
+            }
+
+        .etbl-ans {
+            min-width: 2800px;
+        }
+
+        .frac-poz {
+            background: #d4edda !important;
+            color: #155724;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .prog-wrap {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            min-width: 120px;
+        }
+
+        .prog-track {
+            flex: 1;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+        }
+
+        .prog-fill {
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        .tr-total td {
+            background: #e9ecef !important;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <div class="sidebar d-flex flex-column p-3">
-        <div class="text-center mb-4 logo-container">
-            <img src="images/logo.png" alt="Logo" style="width: 100%; max-width: 180px; object-fit: contain;"
-                 onerror="this.style.display='none'; this.parentElement.innerHTML='<h3 class=\'text-white\'>LICENȚĂ</h3>'">
-        </div>
 
+    <!-- SIDEBAR -->
+    <div class="sidebar d-flex flex-column p-2">
+        <div class="logo-box text-center mb-3">
+            <img src="images/logo.png" alt="Logo" style="max-width:160px;width:100%;object-fit:contain;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='<h4 class=\'text-white mb-0\'>BI</h4>'">
+        </div>
         <ul class="nav nav-pills flex-column mb-auto">
-            <li class="nav-item"><a href="#" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a></li>
+            <li><a href="#" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
         </ul>
-        <div class="p-3 border-top border-secondary text-center small text-muted">Licență 2026</div>
+        <div class="p-2 border-top border-secondary text-center small text-muted mt-auto">Licenta 2026</div>
     </div>
 
+    <!-- MAIN -->
     <div class="main-content">
-        <h2 id="dashboardTitle" class="mb-4 text-dark fw-bold" style="border-left: 5px solid var(--accent-color); padding-left: 15px;">
+        <h2 class="mb-4 fw-bold text-dark" style="border-left:5px solid var(--accent);padding-left:14px;">
             Academic Year Overview
         </h2>
 
-        <div class="filter-section row g-3 align-items-end">
-            <div class="col-md-auto">
+        <!-- FILTRE -->
+        <div class="filter-bar row g-2 align-items-end">
+            <div class="col-auto">
                 <label class="small fw-bold text-muted d-block">An Univ</label>
-                <select id="anUnivSelect" class="form-select" style="min-width: 150px;"></select>
+                <select id="anUnivSelect" class="form-select" style="min-width:140px;"></select>
             </div>
-            <div class="col-md-auto">
+            <div class="col-auto">
                 <label class="small fw-bold text-muted d-block">Facultate</label>
-                <select id="facultateSelect" class="form-select" style="min-width: 200px;"></select>
+                <select id="facultateSelect" class="form-select" style="min-width:190px;"></select>
             </div>
-            <div class="col-md-auto">
+            <div class="col-auto">
                 <label class="small fw-bold text-muted d-block">Departament</label>
-                <select id="departamentSelect" class="form-select" style="min-width: 200px;"></select>
+                <select id="departamentSelect" class="form-select" style="min-width:190px;"></select>
             </div>
-            <div class="col-md-auto">
-                <label class="small fw-bold text-muted d-block">Forma Înv.</label>
-                <select id="formaInvSelect" class="form-select" style="min-width: 100px;">
+            <div class="col-auto">
+                <label class="small fw-bold text-muted d-block">Forma Inv.</label>
+                <select id="formaInvSelect" class="form-select">
                     <option value="Toti">Toate</option>
-                    <option value="IF">IF</option>
-                    <option value="IFR">IFR</option>
-                    <option value="ID">ID</option>
+                    <option value="Cu frecvență">IF</option>
+                    <option value="Frecvență redusă">IFR</option>
+                    <option value="Învățământ la distanță">ID</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="small fw-bold text-muted d-block">Specializare (Multi)</label>
+                <label class="small fw-bold text-muted d-block">Specializare</label>
                 <select id="specializareSelect" class="form-select w-100" multiple="multiple"></select>
             </div>
-            <div class="col-md-2">
+            <div class="col-auto">
                 <label class="small fw-bold text-muted d-block">Semestru</label>
-                <select id="semestruSelect" class="form-select w-100">
+                <select id="semestruSelect" class="form-select">
                     <option value="0">Toate</option>
                     <option value="1">1</option>
                     <option value="2">2</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-auto">
                 <label class="small fw-bold text-muted d-block">Tip Post</label>
-                <select id="tipPostSelect" class="form-select w-100">
+                <select id="tipPostSelect" class="form-select">
                     <option value="Toti">Toate</option>
                     <option value="Titular">Titular</option>
                     <option value="Suplinitor">Suplinitor</option>
-                    <option value="SupTit">SupTit</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <label class="small fw-bold text-muted d-block">Profesor (Caută)</label>
+            <div class="col-md-2">
+                <label class="small fw-bold text-muted d-block">Profesor</label>
                 <select id="profesorSelect" class="form-select w-100"></select>
             </div>
-            <div class="col-md-auto mt-3">
-                <button class="btn btn-secondary w-100" onclick="resetView()" title="Resetează vizualizarea pentru noi filtre">
-                    <i class="bi bi-arrow-counterclockwise"></i> Actualizează
+            <div class="col-auto mt-1">
+                <button class="btn btn-secondary btn-sm" onclick="resetView()">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
                 </button>
             </div>
         </div>
 
-        <div class="accordion" id="accordionRapoarte">
+        <!-- ACCORDION -->
+        <div class="accordion" id="acc">
 
+            <!-- R1: Norme -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingOne">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNorme" aria-expanded="false" aria-controls="collapseNorme">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cNorme">
                         <i class="bi bi-table me-2"></i> Detaliere Norme Profesori
                     </button>
                 </h2>
-                <div id="collapseNorme" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionRapoarte">
+                <div id="cNorme" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
-                            <button class="btn btn-success btn-sm" onclick="downloadExcel('norma')">
-                                <i class="bi bi-file-earmark-excel"></i> Export Excel
-                            </button>
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-success btn-sm" onclick="dl('norma')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle">
-                                <thead style="background-color: #56723e; color: white;">
-                                    <tr>
-                                        <th>Profesor</th>
-                                        <th>Specializare</th>
-                                        <th>Materie</th>
-                                        <th>Tip Post</th>
-                                        <th class="text-center">Sem.</th>
-                                        <th class="text-center" title="Ore de curs">Ore Curs</th>
-                                        <th class="text-center" title="Seminar + Laborator + Proiect">Ore Aplic.</th>
-                                        <th class="text-center" title="Ore conventionale normate">Ore Conv.</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="normeTableBody">
-                                    <tr><td colspan="8" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="box-norme"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- R2: Ore Program -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingTwo">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOre" aria-expanded="false" aria-controls="collapseOre">
-                        <i class="bi bi-bar-chart-fill me-2"></i> Distribuție Ore Profesor pe Programe
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cOre">
+                        <i class="bi bi-bar-chart-fill me-2"></i> Distributie Ore Profesor pe Programe
                     </button>
                 </h2>
-                <div id="collapseOre" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionRapoarte">
+                <div id="cOre" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
-                            <button class="btn btn-success btn-sm" onclick="downloadExcel('ore-program')">
-                                <i class="bi bi-file-earmark-excel"></i> Export Excel
-                            </button>
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-success btn-sm" onclick="dl('ore-program')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle">
-                                <thead style="background-color: #56723e; color: white;">
-                                    <tr>
-                                        <th>Profesor</th>
-                                        <th>Program Studiu</th>
-                                        <th class="text-center">Nr. Ore Conv.</th>
-                                        <th class="text-center">Procent Post</th>
-                                        <th class="text-center" id="headerTotal">Total Post</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="oreProgramTableBody">
-                                    <tr><td colspan="5" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="box-ore"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- R3: Totaluri Norme -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingTotalNorme">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTotalNorme" aria-expanded="false" aria-controls="collapseTotalNorme">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cTotal">
                         <i class="bi bi-calculator me-2"></i> Totaluri Norme Profesori
                     </button>
                 </h2>
-                <div id="collapseTotalNorme" class="accordion-collapse collapse" aria-labelledby="headingTotalNorme" data-bs-parent="#accordionRapoarte">
+                <div id="cTotal" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
-                            <button class="btn btn-success btn-sm" onclick="downloadExcel('norma-totaluri')">
-                                <i class="bi bi-file-earmark-excel"></i> Export Excel
-                            </button>
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-success btn-sm" onclick="dl('norma-totaluri')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle">
-                                <thead style="background-color: #56723e; color: white;">
-                                    <tr>
-                                        <th>Profesor</th>
-                                        <th>Departament</th>
-                                        <th>Facultate</th>
-                                        <th class="text-center">Total Ore Conv.</th>
-                                        <th class="text-center">Total tot anul ore conv.</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="totalNormeTableBody">
-                                    <tr><td colspan="5" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="box-total"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- R4: Limbi -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingLimbiStraine">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLimbiStraine" aria-expanded="false" aria-controls="collapseLimbiStraine">
-                        <i class="bi bi-translate me-2"></i> Raport Limbi Străine
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cLimbi">
+                        <i class="bi bi-translate me-2"></i> Raport Limbi Straine
                     </button>
                 </h2>
-                <div id="collapseLimbiStraine" class="accordion-collapse collapse" aria-labelledby="headingLimbiStraine" data-bs-parent="#accordionRapoarte">
+                <div id="cLimbi" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
-                            <button class="btn btn-success btn-sm" onclick="downloadExcel('limbi-straine')">
-                                <i class="bi bi-file-earmark-excel"></i> Export Excel
-                            </button>
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-success btn-sm" onclick="dl('limbi-straine')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle text-center">
-                                <thead style="background-color: #56723e; color: white;">
-                                    <tr>
-                                        <th>Nr. Crt.</th>
-                                        <th class="text-start">Nume și prenume profesor</th>
-                                        <th>Total Sem 1</th>
-                                        <th>Total Sem 2</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="limbiStraineTableBody">
-                                    <tr><td colspan="5" class="text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="box-limbi"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- R5: Discipline -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingDiscipline">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDiscipline" aria-expanded="false" aria-controls="collapseDiscipline">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cDisc">
                         <i class="bi bi-book me-2"></i> Raport Discipline Predate
                     </button>
                 </h2>
-                <div id="collapseDiscipline" class="accordion-collapse collapse" aria-labelledby="headingDiscipline" data-bs-parent="#accordionRapoarte">
+                <div id="cDisc" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
-                            <button class="btn btn-success btn-sm" onclick="downloadExcel('discipline-predate')">
-                                <i class="bi bi-file-earmark-excel"></i> Export Excel
-                            </button>
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-success btn-sm" onclick="dl('discipline-predate')"><i class="bi bi-file-earmark-excel"></i> Export ZIP</button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle">
-                                <thead style="background-color: #56723e; color: white;">
-                                    <tr>
-                                        <th>Nume și prenume</th>
-                                        <th>Departament</th>
-                                        <th>Forma Înv.</th>
-                                        <th>Discipline Predate</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="disciplineTableBody">
-                                    <tr><td colspan="4" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="box-disc"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- R6: Titulari -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingTitulari">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTitulari" aria-expanded="false" aria-controls="collapseTitulari">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cTit">
                         <i class="bi bi-person-check me-2"></i> Raport Cadre Didactice Titulare
                     </button>
                 </h2>
-                <div id="collapseTitulari" class="accordion-collapse collapse" aria-labelledby="headingTitulari" data-bs-parent="#accordionRapoarte">
+                <div id="cTit" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
-                            <button class="btn btn-success btn-sm" onclick="downloadExcel('titulari')">
-                                <i class="bi bi-file-earmark-excel"></i> Export Excel
-                            </button>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Filtru: <code>TitularAnUniv=1</code></span>
+                            <button class="btn btn-success btn-sm" onclick="dl('titulari')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle">
-                                <thead style="background-color: #56723e; color: white;">
-                                    <tr>
-                                        <th>Nume și prenume</th>
-                                        <th>Departament</th>
-                                        <th>Facultate</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="titulariTableBody">
-                                    <tr><td colspan="3" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="box-tit"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- R7: Colaboratori -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingColaboratori">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseColaboratori" aria-expanded="false" aria-controls="collapseColaboratori">
-                        <i class="bi bi-people me-2"></i> Raport Asociați / Colaboratori
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cCol">
+                        <i class="bi bi-people me-2"></i> Raport Asociati / Colaboratori
                     </button>
                 </h2>
-                <div id="collapseColaboratori" class="accordion-collapse collapse" aria-labelledby="headingColaboratori" data-bs-parent="#accordionRapoarte">
+                <div id="cCol" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
-                            <button class="btn btn-success btn-sm" onclick="downloadExcel('colaboratori')">
-                                <i class="bi bi-file-earmark-excel"></i> Export Excel
-                            </button>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Filtru: <code>TitularAnUniv=0</code></span>
+                            <button class="btn btn-success btn-sm" onclick="dl('colaboratori')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered align-middle">
-                                <thead style="background-color: #56723e; color: white;">
-                                    <tr>
-                                        <th>Nume și prenume</th>
-                                        <th>Departament</th>
-                                        <th>Facultate</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="colaboratoriTableBody">
-                                    <tr><td colspan="3" class="text-center text-muted"><div class="spinner-border text-primary" role="status"></div> Se încarcă datele...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="box-col"></div>
                     </div>
                 </div>
             </div>
 
+            <!-- R8: ANS -->
             <div class="accordion-item">
-                <h2 class="accordion-header" id="headingThree">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseANS" aria-expanded="false" aria-controls="collapseANS">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cANS">
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i> Raport Domenii ANS
                     </button>
                 </h2>
-                <div id="collapseANS" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#accordionRapoarte">
+                <div id="cANS" class="accordion-collapse collapse" data-bs-parent="#acc">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <p class="mb-0 text-muted">Exportați fracțiunile de normă pe domeniile ANS pentru cadrele didactice titulare (ID An 45 implicit).</p>
-                            <button id="btnExportRaportANS" class="btn btn-success">
-                                <i class="bi bi-file-earmark-excel"></i> Export Raport ANS
-                            </button>
+                            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>50+ coloane dinamice. Scroll orizontal activ.</span>
+                            <button class="btn btn-success btn-sm" onclick="dl('raport-ans')"><i class="bi bi-file-earmark-excel"></i> Export Excel ANS</button>
                         </div>
+                        <div id="box-ans"></div>
                     </div>
                 </div>
             </div>
 
-        </div>
-    </div>
+        </div><!-- /accordion -->
+    </div><!-- /main-content -->
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
     <script>
-        const cacheState = { norme: "", ore: "", totalNorme: "", limbiStraine: "", discipline: "", titulari: "", colaboratori: "" };
+        // =====================================================================
+        // CACHE - evita re-fetch la re-deschidere fara schimbare filtre
+        // =====================================================================
+        const cache = {};
+        function cKey() { return JSON.stringify(getP()); }
+        function isDirty(k) { return cache[k] !== cKey(); }
+        function markClean(k) { cache[k] = cKey(); }
 
-        $(document).ready(function () {
-            $('#specializareSelect').select2({ placeholder: "Alege specializări", allowClear: true, width: 'resolve' });
-            $('#profesorSelect').select2({ placeholder: "Tastați pentru a căuta profesor...", allowClear: true, width: 'resolve', minimumInputLength: 0 });
-
-            fetch('/api/Rapoarte/liste/ani-universitari').then(res => res.json()).then(data => {
-                const s = document.getElementById('anUnivSelect');
-                data.forEach(an => s.innerHTML += `<option value="${an.id}">${an.nume}</option>`);
-                // Primul element (cel mai recent an universitar) este selectat implicit
-                if (data.length > 0) {
-                    s.value = data[0].id;
-                }
-                // Dupa ce se incarca anii, triggerem cascada
-                $('#facultateSelect').trigger('change');
-            });
-
-            fetch('/api/Rapoarte/liste/facultati').then(res => res.json()).then(data => {
-                const s = document.getElementById('facultateSelect');
-                data.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
-                // Nu mai triggerem change aici - se face deja dupa incarcarea anilor
-            });
-
-            $('#anUnivSelect').on('change', function () {
-                $('#facultateSelect').trigger('change');
-                invalidateCache();
-            });
-
-            $('#departamentSelect').on('change', function () { invalidateCache(); });
-            $('#formaInvSelect').on('change', function () { invalidateCache(); });
-
-            // =====================================================================
-            // CASCADA FACULTATE -> DEPARTAMENT + SPECIALIZARE
-            // La schimbarea facultatii:
-            //   1. Reincarca departamentele filtrate dupa facultatea selectata
-            //   2. Reincarca specializarile filtrate dupa facultatea selectata
-            //   3. Reincarca profesorii
-            // =====================================================================
-            $('#facultateSelect').on('change', function () {
-                invalidateCache();
-                const anUniv = $('#anUnivSelect').val() || 'Toti';
-                const fac = $(this).val() || 'Toti';
-
-                // --- Actualizare Departamente in cascada ---
-                // Golim si punem "Se incarca..." cat timp asteptam raspunsul
-                const $dept = $('#departamentSelect');
-                $dept.empty().append(new Option('Se încarcă...', ''));
-
-                fetch(`/api/Rapoarte/liste/departamente?anUniv=${encodeURIComponent(anUniv)}&numeFacultate=${encodeURIComponent(fac)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        $dept.empty();
-                        // Serverul returneaza "Toti" ca primul element - il mapam la "Toate" vizual
-                        data.forEach(u => {
-                            const text = (u === 'Toti' || u === '') ? 'Toate' : u;
-                            const val = (u === 'Toti' || u === '') ? 'Toti' : u;
-                            $dept.append(new Option(text, val));
-                        });
-                        // Selectam automat "Toate" dupa reincarcarea listei
-                        $dept.val('Toti');
-                        invalidateCache();
-                    })
-                    .catch(() => {
-                        $dept.empty().append(new Option('Toate', 'Toti'));
-                    });
-
-                // --- Actualizare Specializari in cascada ---
-                $('#specializareSelect').empty();
-                fetch(`/api/Rapoarte/liste/specializari-per-facultate?anUniv=${encodeURIComponent(anUniv)}&numeFacultate=${encodeURIComponent(fac)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        const $s = $('#specializareSelect');
-                        data.forEach(u => $s.append(new Option(u, u)));
-                        $s.trigger('change');
-                    });
-            });
-
-            $('#specializareSelect').on('change', function () {
-                invalidateCache();
-                const params = new URLSearchParams(getParamsObject());
-                fetch(`/api/Rapoarte/liste/profesori-per-specializari?${params.toString()}`).then(res => res.json()).then(data => {
-                    const $p = $('#profesorSelect').empty();
-                    $p.append(new Option("", ""));
-                    data.forEach(p => { if (p !== "Toti") $p.append(new Option(p, p)); });
-                });
-            });
-
-            $('#semestruSelect, #tipPostSelect, #profesorSelect').on('change', function () { invalidateCache(); });
-
-            document.getElementById('collapseNorme').addEventListener('show.bs.collapse', function () {
-                const currentParams = getFilterParamsString();
-                if (cacheState.norme !== currentParams) { loadNormeData(); cacheState.norme = currentParams; }
-            });
-
-            document.getElementById('collapseOre').addEventListener('show.bs.collapse', function () {
-                const currentParams = getFilterParamsString();
-                if (cacheState.ore !== currentParams) { loadOreData(); cacheState.ore = currentParams; }
-            });
-
-            document.getElementById('collapseTotalNorme').addEventListener('show.bs.collapse', function () {
-                const currentParams = getFilterParamsString();
-                if (cacheState.totalNorme !== currentParams) { loadTotalNormeData(); cacheState.totalNorme = currentParams; }
-            });
-
-            document.getElementById('collapseLimbiStraine').addEventListener('show.bs.collapse', function () {
-                const currentParams = getFilterParamsString();
-                if (cacheState.limbiStraine !== currentParams) { loadLimbiStraineData(); cacheState.limbiStraine = currentParams; }
-            });
-
-            document.getElementById('collapseDiscipline').addEventListener('show.bs.collapse', function () {
-                const currentParams = getFilterParamsString();
-                if (cacheState.discipline !== currentParams) { loadDisciplineData(); cacheState.discipline = currentParams; }
-            });
-
-            document.getElementById('collapseTitulari').addEventListener('show.bs.collapse', function () {
-                const currentParams = getFilterParamsString();
-                if (cacheState.titulari !== currentParams) { loadTitulariData(); cacheState.titulari = currentParams; }
-            });
-
-            document.getElementById('collapseColaboratori').addEventListener('show.bs.collapse', function () {
-                const currentParams = getFilterParamsString();
-                if (cacheState.colaboratori !== currentParams) { loadColaboratoriData(); cacheState.colaboratori = currentParams; }
-            });
-
-            $('#btnExportRaportANS').on('click', function () {
-                let idAnUniv = 45;
-                let url = `/api/Rapoarte/export/raport-ans?idAnUniv=${idAnUniv}`;
-                window.location.href = url;
-            });
-        });
-
-        function downloadExcel(reportType) {
-            const params = new URLSearchParams(getParamsObject());
-            window.location.href = `/api/Rapoarte/export/${reportType}?${params.toString()}`;
-        }
-
-        async function loadNormeData() {
-            const tbody = document.getElementById('normeTableBody');
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams(getParamsObject());
-            try {
-                const res = await fetch(`/api/Rapoarte/norma-profesori?${params.toString()}`);
-                const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nu există date.</td></tr>'; return; }
-
-                let html = '';
-                let totalCurs = 0, totalAplic = 0, totalConv = 0;
-
-                data.forEach(n => {
-                    let curs = parseFloat(n.nrOreCurs || n.NrOreCurs) || 0;
-                    let aplic = parseFloat(n.nrOreAplicatii || n.NrOreAplicatii) || 0;
-                    let conv = parseFloat(n.nrOreConventionale || n.NrOreConventionale) || 0;
-                    totalCurs += curs;
-                    totalAplic += aplic;
-                    totalConv += conv;
-                    html += `<tr>
-                                    <td>${n.profesor || n.Profesor || ''}</td>
-                                    <td>${n.specializare || n.Specializare || ''}</td>
-                                    <td>${n.materie || n.Materie || ''}</td>
-                                    <td class="text-center">${getBadgeStatus(n.tipPost || n.TipPost)}</td>
-                                    <td class="text-center">${n.semestru || n.Semestru || ''}</td>
-                                    <td class="text-center">${curs}</td>
-                                    <td class="text-center">${aplic}</td>
-                                    <td class="text-center fw-bold">${conv}</td>
-                                </tr>`;
-                });
-
-                html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                <td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                                <td class="text-center">${totalCurs.toFixed(2)}</td>
-                                <td class="text-center">${totalAplic.toFixed(2)}</td>
-                                <td class="text-center text-success">${totalConv.toFixed(2)}</td>
-                            </tr>`;
-
-                tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
-        }
-
-        async function loadOreData() {
-            const tbody = document.getElementById('oreProgramTableBody');
-            const headerTotal = document.getElementById('headerTotal');
+        // =====================================================================
+        // FILTRE
+        // =====================================================================
+        function getP() {
             const specs = $('#specializareSelect').val();
-
-            if (!specs || specs.length === 0 || specs.includes('Toti')) { headerTotal.innerText = "Total Post (Anual)"; }
-            else { headerTotal.innerText = "Total Post (Selecție)"; }
-
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams(getParamsObject());
-            try {
-                const res = await fetch(`/api/Rapoarte/ore-profesor-program?${params.toString()}`);
-                const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nu există date.</td></tr>'; return; }
-                let html = '';
-                data.forEach(item => {
-                    // Campurile returnate de API: Profesor, ProgramStudiu, OreConvProgram, ProcentPost, TotalPost
-                    const profesor = item.profesor || item.Profesor || '';
-                    const program = item.programStudiu || item.ProgramStudiu || '';
-                    const oreConv = item.oreConvProgram || item.OreConvProgram || 0;
-                    const procent = item.procentPost || item.ProcentPost || 0;
-                    const totalPost = item.totalPost || item.TotalPost || 0;
-
-                    let colorClass = 'bg-info';
-                    if (procent > 50) colorClass = 'bg-success';
-                    if (procent < 10) colorClass = 'bg-warning';
-
-                    html += `<tr>
-                                    <td class="fw-bold">${profesor}</td>
-                                    <td>${program}</td>
-                                    <td class="text-center">${oreConv}</td>
-                                    <td class="text-center" style="width: 20%;">
-                                        <div class="d-flex align-items-center">
-                                            <span class="me-2 small">${procent}%</span>
-                                            <div class="progress flex-grow-1" style="height: 6px;">
-                                                <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${procent}%"></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-center fw-bold" style="color: #56723e;">${totalPost}</td>
-                                </tr>`;
-                });
-                tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
-        }
-
-        async function loadTotalNormeData() {
-            const tbody = document.getElementById('totalNormeTableBody');
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams(getParamsObject());
-            try {
-                const res = await fetch(`/api/Rapoarte/norma-totaluri?${params.toString()}`);
-                const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nu există date.</td></tr>'; return; }
-
-                let html = '';
-                let grandTotalOre = 0;
-                let grandTotalAnual = 0;
-
-                data.forEach(item => {
-                    // Campurile returnate de API: NumeComplet, TipPost, Facultate, OreIF, OreID, OreIFR, TotalOreConv, TotalAnual
-                    const profesor = item.numeComplet || item.NumeComplet || item.profesor || '';
-                    const dept = item.departament || item.Departament || '';
-                    const facultate = item.facultate || item.Facultate || '';
-                    const totalOre = parseFloat(item.totalOreConv || item.TotalOreConv || 0);
-                    const totalAnual = parseFloat(item.totalAnual || item.TotalAnual || 0);
-
-                    grandTotalOre += totalOre;
-                    grandTotalAnual += totalAnual;
-
-                    html += `<tr>
-                                    <td class="fw-bold">${profesor}</td>
-                                    <td>${dept}</td>
-                                    <td>${facultate}</td>
-                                    <td class="text-center">${totalOre.toFixed(2)}</td>
-                                    <td class="text-center fw-bold text-primary">${totalAnual.toFixed(2)}</td>
-                                </tr>`;
-                });
-
-                html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                <td colspan="3" class="text-end">TOTAL GENERAL:</td>
-                                <td class="text-center">${grandTotalOre.toFixed(2)}</td>
-                                <td class="text-center text-success">${grandTotalAnual.toFixed(2)}</td>
-                            </tr>`;
-
-                tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
-        }
-
-        async function loadLimbiStraineData() {
-            const tbody = document.getElementById('limbiStraineTableBody');
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams(getParamsObject());
-            try {
-                const res = await fetch(`/api/Rapoarte/limbi-straine?${params.toString()}`);
-                const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nu există date pentru programe în limbi străine conform filtrelor.</td></tr>'; return; }
-
-                let html = '';
-                let sumSem1 = 0, sumSem2 = 0, sumTotal = 0;
-
-                data.forEach(item => {
-                    // FIX: campul se numeste "profesor" nu "numeProfesor"
-                    // API returneaza: NrCrt, Profesor, TotalSem1, TotalSem2, Total
-                    const nrCrt = item.nrCrt || item.NrCrt || '';
-                    const profesor = item.profesor || item.Profesor || '';
-                    const sem1 = parseFloat(item.totalSem1 || item.TotalSem1 || 0);
-                    const sem2 = parseFloat(item.totalSem2 || item.TotalSem2 || 0);
-                    const total = parseFloat(item.total || item.Total || 0);
-
-                    sumSem1 += sem1;
-                    sumSem2 += sem2;
-                    sumTotal += total;
-
-                    html += `<tr>
-                                    <td>${nrCrt}</td>
-                                    <td class="text-start fw-bold">${profesor}</td>
-                                    <td>${sem1.toFixed(2)}</td>
-                                    <td>${sem2.toFixed(2)}</td>
-                                    <td class="fw-bold text-success">${total.toFixed(2)}</td>
-                                </tr>`;
-                });
-
-                html += `<tr style="background-color: #e9ecef; font-weight: bold;">
-                                <td colspan="2" class="text-end">TOTAL:</td>
-                                <td>${sumSem1.toFixed(2)}</td>
-                                <td>${sumSem2.toFixed(2)}</td>
-                                <td class="text-success">${sumTotal.toFixed(2)}</td>
-                            </tr>`;
-
-                tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
-        }
-
-        async function loadDisciplineData() {
-            const tbody = document.getElementById('disciplineTableBody');
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams(getParamsObject());
-            try {
-                const res = await fetch(`/api/Rapoarte/discipline-predate?${params.toString()}`);
-                const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nu există date.</td></tr>'; return; }
-
-                let html = '';
-                data.forEach(item => {
-                    html += `<tr>
-                                    <td class="fw-bold">${item.profesor || item.Profesor || ''}</td>
-                                    <td>${item.departament || item.Departament || ''}</td>
-                                    <td><span class="badge bg-secondary">${item.formaInvatamant || item.FormaInvatamant || ''}</span></td>
-                                    <td style="white-space: pre-wrap;">${item.discipline || item.Discipline || ''}</td>
-                                </tr>`;
-                });
-                tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
-        }
-
-        async function loadTitulariData() {
-            const tbody = document.getElementById('titulariTableBody');
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams(getParamsObject());
-            try {
-                const res = await fetch(`/api/Rapoarte/titulari?${params.toString()}`);
-                const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="text-center">Nu există date.</td></tr>'; return; }
-
-                let html = '';
-                data.forEach(item => {
-                    // API returneaza: NumeComplet (nu "profesor")
-                    const nume = item.numeComplet || item.NumeComplet || item.profesor || '';
-                    const dept = item.denumireCatedra || item.DenumireCatedra || item.departament || '';
-                    const facultate = item.facultate || item.Facultate || '';
-                    html += `<tr>
-                                    <td class="fw-bold">${nume}</td>
-                                    <td>${dept}</td>
-                                    <td>${facultate}</td>
-                                </tr>`;
-                });
-                tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
-        }
-
-        async function loadColaboratoriData() {
-            const tbody = document.getElementById('colaboratoriTableBody');
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Se actualizează datele...</td></tr>';
-            const params = new URLSearchParams(getParamsObject());
-            try {
-                const res = await fetch(`/api/Rapoarte/colaboratori?${params.toString()}`);
-                const data = await res.json();
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="text-center">Nu există date.</td></tr>'; return; }
-
-                let html = '';
-                data.forEach(item => {
-                    // API returneaza: NumeComplet, DenumireCatedra, Facultate
-                    const nume = item.numeComplet || item.NumeComplet || item.profesor || '';
-                    const dept = item.denumireCatedra || item.DenumireCatedra || item.departament || '';
-                    const facultate = item.facultate || item.Facultate || '';
-                    html += `<tr>
-                                    <td class="fw-bold">${nume}</td>
-                                    <td>${dept}</td>
-                                    <td>${facultate}</td>
-                                </tr>`;
-                });
-                tbody.innerHTML = html;
-            } catch (err) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Eroare: ${err.message}</td></tr>`; }
-        }
-
-        function getParamsObject() {
-            const specs = $('#specializareSelect').val();
-            const querySpecs = (specs && specs.length > 0) ? (Array.isArray(specs) ? specs.join(',') : specs) : 'Toti';
             return {
-                anUniv: $('#anUnivSelect').val() || 'Toti',
+                idAnUniv: $('#anUnivSelect').val() || 45,
                 facultate: $('#facultateSelect').val() || 'Toti',
                 departament: $('#departamentSelect').val() || 'Toti',
                 formaInvatamant: $('#formaInvSelect').val() || 'Toti',
-                specializari: querySpecs,
+                specializari: (specs && specs.length) ? specs.join(',') : 'Toti',
                 semestru: $('#semestruSelect').val() || 0,
                 tipPost: $('#tipPostSelect').val() || 'Toti',
                 profesor: $('#profesorSelect').val() || 'Toti'
             };
         }
+        function resetView() { $('.accordion-collapse').collapse('hide'); Object.keys(cache).forEach(k => delete cache[k]); }
 
-        function getFilterParamsString() {
-            const p = getParamsObject();
-            return `an=${p.anUniv}&fac=${p.facultate}&dept=${p.departament}&forma=${p.formaInvatamant}&spec=${p.specializari}&sem=${p.semestru}&tip=${p.tipPost}&prof=${p.profesor}`;
+        // =====================================================================
+        // INIT
+        // =====================================================================
+        $(document).ready(function () {
+            $('#specializareSelect').select2({ placeholder: 'Alege specializari', allowClear: true, width: 'resolve' });
+            $('#profesorSelect').select2({ placeholder: 'Cauta profesor...', allowClear: true, width: 'resolve' });
+
+            fetch('/api/Rapoarte/liste/ani-universitari').then(r => r.json()).then(data => {
+                const s = document.getElementById('anUnivSelect');
+                data.forEach(a => s.innerHTML += `<option value="${a.id}">${a.nume}</option>`);
+                if (data.length) s.value = data[0].id;
+                $('#facultateSelect').trigger('change');
+            });
+
+            fetch('/api/Rapoarte/liste/facultati').then(r => r.json()).then(data => {
+                const s = document.getElementById('facultateSelect');
+                s.innerHTML = ""; // Curățăm lista existentă
+                data.forEach(f => {
+                    // Verificăm dacă 'f' este obiect sau string (pentru siguranță)
+                    const id = (f && typeof f === 'object') ? (f.id || f.nume) : f;
+                    const nume = (f && typeof f === 'object') ? f.nume : f;
+
+                    // Folosim nume pentru afișare și ID/nume pentru valoarea din spate
+                    s.innerHTML += `<option value="${id}">${nume}</option>`;
+                });
+            });
+
+            $('#anUnivSelect').on('change', () => { $('#facultateSelect').trigger('change'); resetView(); });
+            $('#departamentSelect, #formaInvSelect, #semestruSelect, #tipPostSelect, #profesorSelect').on('change', resetView);
+
+            $('#facultateSelect').on('change', function () {
+                resetView();
+                const an = $('#anUnivSelect').val() || 'Toti', fac = $(this).val() || 'Toti';
+
+                // --- FIX DEPARTAMENTE ---
+                $('#departamentSelect').empty().append(new Option('Se incarca...', ''));
+                fetch(`/api/Rapoarte/liste/departamente?idAnUniv=${an}&idFacultate=${fac}`) // Folosim parametrii noi
+                    .then(r => r.json()).then(data => {
+                        $('#departamentSelect').empty();
+                        data.forEach(u => {
+                            // Dacă e obiect (de la SP), luăm proprietățile corecte
+                            const nume = (u && typeof u === 'object') ? u.nume : u;
+                            const id = (u && typeof u === 'object') ? (u.id || u.nume) : u;
+                            $('#departamentSelect').append(new Option(nume === 'Toti' ? 'Toate' : nume, id));
+                        });
+                        $('#departamentSelect').val('Toti');
+                    }).catch(() => $('#departamentSelect').empty().append(new Option('Toate', 'Toti')));
+
+                // --- FIX SPECIALIZARI ---
+                $('#specializareSelect').empty();
+                fetch(`/api/Rapoarte/liste/specializari?idAnUniv=${an}&idFacultate=${fac}`)
+                    .then(r => r.json()).then(data => {
+                        data.forEach(u => {
+                            const nume = (u && typeof u === 'object') ? u.nume : u;
+                            const id = (u && typeof u === 'object') ? (u.id || u.nume) : u;
+                            $('#specializareSelect').append(new Option(nume, id));
+                        });
+                        $('#specializareSelect').trigger('change');
+                    });
+            });
+
+            $('#specializareSelect').on('change', function () {
+                resetView();
+                fetch(`/api/Rapoarte/liste/profesori-per-specializari?${new URLSearchParams(getP())}`)
+                    .then(r => r.json()).then(data => {
+                        const $p = $('#profesorSelect').empty(); $p.append(new Option('', ''));
+                        data.forEach(p => { if (p !== 'Toti') $p.append(new Option(p, p)); });
+                    });
+            });
+
+            // Accordion listeners
+            $('#cNorme').on('show.bs.collapse', () => { if (isDirty('norme')) { loadNorme(); markClean('norme'); } });
+            $('#cOre').on('show.bs.collapse', () => { if (isDirty('ore')) { loadOre(); markClean('ore'); } });
+            $('#cTotal').on('show.bs.collapse', () => { if (isDirty('total')) { loadTotal(); markClean('total'); } });
+            $('#cLimbi').on('show.bs.collapse', () => { if (isDirty('limbi')) { loadLimbi(); markClean('limbi'); } });
+            $('#cDisc').on('show.bs.collapse', () => { if (isDirty('disc')) { loadDisc(); markClean('disc'); } });
+            $('#cTit').on('show.bs.collapse', () => { if (isDirty('tit')) { loadTit(); markClean('tit'); } });
+            $('#cCol').on('show.bs.collapse', () => { if (isDirty('col')) { loadCol(); markClean('col'); } });
+            $('#cANS').on('shown.bs.collapse', () => { if (isDirty('ans')) { loadANS(); markClean('ans'); } });
+        });
+
+        // =====================================================================
+        // EXCEL PREVIEW BOX - builder generic
+        // =====================================================================
+        let zoomState = {};
+        function buildBox(containerId, tableId, extraClass = '') {
+            const sid = 'sl-' + containerId, vid = 'zv-' + containerId, wid = 'sw-' + containerId;
+            document.getElementById(containerId).innerHTML = `
+        <div class="excel-toolbar">
+            <span class="lbl"><i class="bi bi-zoom-in me-1"></i>Zoom:</span>
+            <button class="zbtn" onclick="adjZ('${sid}','${wid}','${vid}',-10)">−</button>
+            <input type="range" id="${sid}" min="30" max="150" value="100" step="5"
+                   oninput="applyZ('${sid}','${wid}','${vid}')">
+            <button class="zbtn" onclick="adjZ('${sid}','${wid}','${vid}',10)">+</button>
+            <span class="zval" id="${vid}">100%</span>
+            <button class="zbtn" onclick="resetZ('${sid}','${wid}','${vid}')">Reset</button>
+        </div>
+        <div class="excel-preview-box">
+            <div class="scale-wrap" id="${wid}">
+                <table class="etbl table-bordered mb-0 ${extraClass}" id="${tableId}">
+                    <thead id="${tableId}-head"><tr><th colspan="10" class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm text-light"></div>
+                    </th></tr></thead>
+                    <tbody id="${tableId}-body"></tbody>
+                </table>
+            </div>
+        </div>`;
+            zoomState[sid] = 100;
+        }
+        function applyZ(sid, wid, vid) {
+            const v = parseInt(document.getElementById(sid).value);
+            zoomState[sid] = v;
+            const w = document.getElementById(wid);
+            w.style.transform = `scale(${v / 100})`;
+            w.style.width = (10000 / v) + '%';
+            document.getElementById(vid).textContent = v + '%';
+        }
+        function adjZ(sid, wid, vid, delta) {
+            const s = document.getElementById(sid);
+            s.value = Math.min(150, Math.max(30, parseInt(s.value) + delta));
+            applyZ(sid, wid, vid);
+        }
+        function resetZ(sid, wid, vid) {
+            document.getElementById(sid).value = 100; applyZ(sid, wid, vid);
         }
 
-        function invalidateCache() {
-            cacheState.norme = "dirty";
-            cacheState.ore = "dirty";
-            cacheState.totalNorme = "dirty";
-            cacheState.limbiStraine = "dirty";
-            cacheState.discipline = "dirty";
-            cacheState.titulari = "dirty";
-            cacheState.colaboratori = "dirty";
+        // =====================================================================
+        // HELPERS
+        // =====================================================================
+        function badge(t) {
+            if (!t) return '<span class="badge bg-secondary">-</span>';
+            if (t.toLowerCase().includes('tit')) return `<span class="badge" style="background:var(--accent);">${t}</span>`;
+            return `<span class="badge bg-warning text-dark">${t}</span>`;
+        }
+        function progBar(p) {
+            const cc = p > 50 ? 'var(--accent)' : p < 10 ? '#ffc107' : '#0dcaf0';
+            return `<div class="prog-wrap"><span class="small" style="min-width:34px">${p}%</span>
+            <div class="prog-track"><div class="prog-fill" style="width:${Math.min(p, 100)}%;background:${cc};"></div></div></div>`;
         }
 
-        function resetView() {
-            $('.accordion-collapse').collapse('hide');
-            invalidateCache();
+        // =====================================================================
+        // R1: NORME
+        // =====================================================================
+        async function loadNorme() {
+            buildBox('box-norme', 'tNorme');
+            document.getElementById('tNorme-head').innerHTML = `<tr>
+            <th>Nr.</th><th>Profesor</th><th>Departament</th><th>Specializare</th>
+            <th>Materie</th><th>Tip Post</th><th>Sem.</th>
+            <th>Ore Curs</th><th>Ore Aplic.</th><th>Ore Conv.</th></tr>`;
+            const p = getP();
+            const params = new URLSearchParams({
+                idAnUniv: p.idAnUniv, facultate: p.facultate,
+                departament: p.departament, profesor: p.profesor, formaInvatamant: p.formaInvatamant,
+                semestru: p.semestru, tipPost: p.tipPost
+            });
+            const data = await fetch(`/api/norma?${params}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tNorme-body');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="10" class="text-center">Nu exista date.</td></tr>'; return; }
+            let html = '', tc = 0, ta = 0, tv = 0;
+            data.forEach(n => {
+                const c = +n.nrOreCurs || 0, a = +n.nrOreAplicatii || 0, v = +n.nrOreConventionale || 0;
+                tc += c; ta += a; tv += v;
+                html += `<tr>
+                <td>${n.nrCrt}</td><td>${n.profesor || ''}</td><td>${n.departament || ''}</td>
+                <td>${n.specializare || ''}</td><td>${n.materie || ''}</td>
+                <td>${badge(n.tipPost)}</td><td class="text-center">${n.semestru || ''}</td>
+                <td class="text-center">${c}</td><td class="text-center">${a}</td>
+                <td class="text-center fw-bold">${v}</td></tr>`;
+            });
+            html += `<tr class="tr-total"><td colspan="7" class="text-end">TOTAL:</td>
+            <td class="text-center">${tc.toFixed(2)}</td>
+            <td class="text-center">${ta.toFixed(2)}</td>
+            <td class="text-center text-success">${tv.toFixed(2)}</td></tr>`;
+            tb.innerHTML = html;
         }
 
-        function getBadgeStatus(statusText) {
-            if (!statusText) return '<span class="badge bg-secondary">Nespecificat</span>';
-            if (statusText.toLowerCase().includes('tit')) return `<span class="badge" style="background-color: #56723e;">${statusText}</span>`;
-            if (statusText.toLowerCase().includes('sup')) return `<span class="badge bg-warning text-dark">${statusText}</span>`;
-            return `<span class="badge bg-secondary">${statusText}</span>`;
+        // =====================================================================
+        // R2: ORE PROGRAM
+        // =====================================================================
+        async function loadOre() {
+            buildBox('box-ore', 'tOre');
+            document.getElementById('tOre-head').innerHTML = `<tr>
+            <th>Nr.</th><th>Profesor</th><th>Program Studiu</th>
+            <th>Nr Ore Curs</th><th>Nr Ore Aplic.</th>
+            <th>Ore Conv.</th><th>% Post</th><th>Total Post</th></tr>`;
+            const p = getP();
+            const params = new URLSearchParams({
+                idAnUniv: p.idAnUniv, facultate: p.facultate,
+                departament: p.departament, profesor: p.profesor
+            });
+            const data = await fetch(`/api/oreprogram?${params}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tOre-body');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center">Nu exista date.</td></tr>'; return; }
+            let html = '';
+            data.forEach(item => {
+                const pr = +item.procentPost || 0;
+                html += `<tr>
+                <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
+                <td>${item.programStudiu || ''}</td>
+                <td class="text-center">${(+item.nrOreCurs || 0).toFixed(2)}</td>
+                <td class="text-center">${(+item.nrOreAplicatii || 0).toFixed(2)}</td>
+                <td class="text-center">${(+item.oreConvProgram || 0).toFixed(2)}</td>
+                <td>${progBar(pr)}</td>
+                <td class="text-center fw-bold" style="color:var(--accent);">${(+item.totalPost || 0).toFixed(2)}</td></tr>`;
+            });
+            tb.innerHTML = html;
+        }
+
+        // =====================================================================
+        // R3: TOTALURI NORME
+        // =====================================================================
+        async function loadTotal() {
+            buildBox('box-total', 'tTotal');
+            document.getElementById('tTotal-head').innerHTML = `<tr>
+            <th>Nr.</th><th>Profesor</th><th>Departament</th><th>Facultate</th>
+            <th>Ore IF</th><th>Ore ID</th><th>Ore IFR</th>
+            <th>Total Ore Conv.</th><th>Total Anual</th></tr>`;
+            const p = getP();
+            const params = new URLSearchParams({
+                idAnUniv: p.idAnUniv, facultate: p.facultate,
+                departament: p.departament, profesor: p.profesor
+            });
+            const data = await fetch(`/api/normatotaluri?${params}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tTotal-body');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="9" class="text-center">Nu exista date.</td></tr>'; return; }
+            let html = '', go = 0, ga = 0;
+            data.forEach(item => {
+                const o = +item.totalOreConv || 0, a = +item.totalAnual || 0; go += o; ga += a;
+                html += `<tr>
+                <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
+                <td>${item.departament || ''}</td><td>${item.facultate || ''}</td>
+                <td class="text-center">${(+item.oreIF || 0).toFixed(2)}</td>
+                <td class="text-center">${(+item.oreID || 0).toFixed(2)}</td>
+                <td class="text-center">${(+item.oreIFR || 0).toFixed(2)}</td>
+                <td class="text-center fw-bold">${o.toFixed(2)}</td>
+                <td class="text-center fw-bold text-primary">${a.toFixed(2)}</td></tr>`;
+            });
+            html += `<tr class="tr-total"><td colspan="7" class="text-end">TOTAL:</td>
+            <td class="text-center">${go.toFixed(2)}</td>
+            <td class="text-center text-success">${ga.toFixed(2)}</td></tr>`;
+            tb.innerHTML = html;
+        }
+
+        // =====================================================================
+        // R4: LIMBI STRAINE
+        // =====================================================================
+        async function loadLimbi() {
+            buildBox('box-limbi', 'tLimbi');
+            document.getElementById('tLimbi-head').innerHTML = `<tr>
+            <th>Nr.</th><th>Profesor</th><th>Facultate</th>
+            <th>Departament</th><th>Limba</th>
+            <th>Ore Sem.1</th><th>Ore Sem.2</th><th>Total</th></tr>`;
+            const p = getP();
+            const data = await fetch(`/api/foreignlang?idAnUniv=${p.idAnUniv}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tLimbi-body');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center">Nu exista date.</td></tr>'; return; }
+            let html = '', s1 = 0, s2 = 0, st = 0;
+            data.forEach(item => {
+                const o1 = +item.oreSem1 || 0, o2 = +item.oreSem2 || 0, t = +item.total || 0;
+                s1 += o1; s2 += o2; st += t;
+                html += `<tr>
+                <td>${item.nrCrt}</td><td class="fw-bold">${item.numeIntreg || ''}</td>
+                <td>${item.facultate || ''}</td><td>${item.departament || ''}</td>
+                <td><span class="badge" style="background:var(--accent);">${item.limba || ''}</span></td>
+                <td class="text-center">${o1.toFixed(2)}</td>
+                <td class="text-center">${o2.toFixed(2)}</td>
+                <td class="text-center fw-bold text-success">${t.toFixed(2)}</td></tr>`;
+            });
+            html += `<tr class="tr-total"><td colspan="5" class="text-end">TOTAL:</td>
+            <td class="text-center">${s1.toFixed(2)}</td>
+            <td class="text-center">${s2.toFixed(2)}</td>
+            <td class="text-center text-success">${st.toFixed(2)}</td></tr>`;
+            tb.innerHTML = html;
+        }
+
+        // =====================================================================
+        // R5: DISCIPLINE
+        // =====================================================================
+        async function loadDisc() {
+            buildBox('box-disc', 'tDisc');
+            document.getElementById('tDisc-head').innerHTML = `<tr>
+            <th>Nr.</th><th>Profesor</th>
+            <th>Departament</th><th>Forma Inv.</th><th>Discipline Predate</th></tr>`;
+            const p = getP();
+            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
+            const data = await fetch(`/api/discipline?${params}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tDisc-body');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center">Nu exista date.</td></tr>'; return; }
+            let html = '';
+            data.forEach((item, idx) => {
+                html += `<tr>
+                <td>${idx + 1}</td><td class="fw-bold">${item.profesor || ''}</td>
+                <td>${item.departament || ''}</td>
+                <td><span class="badge bg-secondary">${item.formaInvatamant || ''}</span></td>
+                <td style="white-space:normal;max-width:450px;">${item.discipline || ''}</td></tr>`;
+            });
+            tb.innerHTML = html;
+        }
+
+        // =====================================================================
+        // R6: TITULARI
+        // =====================================================================
+        async function loadTit() {
+            buildBox('box-tit', 'tTit');
+            document.getElementById('tTit-head').innerHTML = `<tr>
+            <th>Nr.</th><th>Profesor</th>
+            <th>Departament</th><th>Facultate</th><th>Grad</th></tr>`;
+            const p = getP();
+            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
+            const data = await fetch(`/api/titulari?${params}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tTit-body');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center">Nu exista date.</td></tr>'; return; }
+            let html = '';
+            data.forEach(item => {
+                html += `<tr>
+            <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
+            <td>${item.departament || ''}</td><td>${item.facultate || ''}</td><td>${item.grad || ''}</td></tr>`;
+            });
+            tb.innerHTML = html;
+        }
+
+        // =====================================================================
+        // R7: COLABORATORI
+        // =====================================================================
+        async function loadCol() {
+            buildBox('box-col', 'tCol');
+            document.getElementById('tCol-head').innerHTML = `<tr>
+            <th>Nr.</th><th>Profesor</th>
+            <th>Departament</th><th>Facultate</th><th>Grad</th></tr>`;
+            const p = getP();
+            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
+            const data = await fetch(`/api/colaboratori?${params}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tCol-body');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center">Nu exista date.</td></tr>'; return; }
+            let html = '';
+            data.forEach(item => {
+                html += `<tr>
+            <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
+            <td>${item.departament || ''}</td><td>${item.facultate || ''}</td><td>${item.grad || ''}</td></tr>`;
+            });
+            tb.innerHTML = html;
+        }
+
+        // =====================================================================
+        // R8: ANS - coloane dinamice
+        // =====================================================================
+        async function loadANS() {
+            buildBox('box-ans', 'tANS', 'etbl-ans');
+            const p = getP();
+            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
+            const data = await fetch(`/api/ansreport/date?${params}`).then(r => r.json()).catch(() => []);
+            const tb = document.getElementById('tANS-body');
+            const th = document.getElementById('tANS-head');
+            if (!data.length) { tb.innerHTML = '<tr><td colspan="10" class="text-center">Nu exista date.</td></tr>'; return; }
+
+            // Coloane dinamice din ID-urile ANS prezente in date
+            const idAnsSet = new Set();
+            data.forEach(prof => { if (prof.fractiuniPerDomeniu) Object.keys(prof.fractiuniPerDomeniu).forEach(k => idAnsSet.add(parseInt(k))); });
+            const ids = Array.from(idAnsSet).sort((a, b) => a - b);
+
+            th.innerHTML = '<tr><th>Nr.</th><th>Profesor</th><th>Facultate</th><th>Departament</th><th>Grad</th><th>Norma(h)</th><th>Total Ore</th>'
+                + ids.map(id => `<th title="ID_ANS=${id}">D.${id}</th>`).join('') + '<th>Σ Frac.</th></tr>';
+
+            tb.innerHTML = '';
+            data.forEach((prof, idx) => {
+                let tf = 0;
+                let cells = `<td>${idx + 1}</td><td>${prof.numeIntreg || ''}</td>
+                <td>${prof.facultate || '-'}</td><td>${prof.departament || '-'}</td>
+                <td>${prof.grad || '-'}</td>
+                <td class="text-center">${prof.normaLegalaOre || ''}</td>
+                <td class="text-center">${(+prof.totalOreConv || 0).toFixed(2)}</td>`;
+                ids.forEach(id => {
+                    const frac = prof.fractiuniPerDomeniu ? (+prof.fractiuniPerDomeniu[id] || 0) : 0;
+                    if (frac > 0) { cells += `<td class="frac-poz">${frac.toFixed(2)}</td>`; tf += frac; }
+                    else cells += '<td></td>';
+                });
+                cells += `<td class="fw-bold text-center">${tf.toFixed(2)}</td>`;
+                const tr = document.createElement('tr'); tr.innerHTML = cells; tb.appendChild(tr);
+            });
+        }
+
+        // =====================================================================
+        // DOWNLOAD ROUTER
+        // =====================================================================
+        function dl(tip) {
+            const p = getP();
+            const id = p.idAnUniv;
+            const fac = encodeURIComponent(p.facultate);
+            const dept = encodeURIComponent(p.departament);
+            const prof = encodeURIComponent(p.profesor);
+            const params = new URLSearchParams({
+                idAnUniv: id, facultate: p.facultate,
+                departament: p.departament, profesor: p.profesor, formaInvatamant: p.formaInvatamant,
+                semestru: p.semestru, tipPost: p.tipPost
+            });
+
+            if (tip === 'raport-ans') location.href = `/api/ansreport/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
+            else if (tip === 'limbi-straine') location.href = `/api/foreignlang/export?idAnUniv=${id}`;
+            else if (tip === 'titulari') location.href = `/api/titulari/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
+            else if (tip === 'colaboratori') location.href = `/api/colaboratori/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
+            else if (tip === 'discipline-predate') location.href = `/api/discipline/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
+            else if (tip === 'norma') location.href = `/api/norma/export?${params}`;
+            else if (tip === 'ore-program') location.href = `/api/oreprogram/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}&profesor=${prof}`;
+            else if (tip === 'norma-totaluri') location.href = `/api/normatotaluri/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}&profesor=${prof}`;
         }
     </script>
 </body>

@@ -7,6 +7,27 @@ using ClosedXML.Excel;
 
 namespace LicentaV1.Controllers
 {
+    /// <summary>
+    /// RapoarteController — refactorizat Metadata-Driven.
+    ///
+    /// Modificari fata de versiunea anterioara:
+    ///
+    /// LISTE (dropdown-uri):
+    ///   - Facultati:     [dbo].[FacultateListAll]                         (SP oficial)
+    ///   - Departamente:  [dbo].[CatedraListByFacultateAnUniv]             (SP oficial, params: @ID_AnUniv, @ID_Facultate)
+    ///   - Specializari:  [dbo].[SpecializareListByFacultateAnUniv]        (SP oficial, params: @ID_AnUniv, @ID_Facultate)
+    ///   - Profesori:     SELECT DISTINCT pe View_Profesori_CF_AnUniv      (nu exista SP dedicat)
+    ///   - Ani univ:      SELECT WHERE Denumire LIKE '%2025-2026%', fallback ID 45
+    ///
+    /// AN UNIVERSITAR CURENT:
+    ///   SetariUniversitate blocat -> cautam Denumire LIKE '%2025-2026%' in AnUniversitar.
+    ///   Fallback: Ordine DESC (cel mai recent), fallback final: 45.
+    ///
+    /// RAPOARTE (regiunile 1-7):
+    ///   Nemodificate structural — refactorizarea listelor nu afecteaza query-urile de raport.
+    ///   Parametrii @ID_Facultate inlocuiesc @fac (string) pentru dropdownuri;
+    ///   query-urile de raport continua sa foloseasca @fac (string) pentru compatibilitate.
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class RapoarteController : ControllerBase
@@ -16,1116 +37,894 @@ namespace LicentaV1.Controllers
         private readonly IMemoryCache _cache;
         private const string BrandColorHex = "#56723e";
 
-        private readonly string[] DomeniiExcel = new string[]
-        {
-            "Matematica", "Informatica", "Fizica", "Chimie si inginerie chimica", "Stiintele pamantului si atmosferei",
-            "Inginerie civila", "Inginerie electrica, electronica si telecomunicatii", "Inginerie geologica, mine, petrol si gaze",
-            "Ingineria transporturilor", "Ingineria resurselor vegetale si animale",
-            "Ingineria sistemelor, calculatoare si tehnologia informatiei",
-            "Inginerie mecanica, mecatronica, inginerie industriala si management",
-            "Biologie", "Biochimie", "Medicina", "Medicina veterinara", "Medicina dentara", "Farmacie",
-            "Stiinte juridice", "Stiinte administrative", "Stiinte ale comunicarii", "Sociologie",
-            "Stiinte politice", "Stiinte militare, informatii si ordine publica",
-            "Stiinte economice (doar Cibernetica, statistica si informatica economica)",
-            "Stiinte economice (fara Cibernetica, statistica si informatica economica)",
-            "Psihologie si stiinte comportamentale",
-            "Filologie", "Filosofie", "Istorie", "Teologie", "Studii culturale",
-            "Arhitectura si urbanism", "Arte vizuale (fara Istoria si teoria artei)",
-            "Arte vizuale (doar Istoria si teoria artei)", "Teatru si artele spectacolului",
-            "Cinematografie si media", "Muzica (doar Interpretare muzicala)",
-            "Muzica (fara Interpretare muzicala)", "Stiintele Sportului si Educatiei Fizice"
-        };
-
-        private static readonly Dictionary<int, int> MappingMetaspec = new Dictionary<int, int>
-        {
-            // ===== AnsId=1 MATEMATICA =====
-            { 251, 1 }, // Matematica informatica
-            { 340, 1 }, // Structuri matematice fundamentale
-            // ===== AnsId=2 INFORMATICA =====
-            { 35, 2 },  // Calculatoare
-            { 101, 2 }, // Informatica
-            { 102, 2 }, // Informatica aplicata
-            { 104, 2 }, // Informatica aplicata lb.germana
-            { 596, 2 }, // Informatica
-            // ===== AnsId=6 INGINERIE CIVILA =====
-            { 44, 6 },  // Constructii civile, industriale si agricole
-            { 182, 6 }, // Instalatii pentru constructii
-            { 847, 6 }, // Ingineria constructiilor sustenabile
-            { 848, 6 }, // Instalatii pentru cladiri eficiente energetic
-            // ===== AnsId=7 INGINERIE ELECTRICA =====
-            { 82, 7 },  // Electronica aplicata
-            { 84, 7 },  // Electrotehnica
-            { 138, 7 }, // Ingineria sistemelor de energii regenerabile
-            { 162, 7 }, // Inginerie electrica si calculatoare
-            { 315, 7 }, // Sisteme electrice avansate
-            { 316, 7 }, // Sisteme electronice si comunicatii RCD
-            { 372, 7 }, // Tehnologii si sisteme telecomunicatii
-            { 617, 7 }, // Sisteme electronice comunicatii SI
-            // ===== AnsId=8 INGINERIE GEOLOGICA =====
-            { 249, 8 }, // Masuratori terestre si cadastru
-            // ===== AnsId=9 INGINERIA TRANSPORTURILOR =====
-            { 23, 9 },  // Autovehicule rutiere
-            { 24, 9 },  // Autovehicule rutiere lb.engleza
-            { 27, 9 },  // Autovehiculul si mediul
-            { 28, 9 },  // Autovehiculul si tehnologiile viitorului
-            { 43, 9 },  // Constructii aerospatiale
-            { 148, 9 }, // Ingineria transporturilor si a traficului
-            { 306, 9 }, // Securitate rutiera, transport
-            { 466, 9 }, // Inginerie virtuala proiectarea autovehiculelor
-            { 610, 9 }, // Autovehicule rutiere FR
-            { 615, 9 }, // Metode practice sisteme propulsie
-            { 828, 9 }, // Sisteme comanda si control autovehicule
-            { 862, 9 }, // Inginerie si Mgm.Aviatie
-            // ===== AnsId=10 INGINERIA RESURSELOR VEGETALE =====
-            { 46, 10 }, // Controlul si expertiza prod.alimentare
-            { 72, 10 }, // Ecodesign de mobilier si restaurare
-            { 90, 10 }, // Exploatari forestiere
-            { 118, 10 }, // Ingineria prelucrarii lemnului IF
-            { 120, 10 }, // Ingineria prelucrarii lemnului ID
-            { 122, 10 }, // Ingineria produselor alimentare
-            { 176, 10 }, // Ing.mgm.alimentatie publica si agroturism
-            { 226, 10 }, // Mgm.sisteme tehnice exploatari forestiere
-            { 235, 10 }, // Mgm.ecosistemelor forestiere
-            { 307, 10 }, // Silvicultura
-            { 437, 10 }, // Ing.si designul produselor finite din lemn
-            { 458, 10 }, // Cinegetica
-            { 517, 10 }, // Sisteme procesare calitate prod.agroalimentare
-            { 566, 10 }, // Silvicultura multifunctionala
-            { 614, 10 }, // Cinegetica ID
-            { 845, 10 }, // Tehnologia Lemnului pentru Constructii
-            { 854, 10 }, // Inginerie gastronomica
-            // ===== AnsId=11 INGINERIA SISTEMELOR =====
-            { 18, 11 }, // Automatica si informatica aplicata
-            { 310, 11 }, // Sisteme avansate in automatica
-            { 362, 11 }, // Tehnologia informatiei
-            { 368, 11 }, // Tehnologii Internet
-            { 369, 11 }, // Tehnologii moderne ing.sisteme soft
-            { 477, 11 }, // Aplicatii mobile si Internet E-Business
-            { 597, 11 }, // Securitate cibernetica
-            // ===== AnsId=12 INGINERIE MECANICA =====
-            { 53, 12 }, // Design industrial
-            { 116, 12 }, // Ingineria fabricatiei inovative
-            { 126, 12 }, // Ingineria securitatii in industrie
-            { 129, 12 }, // Ingineria si Mgm.Calitatii
-            { 139, 12 }, // Ingineria sudarii
-            { 142, 12 }, // Ingineria sudarii materialelor avansate
-            { 156, 12 }, // Inginerie economica industriala
-            { 171, 12 }, // Inginerie mecanica
-            { 326, 12 }, // Stiinta materialelor
-            { 358, 12 }, // Tehnologia constructiilor de masini
-            { 418, 12 }, // Robotica
-            { 446, 12 }, // Ing.si protectia mediului in industrie
-            { 448, 12 }, // Design industrial
-            { 449, 12 }, // Mecatronica
-            { 451, 12 }, // Optometrie
-            { 464, 12 }, // Simulare si testare ing.mecanica
-            { 496, 12 }, // Design produs dez.durabila si protectia mediului
-            { 497, 12 }, // Sisteme mecatronice industrie si medicina
-            { 529, 12 }, // Ing.proceselor de fabricatie avansate
-            { 531, 12 }, // Ing.securitatii si sanatatii in munca
-            { 556, 12 }, // Inginerie economica industriala ID
-            { 613, 12 }, // Inginerie mecanica IFR
-            { 806, 12 }, // Ing.si mgm.materialelor avansate
-            { 819, 12 }, // Antreprenoriat in ing.materialelor
-            { 823, 12 }, // Sisteme de Productie Digitale
-            // ===== AnsId=15 MEDICINA =====
-            { 13, 15 }, // Asistenta medicala generala
-            { 394, 15 }, // Medicina
-            { 397, 15 }, // Balneofiziokinetoterapie si recuperare
-            { 450, 15 }, // Inginerie medicala
-            { 484, 15 }, // Laborator clinic
-            { 585, 15 }, // Mgm.strategii preventive si politici de sanatate
-            { 594, 15 }, // Medicina traditionala chineza
-            { 835, 15 }, // Rezidentiat
-            // ===== AnsId=19 STIINTE JURIDICE =====
-            { 60, 19 }, // Drept
-            { 64, 19 }, // Drept privat aprofundat
-            { 331, 19 }, // Stiinte penale aprofundate
-            { 457, 19 }, // Drept
-            { 485, 19 }, // Legislatie europeana si cariera judiciara
-            { 555, 19 }, // Sisteme si institutii de drept international
-            { 859, 19 }, // Drept si diplomatia dez.durabila
-            // ===== AnsId=21 STIINTE ALE COMUNICARII =====
-            { 41, 21 }, // Comunicare si relatii publice
-            { 98, 21 }, // Gestiunea campaniilor de imagine
-            { 579, 21 }, // Media digitala
-            { 831, 21 }, // Media digitala lb.engleza
-            // ===== AnsId=22 SOCIOLOGIE =====
-            { 15, 22 }, // Asistenta si dezvoltare comunitara
-            { 16, 22 }, // Asistenta Sociala
-            { 100, 22 }, // Gestiunea si dezvoltarea resursei umane
-            { 322, 22 }, // Sociologie
-            { 384, 22 }, // Psihologia muncii si resurse umane
-            { 524, 22 }, // Resurse umane
-            { 813, 22 }, // Formarea si mgm.resurselor umane in educatie
-            // ===== AnsId=25 STIINTE ECONOMICE CIE =====
-            { 112, 25 }, // Informatica economica
-            // ===== AnsId=26 STIINTE ECONOMICE REST =====
-            { 7, 26 },   // Administrarea afacerilor
-            { 9, 26 },   // Administrarea afacerilor in turism
-            { 10, 26 },  // Afaceri internationale
-            { 45, 26 },  // Contabilitate si informatica de gestiune
-            { 73, 26 },  // Economia comertului, turismului si serviciilor
-            { 93, 26 },  // Finante si banci
-            { 178, 26 }, // Ing.si mgm.industria turismului
-            { 221, 26 }, // Management
-            { 223, 26 }, // Mgm.financiar bancar
-            { 227, 26 }, // Mgm.si strategii de afaceri
-            { 228, 26 }, // Mgm.afacerilor in industrie
-            { 229, 26 }, // Mgm.calitatii
-            { 242, 26 }, // Marketing
-            { 283, 26 }, // Politici contabile, audit si control de gestiune
-            { 288, 26 }, // Politici si strategii de marketing
-            { 299, 26 }, // Relatii economice internationale
-            { 402, 26 }, // Mgm.strategiile ingrijirilor paliative
-            { 404, 26 }, // Ing.si Mgm.Afacerilor
-            { 452, 26 }, // Afaceri internationale
-            { 453, 26 }, // Economia comertului, turismului si serviciilor
-            { 454, 26 }, // Management
-            { 456, 26 }, // Contabilitate si informatica de gestiune
-            { 595, 26 }, // Marketing
-            { 731, 26 }, // Mgm.ospitalitate si eco-agroturism
-            { 821, 26 }, // Mgm.integrat de mediu
-            { 857, 26 }, // Ing.si mgm.ospitalitatea de lux
-            // ===== AnsId=27 PSIHOLOGIE =====
-            { 276, 27 }, // Pedagogia invatamantului primar si prescolar
-            { 294, 27 }, // Psihologie
-            { 296, 27 }, // Psihologie educationala
-            { 383, 27 }, // Psihopedagogie speciala
-            { 416, 27 }, // Psihopedagogia ed.timpurii
-            { 515, 27 }, // Psihologie clinica
-            { 600, 27 }, // Pedagogia inv.primar ID
-            { 601, 27 }, // Psihologie ID
-            { 832, 27 }, // Pregatire formare psihopedagogica
-            { 834, 27 }, // Program de formare psihopedagogica
-            { 851, 27 }, // Educatie si consiliere intercultural
-            { 863, 27 }, // Formare psihopedagogica nivel I dubla
-            { 864, 27 }, // Formare psihopedagogica nivel I mono
-            { 865, 27 }, // Formare psihopedagogica nivel II
-            // ===== AnsId=28 FILOLOGIE =====
-            { 47, 28 },  // Cultura si Discurs Anglo-American
-            { 196, 28 }, // Lb.Engleza - Lb.Franceza
-            { 197, 28 }, // Lb.Engleza - Lb.Germana
-            { 200, 28 }, // Lb.Engleza - Lb.Romana
-            { 203, 28 }, // Lb.Romana - Identitate in Multiculturalism
-            { 205, 28 }, // Lb.Romana - Lb.Engleza
-            { 207, 28 }, // Lb.Romana - Lb.Franceza
-            { 209, 28 }, // Lb.Romana - Lb.Germana
-            { 217, 28 }, // Limbi Moderne Aplicate (De-En)
-            { 218, 28 }, // Limbi Moderne Aplicate (Fr-En)
-            { 341, 28 }, // Studii americane
-            { 343, 28 }, // Studii de Lb.si Literatura Romana
-            { 463, 28 }, // An pregatitor lb.romana pt.cetateni straini
-            { 511, 28 }, // Lb.Chineza - Lb.Romana
-            { 512, 28 }, // Lb.Chineza - Lb.Engleza
-            { 513, 28 }, // Lb.Chineza - Lb.Franceza
-            { 514, 28 }, // Lb.Chineza - Lb.Germana
-            { 606, 28 }, // Lb.Romana - Lb.Engleza ID
-            { 607, 28 }, // Lb.Romana - Lb.Franceza ID
-            { 726, 28 }, // Studii de lb.si literatura germana interculturala
-            { 798, 28 }, // Studii lingvistice comunicare interculturala
-            { 801, 28 }, // Studii de lb.si de cultura franceza
-            // ===== AnsId=32 STUDII CULTURALE =====
-            { 181, 32 }, // Inovare Culturala
-            // ===== AnsId=33 ARHITECTURA =====
-            { 297, 33 }, // Restaurarea si conservarea patrimoniului construit
-            // ===== AnsId=38 MUZICA INTERPRETARE =====
-            { 186, 38 }, // Interpretare Muzicala - Instrumente
-            { 187, 38 }, // Interpretare Muzicala - Canto
-            { 264, 38 }, // Meloterapie
-            { 332, 38 }, // Stil si Performanta Interpretare Instrumentala si Vocala
-            { 838, 38 }, // Interpretare Muzicala - Instrumente EN
-            // ===== AnsId=39 MUZICA REST =====
-            { 351, 39 }, // Tehnica si arta muzicala din sec.XX
-            { 557, 39 }, // Muzica
-            // ===== AnsId=40 SPORT/EFS =====
-            { 78, 40 },  // Educatie fizica si sportiva
-            { 189, 40 }, // Kinetoterapie si Motricitate Speciala
-            { 325, 40 }, // Sport si performanta motrica
-            { 470, 40 }, // Performanta sportiva si mgm.in sport
-            { 608, 40 }, // Educatie fizica si sportiva
-            { 609, 40 }, // Sport si performanta motrica
-            { 783, 40 }, // Educatie fizica scolara si activitati motrice
-            { 784, 40 }, // Profilaxie si recuperare motrica
-            { 846, 40 }, // Performanta umana in antrenamentul sportiv
-        };
-
-        private static readonly Dictionary<int, int> AnsIdToCol = new Dictionary<int, int>
-        {
-            { 1, 10 }, { 2, 11 }, { 3, 12 }, { 4, 13 }, { 5, 14 },
-            { 6, 15 }, { 7, 16 }, { 8, 17 }, { 9, 18 }, { 10, 19 }, { 11, 20 }, { 12, 21 },
-            { 13, 22 }, { 14, 23 }, { 15, 24 }, { 16, 25 }, { 17, 26 }, { 18, 27 },
-            { 19, 28 }, { 20, 29 }, { 21, 30 }, { 22, 31 }, { 23, 32 }, { 24, 33 },
-            { 25, 34 }, { 26, 35 }, { 27, 36 },
-            { 28, 37 }, { 29, 38 }, { 30, 39 }, { 31, 40 }, { 32, 41 }, { 33, 42 },
-            { 34, 43 }, { 35, 44 }, { 36, 45 }, { 37, 46 }, { 38, 47 }, { 39, 48 }, { 40, 49 },
-        };
-
-        private static readonly Dictionary<long, string> MapareCatedra = new Dictionary<long, string>
-        {
-            { 583, "DEPARTAMENTUL AUTOMATICA SI TEHNOLOGIA INFORMATIEI" },
-            { 554, "DEPARTAMENTUL AUTOMATICA SI TEHNOLOGIA INFORMATIEI" },
-            { 524, "DEPARTAMENTUL AUTOMATICA SI TEHNOLOGIA INFORMATIEI" },
-            { 572, "DEPARTAMENTUL AUTOVEHICULE SI TRANSPORTURI" },
-            { 584, "DEPARTAMENTUL AUTOVEHICULE SI TRANSPORTURI" },
-            { 542, "DEPARTAMENTUL AUTOVEHICULE SI TRANSPORTURI" },
-            { 570, "DEPARTAMENTUL DESIGN DE PRODUS, MECATRONIC SI MEDIU" },
-            { 585, "DEPARTAMENTUL DESIGN DE PRODUS, MECATRONIC SI MEDIU" },
-            { 540, "DEPARTAMENTUL DESIGN DE PRODUS, MECATRONIC SI MEDIU" },
-            { 566, "DEPARTAMENTUL DISCIPLINELOR FUNDAMENTALE, PROFILACTICE SI CLINICE" },
-            { 586, "DEPARTAMENTUL DISCIPLINELOR FUNDAMENTALE, PROFILACTICE SI CLINICE" },
-            { 536, "DEPARTAMENTUL DISCIPLINELOR FUNDAMENTALE, PROFILACTICE SI CLINICE" },
-            { 532, "DEPARTAMENTUL DREPT" },
-            { 562, "DEPARTAMENTUL DREPT" },
-            { 587, "DEPARTAMENTUL DREPT" },
-            { 577, "DEPARTAMENTUL EDUCATIE FIZICA SI MOTRICITATE SPECIALA" },
-            { 588, "DEPARTAMENTUL EDUCATIE FIZICA SI MOTRICITATE SPECIALA" },
-            { 547, "DEPARTAMENTUL EDUCATIE FIZICA SI MOTRICITATE SPECIALA" },
-            { 575, "DEPARTAMENTUL ELECTRONICA SI CALCULATOARE" },
-            { 545, "DEPARTAMENTUL ELECTRONICA SI CALCULATOARE" },
-            { 589, "DEPARTAMENTUL ELECTRONICA SI CALCULATOARE" },
-            { 557, "DEPARTAMENTUL EXPLOATARI FORESTIERE, AMENAJAREA PADURILOR SI MASURATORI TERESTRE" },
-            { 527, "DEPARTAMENTUL EXPLOATARI FORESTIERE, AMENAJAREA PADURILOR SI MASURATORI TERESTRE" },
-            { 590, "DEPARTAMENTUL EXPLOATARI FORESTIERE, AMENAJAREA PADURILOR SI MASURATORI TERESTRE" },
-            { 531, "DEPARTAMENTUL FINANTE, CONTABILITATE SI TEORIE ECONOMICA" },
-            { 591, "DEPARTAMENTUL FINANTE, CONTABILITATE SI TEORIE ECONOMICA" },
-            { 561, "DEPARTAMENTUL FINANTE, CONTABILITATE SI TEORIE ECONOMICA" },
-            { 573, "DEPARTAMENTUL INGINERIA FABRICATIEI" },
-            { 592, "DEPARTAMENTUL INGINERIA FABRICATIEI" },
-            { 543, "DEPARTAMENTUL INGINERIA FABRICATIEI" },
-            { 522, "DEPARTAMENTUL INGINERIA MATERIALELOR SI SUDURA" },
-            { 593, "DEPARTAMENTUL INGINERIA MATERIALELOR SI SUDURA" },
-            { 552, "DEPARTAMENTUL INGINERIA MATERIALELOR SI SUDURA" },
-            { 529, "DEPARTAMENTUL INGINERIA SI MANAGEMENTUL ALIMENTATIEI SI TURISMULUI" },
-            { 594, "DEPARTAMENTUL INGINERIA SI MANAGEMENTUL ALIMENTATIEI SI TURISMULUI" },
-            { 559, "DEPARTAMENTUL INGINERIA SI MANAGEMENTUL ALIMENTATIEI SI TURISMULUI" },
-            { 558, "DEPARTAMENTUL INGINERIE CIVILA" },
-            { 595, "DEPARTAMENTUL INGINERIE CIVILA" },
-            { 528, "DEPARTAMENTUL INGINERIE CIVILA" },
-            { 523, "DEPARTAMENTUL INGINERIE ELECTRICA SI FIZICA APLICATA" },
-            { 553, "DEPARTAMENTUL INGINERIE ELECTRICA SI FIZICA APLICATA" },
-            { 596, "DEPARTAMENTUL INGINERIE ELECTRICA SI FIZICA APLICATA" },
-            { 597, "DEPARTAMENTUL INGINERIE MECANICA" },
-            { 550, "DEPARTAMENTUL INGINERIE MECANICA" },
-            { 520, "DEPARTAMENTUL INGINERIE MECANICA" },
-            { 521, "DEPARTAMENTUL INGINERIE SI MANAGEMENT INDUSTRIAL" },
-            { 598, "DEPARTAMENTUL INGINERIE SI MANAGEMENT INDUSTRIAL" },
-            { 551, "DEPARTAMENTUL INGINERIE SI MANAGEMENT INDUSTRIAL" },
-            { 576, "DEPARTAMENTUL INSTALATII PENTRU CONSTRUCTII" },
-            { 546, "DEPARTAMENTUL INSTALATII PENTRU CONSTRUCTII" },
-            { 599, "DEPARTAMENTUL INSTALATII PENTRU CONSTRUCTII" },
-            { 568, "DEPARTAMENTUL INTERPRETARE SI PEDAGOGIE MUZICALA" },
-            { 538, "DEPARTAMENTUL INTERPRETARE SI PEDAGOGIE MUZICALA" },
-            { 600, "DEPARTAMENTUL INTERPRETARE SI PEDAGOGIE MUZICALA" },
-            { 534, "DEPARTAMENTUL LINGVISTICA TEORETICA SI APLICATA" },
-            { 601, "DEPARTAMENTUL LINGVISTICA TEORETICA SI APLICATA" },
-            { 564, "DEPARTAMENTUL LINGVISTICA TEORETICA SI APLICATA" },
-            { 602, "DEPARTAMENTUL LITERATURA SI STUDII CULTURALE" },
-            { 533, "DEPARTAMENTUL LITERATURA SI STUDII CULTURALE" },
-            { 563, "DEPARTAMENTUL LITERATURA SI STUDII CULTURALE" },
-            { 548, "DEPARTAMENTUL MANAGEMENT SI INFORMATICA ECONOMICA" },
-            { 603, "DEPARTAMENTUL MANAGEMENT SI INFORMATICA ECONOMICA" },
-            { 578, "DEPARTAMENTUL MANAGEMENT SI INFORMATICA ECONOMICA" },
-            { 579, "DEPARTAMENTUL MARKETING,TURISM-SERVICII SI AFACERI INTERNATIONALE" },
-            { 604, "DEPARTAMENTUL MARKETING,TURISM-SERVICII SI AFACERI INTERNATIONALE" },
-            { 549, "DEPARTAMENTUL MARKETING,TURISM-SERVICII SI AFACERI INTERNATIONALE" },
-            { 605, "DEPARTAMENTUL MATEMATICA SI INFORMATICA" },
-            { 560, "DEPARTAMENTUL MATEMATICA SI INFORMATICA" },
-            { 530, "DEPARTAMENTUL MATEMATICA SI INFORMATICA" },
-            { 565, "DEPARTAMENTUL PERFORMANTA MOTRICA" },
-            { 535, "DEPARTAMENTUL PERFORMANTA MOTRICA" },
-            { 606, "DEPARTAMENTUL PERFORMANTA MOTRICA" },
-            { 555, "DEPARTAMENTUL PRELUCRAREA LEMNULUI SI DESIGNUL PRODUSELOR DIN LEMN" },
-            { 525, "DEPARTAMENTUL PRELUCRAREA LEMNULUI SI DESIGNUL PRODUSELOR DIN LEMN" },
-            { 607, "DEPARTAMENTUL PRELUCRAREA LEMNULUI SI DESIGNUL PRODUSELOR DIN LEMN" },
-            { 539, "Departamentul Psihologie si Stiinte ale Educatie" },
-            { 608, "DEPARTAMENTUL PSIHOLOGIE SI STIINTELE EDUCATIEI" },
-            { 569, "DEPARTAMENTUL PSIHOLOGIE SI STIINTELE EDUCATIEI" },
-            { 526, "DEPARTAMENTUL SILVICULTURA" },
-            { 609, "DEPARTAMENTUL SILVICULTURA" },
-            { 556, "DEPARTAMENTUL SILVICULTURA" },
-            { 610, "DEPARTAMENTUL SPECIALITATILOR MEDICALE SI CHIRURGICALE" },
-            { 567, "DEPARTAMENTUL SPECIALITATILOR MEDICALE SI CHIRURGICALE" },
-            { 537, "DEPARTAMENTUL SPECIALITATILOR MEDICALE SI CHIRURGICALE" },
-            { 574, "DEPARTAMENTUL STIINTA MATERIALELOR" },
-            { 544, "DEPARTAMENTUL STIINTA MATERIALELOR" },
-            { 611, "DEPARTAMENTUL STIINTA MATERIALELOR" },
-            { 612, "DEPARTAMENTUL STIINTE SOCIALE SI ALE COMUNICARII" },
-            { 541, "DEPARTAMENTUL STIINTE SOCIALE SI ALE COMUNICARII" },
-            { 571, "DEPARTAMENTUL STIINTE SOCIALE SI ALE COMUNICARII" },
-            { 862, "DPPD" }, { 613, "DPPD" }, { 863, "DPPD" },
-            { 614, "DEPARTAMENTUL AUTOMATICA SI TEHNOLOGIA INFORMATIEI" },
-            { 615, "DEPARTAMENTUL AUTOVEHICULE SI TRANSPORTURI" },
-            { 616, "DEPARTAMENTUL DESIGN DE PRODUS, MECATRONIC SI MEDIU" },
-            { 617, "DEPARTAMENTUL DISCIPLINELOR FUNDAMENTALE, PROFILACTICE SI CLINICE" },
-            { 618, "DEPARTAMENTUL DREPT" },
-            { 619, "DEPARTAMENTUL EDUCATIE FIZICA SI MOTRICITATE SPECIALA" },
-            { 620, "DEPARTAMENTUL ELECTRONICA SI CALCULATOARE" },
-            { 621, "DEPARTAMENTUL EXPLOATARI FORESTIERE, AMENAJAREA PADURILOR SI MASURATORI TERESTRE" },
-            { 622, "DEPARTAMENTUL FINANTE, CONTABILITATE SI TEORIE ECONOMICA" },
-            { 623, "DEPARTAMENTUL INGINERIA FABRICATIEI" },
-            { 624, "DEPARTAMENTUL INGINERIA MATERIALELOR SI SUDURA" },
-            { 625, "DEPARTAMENTUL INGINERIA SI MANAGEMENTUL ALIMENTATIEI SI TURISMULUI" },
-            { 626, "DEPARTAMENTUL INGINERIE CIVILA" },
-            { 627, "DEPARTAMENTUL INGINERIE ELECTRICA SI FIZICA APLICATA" },
-            { 628, "DEPARTAMENTUL INGINERIE MECANICA" },
-            { 629, "DEPARTAMENTUL INGINERIE SI MANAGEMENT INDUSTRIAL" },
-            { 630, "DEPARTAMENTUL INSTALATII PENTRU CONSTRUCTII" },
-            { 631, "DEPARTAMENTUL INTERPRETARE SI PEDAGOGIE MUZICALA" },
-            { 632, "DEPARTAMENTUL LINGVISTICA TEORETICA SI APLICATA" },
-            { 633, "DEPARTAMENTUL LITERATURA SI STUDII CULTURALE" },
-            { 634, "DEPARTAMENTUL MANAGEMENT SI INFORMATICA ECONOMICA" },
-            { 635, "DEPARTAMENTUL MARKETING,TURISM-SERVICII SI AFACERI INTERNATIONALE" },
-            { 636, "DEPARTAMENTUL MATEMATICA SI INFORMATICA" },
-            { 637, "DEPARTAMENTUL PERFORMANTA MOTRICA" },
-            { 638, "DEPARTAMENTUL PRELUCRAREA LEMNULUI SI DESIGNUL PRODUSELOR DIN LEMN" },
-            { 639, "Departamentul Psihologie si Stiinte ale Educatie" },
-            { 640, "DEPARTAMENTUL SILVICULTURA" },
-            { 641, "DEPARTAMENTUL SPECIALITATILOR MEDICALE SI CHIRURGICALE" },
-            { 642, "DEPARTAMENTUL STIINTA MATERIALELOR" },
-            { 643, "DEPARTAMENTUL STIINTE SOCIALE SI ALE COMUNICARII" },
-            { 644, "DPPD" },
-        };
-
-        // =====================================================================
-        // NumeCorecte: fix diacritice + unificare profesori cu ID-uri duplicate
-        // FIX TOHANEAN: ID 5665 (Mate-Info) -> acelasi nume ca ID 1549 (EFS)
-        // FIX FOLEA/VECERDI: ID 3887 -> acelasi ca ID 4401
-        // =====================================================================
-        private static readonly Dictionary<int, string> NumeCorecte = new Dictionary<int, string>
-        {
-            { 6621, "TITEIU RAMONA DANIELA" },
-            { 6698, "BENEA ALINA-PETRUȚA" },
-            { 6631, "CĂBAȘ NICOLAE SERGIU" },
-            { 4605, "CĂPRIȚĂ FLORIN" },
-            { 4165, "CIORICEANU IONUȚ-HORIA" },
-            { 2375, "ILAȘ MAGDALENA" },
-            { 6616, "MÂNDRU MARIA SPERANȚA" },
-            { 16893, "MILEA GIGUȘA-ROXANA" },
-            { 16894, "NEGOIȚĂ ELENA" },
-            { 6803, "STAREȘU CAMELIA MARIANA" },
-            { 6800, "ȘERBAN AGURIȚA DORINELA" },
-            { 5881, "TUCHEL IONUȚ-VLAD" },
-            { 2899, "BREZEANU ALIN IONUȚ" },
-            { 4345, "DIACONU ȘTEFANIA-ROXANA" },
-            { 4352, "MANIȘIU(VASILE) VIRGINIA IOANA" },
-            { 4401, "FOLEA(VECERDI) CRISTINA AGNEȘ" },
-            { 3887, "VECERDI(FOLEA) CRISTINA AGNEȘ" }, // FIX unificare cu 4401
-            { 4821, "CHIRA CODRUȚA-ELENA" },
-            { 5833, "MARCHIȘ(TOMA) MARIA-ALEXANDRA" },
-            { 5884, "VEZETEU COSMIN-DĂNUȚ" },
-            { 6716, "BĂȘEANU IONUȚ-CRISTIAN-COZMIN" },
-            { 6721, "MÂNZĂȚANU DIANA" },
-            { 6761, "CIOPLEIAȘ BOGDAN-NICOLAE" },
-            { 5665, "TOHANEAN DRAGOS IOAN - EFS" }, // FIX unificare cu 1549
-        };
-
-        private string FixNume(string? nume, object? idProfesorObj)
-        {
-            if (idProfesorObj != null && idProfesorObj != DBNull.Value)
-            {
-                int id = Convert.ToInt32(idProfesorObj);
-                if (NumeCorecte.TryGetValue(id, out var corect)) return corect;
-            }
-            return nume ?? "";
-        }
-
-        // Norma legala per profesor: ISNULL(ExceptiiNormaOreConv.NrOreTitular, NormaOreConv standard)
-        // Aceasta este formula exacta folosita de profa in raportul ANS oficial
-        private readonly Dictionary<int, decimal> _normaPerProf;
+        // An universitar curent — detectat din BD la startup, nu hardcodat
+        private readonly int _idAnUnivCurent;
 
         public RapoarteController(IConfiguration configuration, IMemoryCache cache)
         {
             _configuration = configuration;
             _connectionString = _configuration.GetConnectionString("DefaultConnection")!;
             _cache = cache;
-            _normaPerProf = IncarcaNormeProf();
+            _idAnUnivCurent = DetectaAnUnivCurent();
         }
 
-        private Dictionary<int, decimal> IncarcaNormeProf()
+        // =====================================================================
+        // Detectie an universitar curent — fara SetariUniversitate (blocat).
+        // Strategia:
+        //   1. Cauta Denumire LIKE '%2025-2026%' (an curent hardcodat DOAR in pattern,
+        //      nu in ID — pattern-ul e parametrizabil din config daca e necesar)
+        //   2. Fallback: MAX(Ordine) — cel mai recent an din BD
+        //   3. Fallback final: 45
+        // =====================================================================
+        private int DetectaAnUnivCurent()
         {
-            var dict = new Dictionary<int, decimal>();
+            // Pattern-ul anului curent poate veni din appsettings daca se doreste
+            // zero-hardcoding absolut. Deocamdata e citit din config cu fallback inline.
+            string anPattern = _configuration["AnUniversitar:Pattern"] ?? "2025-2026";
+
             try
             {
                 using var conn = new SqlConnection(_connectionString);
                 conn.Open();
-                // Formula profa: ISNULL(Exceptii.NrOreTitular, NormaStandard.NrOreConventionaleTitular)
-                // Sursa: ExceptiiNormaOreConventionale (norma individuala) + NormaOreConventionale (standard)
-                const string sql = @"
-                    SELECT e.ID_Profesor,
-                           ISNULL(ex.NrOreTitular, n.NrOreConventionaleTitular) AS NormaFinala
-                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] e
-                    LEFT JOIN [AGSIS].[pi].[ExceptiiNormaOreConventionale] ex
-                        ON ex.ID_Profesor = e.ID_Profesor AND ex.ID_AnUniv = 45
-                    INNER JOIN [AGSIS].[pi].[NormaOreConventionale] n
-                        ON n.ID_TipGradDidactic = e.ID_TipGradDidacticAnUniv AND n.ID_AnUniv = 45
-                    WHERE e.ID_AnUnivCatedra = 45";
-                using var cmd = new SqlCommand(sql, conn);
-                cmd.CommandTimeout = 60;
-                using var r = cmd.ExecuteReader();
-                while (r.Read())
+
+                // Strategia 1: an explicit dupa denumire
+                using (var cmd = new SqlCommand(@"
+                    SELECT TOP 1 ID_AnUniv
+                    FROM [AGSIS].[dbo].[AnUniversitar]
+                    WHERE Denumire LIKE @pattern
+                      AND Denumire IS NOT NULL
+                    ORDER BY Ordine DESC", conn))
                 {
-                    int idProf = Convert.ToInt32(r["ID_Profesor"]);
-                    decimal norma = Convert.ToDecimal(r["NormaFinala"]);
-                    if (norma > 0) dict[idProf] = norma;
+                    cmd.Parameters.Add(new SqlParameter("@pattern", SqlDbType.NVarChar, 50)
+                    { Value = $"%{anPattern}%" });
+                    var val = cmd.ExecuteScalar();
+                    if (val != null && val != DBNull.Value)
+                        return Convert.ToInt32(val);
+                }
+
+                // Strategia 2: cel mai recent dupa Ordine
+                using (var cmd2 = new SqlCommand(@"
+                    SELECT TOP 1 ID_AnUniv
+                    FROM [AGSIS].[dbo].[AnUniversitar]
+                    WHERE Denumire IS NOT NULL
+                    ORDER BY Ordine DESC", conn))
+                {
+                    var val2 = cmd2.ExecuteScalar();
+                    if (val2 != null && val2 != DBNull.Value)
+                        return Convert.ToInt32(val2);
                 }
             }
-            catch { /* fallback la GetNormaLegala daca DB-ul nu e accesibil */ }
+            catch (Exception ex)
+            {
+                // Log minim — nu inghitim exceptia silentios
+                Console.Error.WriteLine(
+                    $"[RapoarteController] DetectaAnUnivCurent EROARE: {ex.Message}. Fallback: 45.");
+            }
+
+            return 45; // fallback final documentat
+        }
+
+        // =====================================================================
+        // Norme legale — reutilizat de rapoartele de norma
+        // =====================================================================
+        private async Task<Dictionary<int, decimal>> LoadNormeLegaleAsync(
+            SqlConnection conn, int idAnUniv)
+        {
+            var dict = new Dictionary<int, decimal>();
+            const string sql = @"
+                SELECT ID_TipGradDidactic, NrOreConventionaleTitular
+                FROM [AGSIS].[pi].[NormaOreConventionale]
+                WHERE ID_AnUniv = @id
+                  AND NrOreConventionaleTitular IS NOT NULL
+                  AND NrOreConventionaleTitular > 0";
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add(new SqlParameter("@id", SqlDbType.Int) { Value = idAnUniv });
+            using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+                dict[Convert.ToInt32(r["ID_TipGradDidactic"])] =
+                    Convert.ToDecimal(r["NrOreConventionaleTitular"]);
             return dict;
         }
 
-        private string GetDenumireCatedra(long idCatedra) =>
-            MapareCatedra.TryGetValue(idCatedra, out var den) ? den : $"Catedra {idCatedra}";
+        #region ================= LISTE (DROPDOWNS via Stored Procedures) =================
 
-        #region ================= LISTE (DROPDOWNS) =================
-
+        // -------------------------------------------------------------------------
+        // Ani universitari — query direct (nu exista SP dedicat)
+        // Cache 60 min — lista se schimba o data pe an
+        // -------------------------------------------------------------------------
         [HttpGet("liste/ani-universitari")]
         public ActionResult GetAni()
         {
-            return Ok(_cache.GetOrCreate("ListaAniUniv", entry =>
+            return Ok(_cache.GetOrCreate("ListaAniUniv_v2", entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60);
                 var lista = new List<object>();
                 using var conn = new SqlConnection(_connectionString);
                 conn.Open();
-                using var cmd = new SqlCommand(
-                    "SELECT UPPER(LTRIM(RTRIM(Denumire))) COLLATE DATABASE_DEFAULT AS AnCurat FROM [AGSIS].[dbo].[AnUniversitar] WHERE Denumire IS NOT NULL ORDER BY Ordine DESC", conn);
+                using var cmd = new SqlCommand(@"
+                    SELECT au.ID_AnUniv                              AS id,
+                           UPPER(LTRIM(RTRIM(au.Denumire)))
+                               COLLATE DATABASE_DEFAULT             AS AnCurat
+                    FROM [AGSIS].[dbo].[AnUniversitar] au
+                    WHERE au.Denumire IS NOT NULL
+                      AND LTRIM(RTRIM(au.Denumire)) != ''
+                    ORDER BY au.Ordine DESC", conn);
                 using var reader = cmd.ExecuteReader();
-                while (reader.Read()) { var an = reader["AnCurat"]?.ToString() ?? ""; lista.Add(new { id = an, nume = an }); }
+                while (reader.Read())
+                    lista.Add(new
+                    {
+                        id = reader["id"] != DBNull.Value ? Convert.ToInt32(reader["id"]) : 0,
+                        nume = reader["AnCurat"]?.ToString() ?? ""
+                    });
                 return lista;
             }));
         }
 
+        // -------------------------------------------------------------------------
+        // Facultati — via SP oficial [dbo].[FacultateListAll]
+        // SP returneaza: ID_Facultate, Denumire (sau similar — adaptam la schema SP).
+        // Cache 60 min.
+        // -------------------------------------------------------------------------
         [HttpGet("liste/facultati")]
         public ActionResult GetFacultati()
         {
-            return Ok(_cache.GetOrCreate("ListaFacultati_v3", entry =>
+            return Ok(_cache.GetOrCreate("ListaFacultati_SP_v1", entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60);
+                var lista = new List<object> {
+                    new { id = (int?)null, nume = "Toti" }
+                };
+                try
+                {
+                    using var conn = new SqlConnection(_connectionString);
+                    conn.Open();
+                    using var cmd = new SqlCommand("[dbo].[FacultateListAll]", conn)
+                    {
+                        CommandType = CommandType.StoredProcedure,
+                        CommandTimeout = 30
+                    };
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        // SP poate returna coloane cu diferite denumiri — incercam variantele comune
+                        int? id = TryGetInt(reader, "ID_Facultate") ?? TryGetInt(reader, "id");
+                        string den = TryGetString(reader, "Denumire")
+                                  ?? TryGetString(reader, "NumeFacultate")
+                                  ?? TryGetString(reader, "DenumireFacultate")
+                                  ?? reader[0]?.ToString() ?? "";
+                        if (!string.IsNullOrWhiteSpace(den))
+                            lista.Add(new { id, nume = den.Trim() });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(
+                        $"[RapoarteController] GetFacultati SP EROARE: {ex.Message}. " +
+                        "Fallback pe SELECT DISTINCT.");
+                    // Fallback: citire directa daca SP nu exista sau e incompatibil
+                    lista = FacultatiDirectFallback();
+                }
+                return lista;
+            }));
+        }
+
+        private List<object> FacultatiDirectFallback()
+        {
+            var lista = new List<object> { new { id = (int?)null, nume = "Toti" } };
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(@"
+                    SELECT DISTINCT
+                        LTRIM(RTRIM(p.DenumireFacultate)) COLLATE DATABASE_DEFAULT AS Denumire
+                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
+                    WHERE p.DenumireFacultate IS NOT NULL
+                      AND LTRIM(RTRIM(p.DenumireFacultate)) != ''
+                      AND p.ID_AnUnivCatedra = (
+                          SELECT TOP 1 ID_AnUniv FROM [AGSIS].[dbo].[AnUniversitar]
+                          ORDER BY Ordine DESC)
+                    ORDER BY Denumire", conn);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var den = reader[0]?.ToString()?.Trim() ?? "";
+                    if (!string.IsNullOrWhiteSpace(den))
+                        lista.Add(new { id = (int?)null, nume = den });
+                }
+            }
+            catch { /* ignoram — lista va fi doar "Toti" */ }
+            return lista;
+        }
+
+        // -------------------------------------------------------------------------
+        // Departamente — via SP oficial [dbo].[CatedraListByFacultateAnUniv]
+        // Params SP: @ID_AnUniv INT, @ID_Facultate INT
+        // Endpoint primeste atat idFacultate (int, pentru SP) cat si numeFacultate
+        // (string, pentru compatibilitate cu rapoartele existente).
+        // -------------------------------------------------------------------------
+        [HttpGet("liste/departamente")]
+        public ActionResult GetDepartamente(
+            [FromQuery] int? idAnUniv = null,
+            [FromQuery] int? idFacultate = null,
+            [FromQuery] string? numeFacultate = null)  // pastrat pentru compatibilitate
+        {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
+            var lista = new List<object> {
+                new { id = (int?)null, nume = "Toti" }
+            };
+
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand("[dbo].[CatedraListByFacultateAnUniv]", conn)
+                {
+                    CommandType = CommandType.StoredProcedure,
+                    CommandTimeout = 30
+                };
+                cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int)
+                { Value = idAn });
+                cmd.Parameters.Add(new SqlParameter("@ID_Facultate", SqlDbType.Int)
+                { Value = idFacultate.HasValue ? (object)idFacultate.Value : DBNull.Value });
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    int? id = TryGetInt(reader, "ID_Catedra") ?? TryGetInt(reader, "id");
+                    string den = TryGetString(reader, "Denumire")
+                              ?? TryGetString(reader, "DenumireCatedra")
+                              ?? reader[0]?.ToString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(den))
+                        lista.Add(new { id, nume = den.Trim() });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[RapoarteController] GetDepartamente SP EROARE: {ex.Message}. Fallback SELECT DISTINCT.");
+                lista = DepartamenteFallback(idAn, numeFacultate);
+            }
+
+            return Ok(lista);
+        }
+
+        private List<object> DepartamenteFallback(int idAn, string? numeFacultate)
+        {
+            var lista = new List<object> { new { id = (int?)null, nume = "Toti" } };
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(@"
+                    SELECT DISTINCT
+                        LTRIM(RTRIM(vp.DenumireCatedra)) COLLATE DATABASE_DEFAULT AS Denumire
+                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
+                    WHERE vp.ID_AnUnivCatedra = @idAn
+                      AND vp.DenumireCatedra IS NOT NULL
+                      AND LTRIM(RTRIM(vp.DenumireCatedra)) != ''
+                      AND (
+                          @fac = N'Toti'
+                          OR vp.DenumireFacultate COLLATE DATABASE_DEFAULT
+                           = @fac                  COLLATE DATABASE_DEFAULT
+                      )
+                    ORDER BY Denumire", conn);
+                cmd.Parameters.Add(new SqlParameter("@idAn", SqlDbType.Int) { Value = idAn });
+                cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200)
+                { Value = string.IsNullOrWhiteSpace(numeFacultate) ? "Toti" : numeFacultate.Trim() });
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var den = reader[0]?.ToString()?.Trim() ?? "";
+                    if (!string.IsNullOrWhiteSpace(den))
+                        lista.Add(new { id = (int?)null, nume = den });
+                }
+            }
+            catch { }
+            return lista;
+        }
+
+        // -------------------------------------------------------------------------
+        // Specializari — via SP oficial [dbo].[SpecializareListByFacultateAnUniv]
+        // Params SP: @ID_AnUniv INT, @ID_Facultate INT
+        // -------------------------------------------------------------------------
+        [HttpGet("liste/specializari")]
+        public ActionResult GetSpecializari(
+            [FromQuery] int? idAnUniv = null,
+            [FromQuery] int? idFacultate = null,
+            [FromQuery] string? numeFacultate = null)  // pastrat pentru compatibilitate
+        {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
+            var lista = new List<object> {
+                new { id = (int?)null, nume = "Toti" }
+            };
+
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand("[dbo].[SpecializareListByFacultateAnUniv]", conn)
+                {
+                    CommandType = CommandType.StoredProcedure,
+                    CommandTimeout = 30
+                };
+                cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int)
+                { Value = idAn });
+                cmd.Parameters.Add(new SqlParameter("@ID_Facultate", SqlDbType.Int)
+                { Value = idFacultate.HasValue ? (object)idFacultate.Value : DBNull.Value });
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    int? id = TryGetInt(reader, "ID_Specializare") ?? TryGetInt(reader, "id");
+                    string den = TryGetString(reader, "Denumire")
+                              ?? TryGetString(reader, "DenumireSpecializare")
+                              ?? reader[0]?.ToString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(den))
+                        lista.Add(new { id, nume = den.Trim() });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[RapoarteController] GetSpecializari SP EROARE: {ex.Message}. Fallback SELECT DISTINCT.");
+                lista = SpecializariFallback(idAn, numeFacultate);
+            }
+
+            return Ok(lista);
+        }
+
+        private List<object> SpecializariFallback(int idAn, string? numeFacultate)
+        {
+            var lista = new List<object> { new { id = (int?)null, nume = "Toti" } };
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(@"
+                    SELECT DISTINCT
+                        UPPER(LTRIM(RTRIM(ppm.DenumireSpecializare)))
+                            COLLATE DATABASE_DEFAULT AS Denumire
+                    FROM [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
+                    WHERE ppm.ID_AnUniv = @idAn
+                      AND ppm.DenumireSpecializare IS NOT NULL
+                      AND LTRIM(RTRIM(ppm.DenumireSpecializare)) != ''
+                      AND (
+                          @fac = N'Toti'
+                          OR ppm.DenumireFacultate COLLATE DATABASE_DEFAULT
+                           = @fac                   COLLATE DATABASE_DEFAULT
+                      )
+                    ORDER BY Denumire", conn);
+                cmd.Parameters.Add(new SqlParameter("@idAn", SqlDbType.Int) { Value = idAn });
+                cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200)
+                { Value = string.IsNullOrWhiteSpace(numeFacultate) ? "Toti" : numeFacultate.Trim() });
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var den = reader[0]?.ToString()?.Trim() ?? "";
+                    if (!string.IsNullOrWhiteSpace(den) && !lista.Any(x => ((dynamic)x).nume == den))
+                        lista.Add(new { id = (int?)null, nume = den });
+                }
+            }
+            catch { }
+            return lista;
+        }
+
+        // -------------------------------------------------------------------------
+        // Profesori — SELECT DISTINCT din View_Profesori_CF_AnUniv
+        // Filtrat optional dupa facultate si departament (string, pentru compatibilitate rapoarte)
+        // -------------------------------------------------------------------------
+        [HttpGet("liste/profesori")]
+        public ActionResult GetProfesori(
+            [FromQuery] int? idAnUniv = null,
+            [FromQuery] string? facultate = null,
+            [FromQuery] string? departament = null)
+        {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
+            var lista = new List<string> { "Toti" };
+
+            using var conn = new SqlConnection(_connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT DISTINCT
+                    LTRIM(RTRIM(p.NumeIntreg)) COLLATE DATABASE_DEFAULT AS NumeIntreg
+                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
+                WHERE p.ID_AnUnivCatedra = @idAn
+                  AND p.NumeIntreg IS NOT NULL
+                  AND LTRIM(RTRIM(p.NumeIntreg)) != ''
+                  AND (
+                      @fac = N'Toti'
+                      OR p.DenumireFacultate COLLATE DATABASE_DEFAULT
+                       = @fac                COLLATE DATABASE_DEFAULT
+                  )
+                  AND (
+                      @dept = N'Toti'
+                      OR p.DenumireCatedra COLLATE DATABASE_DEFAULT
+                       = @dept             COLLATE DATABASE_DEFAULT
+                  )
+                ORDER BY NumeIntreg", conn);
+            cmd.Parameters.Add(new SqlParameter("@idAn", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200)
+            { Value = string.IsNullOrWhiteSpace(facultate) ? "Toti" : facultate.Trim() });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200)
+            { Value = string.IsNullOrWhiteSpace(departament) ? "Toti" : departament.Trim() });
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var n = reader[0]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(n)) lista.Add(n);
+            }
+
+            return Ok(lista);
+        }
+
+        // -------------------------------------------------------------------------
+        // Forme de invatamant — din DenumireFormaInv din ppm (nu lista statica)
+        // -------------------------------------------------------------------------
+        [HttpGet("liste/forme-invatamant")]
+        public ActionResult GetFormeInvatamant([FromQuery] int? idAnUniv = null)
+        {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
+            return Ok(_cache.GetOrCreate($"FormeInv_{idAn}", entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60);
                 var lista = new List<string> { "Toti" };
                 using var conn = new SqlConnection(_connectionString);
                 conn.Open();
-                using var cmd = new SqlCommand(
-                    "SELECT DISTINCT vcm.DenumireFacultate FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm WHERE vcm.DenumireFacultate IS NOT NULL AND LTRIM(RTRIM(vcm.DenumireFacultate)) != '' ORDER BY vcm.DenumireFacultate ASC", conn);
+                using var cmd = new SqlCommand(@"
+                    SELECT DISTINCT
+                        LTRIM(RTRIM(ppm.DenumireFormaInv)) COLLATE DATABASE_DEFAULT AS FormaInv
+                    FROM [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
+                    WHERE ppm.ID_AnUniv = @idAn
+                      AND ppm.DenumireFormaInv IS NOT NULL
+                      AND LTRIM(RTRIM(ppm.DenumireFormaInv)) != ''
+                    ORDER BY FormaInv", conn);
+                cmd.Parameters.Add(new SqlParameter("@idAn", SqlDbType.Int) { Value = idAn });
                 using var reader = cmd.ExecuteReader();
-                while (reader.Read()) { var val = reader[0]?.ToString()?.Trim() ?? ""; if (!string.IsNullOrWhiteSpace(val)) lista.Add(val); }
+                while (reader.Read())
+                {
+                    var f = reader[0]?.ToString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(f)) lista.Add(f);
+                }
                 return lista;
             }));
         }
 
-        [HttpGet("liste/departamente")]
-        public ActionResult GetDepartamente(string? anUniv, string? numeFacultate)
-        {
-            var lista = new List<string> { "Toti" };
-            using var conn = new SqlConnection(_connectionString);
-            conn.Open();
-            using var cmd = new SqlCommand(@"
-                SELECT DISTINCT vp.DenumireCatedra
-                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
-                WHERE vp.ID_AnUnivCatedra = 45
-                  AND vp.DenumireCatedra IS NOT NULL
-                  AND LTRIM(RTRIM(vp.DenumireCatedra)) != ''
-                  AND (@fac = 'Toti'
-                       OR vp.DenumireFacultate COLLATE Latin1_General_CI_AI
-                          = @fac COLLATE Latin1_General_CI_AI)
-                ORDER BY vp.DenumireCatedra", conn);
-            cmd.Parameters.AddWithValue("@fac", string.IsNullOrWhiteSpace(numeFacultate) ? "Toti" : numeFacultate.Trim());
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var den = reader[0]?.ToString() ?? "";
-                if (!string.IsNullOrWhiteSpace(den)) lista.Add(den);
-            }
-            return Ok(lista);
-        }
-
-        // =====================================================================
-        // FIX GetSpecializari: accepta acum si @departament
-        // Daca departament != "Toti", filtreaza prin JOIN cu HR
-        // astfel incat lista de specializari sa fie relevanta pentru departamentul ales
-        // =====================================================================
-        [HttpGet("liste/specializari-per-facultate")]
-        public ActionResult GetSpecializari(string? anUniv, string? numeFacultate, string? departament)
-        {
-            var lista = new List<string> { "Toti" };
-            using var conn = new SqlConnection(_connectionString);
-            conn.Open();
-            bool filtrDept = !string.IsNullOrWhiteSpace(departament) && departament != "Toti";
-            string sql;
-            if (filtrDept)
-            {
-                sql = @"SELECT DISTINCT UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                            CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0
-                                 THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
-                                 ELSE vcm.DenumireSpecializare END,
-                        ' - CORECT',''),' CORECT',''),' - COPIE',''),'S','S'),'T','T'))))
-                        COLLATE DATABASE_DEFAULT AS SpecCurata
-                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                    INNER JOIN (
-                        SELECT ID_Profesor, MIN(DenumireCatedra) AS DenumireCatedra
-                        FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
-                        WHERE ID_AnUnivCatedra = 45
-                        GROUP BY ID_Profesor
-                    ) vp ON vp.ID_Profesor = vcm.ID_Profesor
-                    WHERE vcm.ID_AnUniv = 45
-                      AND vcm.DenumireSpecializare IS NOT NULL
-                      AND (@fac='Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
-                              vcm.DenumireFacultate,CHAR(9),''),'S','S'),'T','T'))))=@fac)
-                      AND vp.DenumireCatedra COLLATE Latin1_General_CI_AI = @dept COLLATE Latin1_General_CI_AI
-                    ORDER BY SpecCurata";
-            }
-            else
-            {
-                sql = @"SELECT DISTINCT UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                            CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0
-                                 THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
-                                 ELSE vcm.DenumireSpecializare END,
-                        ' - CORECT',''),' CORECT',''),' - COPIE',''),'S','S'),'T','T'))))
-                        COLLATE DATABASE_DEFAULT AS SpecCurata
-                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                    WHERE vcm.ID_AnUniv = 45
-                      AND vcm.DenumireSpecializare IS NOT NULL
-                      AND (@fac='Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
-                              vcm.DenumireFacultate,CHAR(9),''),'S','S'),'T','T'))))=@fac)
-                    ORDER BY SpecCurata";
-            }
-            using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@fac", numeFacultate ?? "Toti");
-            if (filtrDept) cmd.Parameters.AddWithValue("@dept", departament!.Trim());
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var val = reader[0]?.ToString() ?? "";
-                if (!string.IsNullOrWhiteSpace(val) && !lista.Contains(val)) lista.Add(val);
-            }
-            return Ok(lista);
-        }
-
-        [HttpGet("liste/profesori-per-specializari")]
-        public ActionResult GetProfesori(string? anUniv, string? facultate, string? specializari, string? departament)
-        {
-            var lista = new List<string> { "Toti" };
-            bool toateSpec = string.IsNullOrEmpty(specializari) || specializari == "Toti";
-            using var conn = new SqlConnection(_connectionString);
-            conn.Open();
-            using var cmd = new SqlCommand(@"SELECT DISTINCT vcm.NumeIntregProfesor
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                WHERE vcm.NumeIntregProfesor IS NOT NULL
-                  AND (@an='Toti' OR UPPER(LTRIM(RTRIM(au.Denumire)))=@an)
-                  AND (@fac='Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(vcm.DenumireFacultate,CHAR(9),''),'S','S'),'T','T'))))=@fac)
-                  AND (@allSpecs=1 OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0 THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1) ELSE vcm.DenumireSpecializare END,'S','S'),'T','T')))) IN (SELECT value FROM STRING_SPLIT(@listaSpecs,',')))
-                ORDER BY vcm.NumeIntregProfesor", conn);
-            cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            cmd.Parameters.AddWithValue("@allSpecs", toateSpec ? 1 : 0);
-            cmd.Parameters.AddWithValue("@listaSpecs", specializari ?? "");
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read()) lista.Add(reader[0]?.ToString() ?? "");
-            return Ok(lista);
-        }
+        // -------------------------------------------------------------------------
+        // An universitar curent — expus pentru UI
+        // -------------------------------------------------------------------------
+        [HttpGet("liste/an-curent")]
+        public ActionResult GetAnCurent() => Ok(new { idAnUniv = _idAnUnivCurent });
 
         #endregion
 
         #region ================= HELPER SQL COMUN =================
 
-        // =====================================================================
         private const string BaseDataSql = @"
             WITH VcmDedup AS (
                 SELECT DISTINCT
-                    ID_Profesor,
-                    CASE ID_Profesor
-                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
-                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
-                        ELSE NumeIntregProfesor
-                    END AS NumeIntregProfesor,
-                    ID_AnUniv, ID_StatDeFunctii,
-                    DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
-                    Nr_Ore_Curs, Nr_Ore_Seminar, Nr_Ore_Laborator, Nr_Ore_Proiect,
-                    NrOreConventionale, DenumireFacultate, StatDeFunctiiID_Catedra
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor]
-                WHERE ID_AnUniv = 45
+                    ppm.ID_Profesor,
+                    ppm.NumeIntreg                                       AS NumeIntregProfesor,
+                    ppm.ID_AnUniv,
+                    ppm.DenumireSpecializare,
+                    ppm.DenumireMaterie,
+                    ppm.NrSemestruDinAn,
+                    ppm.Nr_Ore_Curs,
+                    ppm.Nr_Ore_Seminar,
+                    ppm.Nr_Ore_Laborator,
+                    ppm.Nr_Ore_Proiect,
+                    ppm.NrOreConventionale,
+                    ppm.DenumireFacultate,
+                    ppm.DenumireCatedraProfesor                          AS DenumireCatedra,
+                    ppm.TitularSauSuplinitor,
+                    ppm.DenumireFormaInv
+                FROM [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
+                WHERE ppm.ID_AnUniv = @ID_AnUniv
             ),
             BaseData AS (
                 SELECT
                     vcm.NumeIntregProfesor                                          AS NumeIntreg,
-                    vcm.ID_Profesor                                                  AS ID_Profesor,
-                    UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
-                        CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0
-                             THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
-                             ELSE vcm.DenumireSpecializare END,
-                    'S','S'),'T','T')))) COLLATE DATABASE_DEFAULT                   AS SpecializareCurata,
-                    vcm.DenumireSpecializare                                         AS NumeSpecOriginal,
-                    ISNULL(vcm.DenumireMaterie,'Nedefinit')                          AS DenumireMaterie,
-                    CASE
-                        WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
-                             THEN 'Titular'
-                        ELSE 'Suplinitor'
-                    END                                                              AS TipPost,
-                    ISNULL(vcm.NrSemestruDinAn,0)                                   AS Semestru,
-                    CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))         AS OreConvLinie,
-                    ISNULL(vcm.Nr_Ore_Curs,0)                                       AS OreCursLinie,
-                    ISNULL(vcm.Nr_Ore_Seminar,0)+ISNULL(vcm.Nr_Ore_Laborator,0)+ISNULL(vcm.Nr_Ore_Proiect,0) AS OreAplicatiiLinie,
-                    LTRIM(RTRIM(ISNULL(vcm.DenumireFacultate,'')))                  AS FacultateCurata,
-                    vcm.StatDeFunctiiID_Catedra                                      AS ID_Catedra,
-                    UPPER(LTRIM(RTRIM(au.Denumire))) COLLATE DATABASE_DEFAULT        AS AnCurat,
-                    CASE
-                        WHEN vcm.DenumireSpecializare LIKE '%-IFR%' OR vcm.DenumireSpecializare LIKE '% IFR%' OR vcm.DenumireSpecializare LIKE '%IFR' THEN 'IFR'
-                        WHEN vcm.DenumireSpecializare LIKE '%-ID%'  OR vcm.DenumireSpecializare LIKE '% ID%'  OR vcm.DenumireSpecializare LIKE '%- ID' THEN 'ID'
-                        ELSE 'IF'
-                    END                                                              AS FormaInv,
-                    vcm.ID_StatDeFunctii                                             AS ID_StatDeFunctii
+                    vcm.ID_Profesor,
+                    UPPER(LTRIM(RTRIM(
+                        CASE WHEN CHARINDEX('+', vcm.DenumireSpecializare) > 0
+                             THEN LEFT(vcm.DenumireSpecializare, CHARINDEX('+', vcm.DenumireSpecializare) - 1)
+                             ELSE vcm.DenumireSpecializare END
+                    ))) COLLATE DATABASE_DEFAULT                                    AS SpecializareCurata,
+                    vcm.DenumireSpecializare                                        AS NumeSpecOriginal,
+                    ISNULL(vcm.DenumireMaterie, 'Nedefinit')                        AS DenumireMaterie,
+                    CASE WHEN vcm.TitularSauSuplinitor = 1 THEN 'Titular' ELSE 'Suplinitor' END AS TipPost,
+                    ISNULL(vcm.NrSemestruDinAn, 0)                                 AS Semestru,
+                    CAST(ISNULL(vcm.NrOreConventionale, 0) AS DECIMAL(10,4))       AS OreConvLinie,
+                    ISNULL(vcm.Nr_Ore_Curs, 0)                                     AS OreCursLinie,
+                    ISNULL(vcm.Nr_Ore_Seminar,   0)
+                  + ISNULL(vcm.Nr_Ore_Laborator, 0)
+                  + ISNULL(vcm.Nr_Ore_Proiect,   0)                                AS OreAplicatiiLinie,
+                    LTRIM(RTRIM(ISNULL(vcm.DenumireFacultate, '')))                AS FacultateCurata,
+                    vcm.DenumireCatedra,
+                    UPPER(LTRIM(RTRIM(au.Denumire))) COLLATE DATABASE_DEFAULT       AS AnCurat,
+                    -- FormaInv din coloana DenumireFormaInv (metadata BD) — fara LIKE pe spec
+                    LTRIM(RTRIM(ISNULL(vcm.DenumireFormaInv, 'IF')))               AS FormaInv
                 FROM VcmDedup vcm
-                INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                LEFT JOIN (
-                    SELECT DISTINCT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
-                           NrSemestruDinAn, DenTitularSauSuplinitor
-                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
-                ) sf
-                    ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
-                    AND sf.DenumireSpecializare=vcm.DenumireSpecializare
-                    AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                WHERE vcm.ID_AnUniv = 45
+                INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv = au.ID_AnUniv
+                WHERE vcm.ID_AnUniv = @ID_AnUniv
             )";
 
         #endregion
 
         #region ================= RAPORT 1: NORMA PROFESORI =================
 
-        private string BuildNormaSql()
-        {
-            return BaseDataSql + @",
+        private string BuildNormaSql() => BaseDataSql + @",
             Filtrat AS (
                 SELECT bd.NumeIntreg, bd.SpecializareCurata, bd.NumeSpecOriginal,
                        bd.DenumireMaterie, bd.TipPost, bd.Semestru,
-                       bd.ID_Catedra, bd.ID_StatDeFunctii,
-                       bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
+                       bd.DenumireCatedra, bd.ID_Profesor,
+                       bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie, bd.FormaInv
                 FROM BaseData bd
-                WHERE (@an='Toti' OR bd.AnCurat=@an)
-                  AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-                  AND (@prof='Toti' OR bd.NumeIntreg=@prof)
-                  AND (@formaInv='Toti' OR bd.FormaInv=@formaInv)
-                  AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-                  AND (@semestru=0 OR bd.Semestru=@semestru)
-                  AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
-                  AND (@dept='Toti' OR bd.ID_Catedra IN (SELECT value FROM STRING_SPLIT(@deptIds,',')))
+                WHERE (@an       = 'Toti' OR bd.AnCurat = @an)
+                  AND (@fac      = 'Toti' OR bd.FacultateCurata COLLATE DATABASE_DEFAULT
+                                           = @fac                COLLATE DATABASE_DEFAULT)
+                  AND (@prof     = 'Toti' OR bd.NumeIntreg = @prof)
+                  AND (@formaInv = 'Toti' OR bd.FormaInv   COLLATE DATABASE_DEFAULT
+                                           = @formaInv      COLLATE DATABASE_DEFAULT)
+                  AND (@specs    = 'Toti' OR bd.SpecializareCurata IN
+                       (SELECT UPPER(LTRIM(RTRIM(value))) FROM STRING_SPLIT(@specs, ',')))
+                  AND (@semestru = 0 OR bd.Semestru = @semestru)
+                  AND (@tipPost  = 'Toti' OR bd.TipPost = @tipPost)
+                  AND (@dept     = 'Toti' OR bd.DenumireCatedra COLLATE DATABASE_DEFAULT
+                                           = @dept               COLLATE DATABASE_DEFAULT)
             ),
-            Agregat AS (
-                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
-                       MAX(ID_Catedra)        AS ID_Catedra,
-                       MAX(ID_StatDeFunctii)  AS ID_StatDeFunctii,
+            Dedup AS (
+                SELECT NumeIntreg, SpecializareCurata, DenumireMaterie, Semestru, TipPost,
                        MAX(OreCursLinie)      AS OreCurs,
-                       SUM(OreAplicatiiLinie) AS OreAplicatii,
-                       MAX(OreConvLinie)      AS OreConv
+                       MAX(OreAplicatiiLinie) AS OreAplicatii,
+                       MAX(OreConvLinie)      AS OreConv,
+                       MAX(DenumireCatedra)   AS DenumireCatedra,
+                       MAX(FormaInv)          AS FormaInv
                 FROM Filtrat
-                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, TipPost, Semestru
-            ),
-            Cuplaje AS (
-                SELECT a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru,
-                       COUNT(DISTINCT a.SpecializareCurata) AS NrSpec,
-                       MIN(a.SpecializareCurata)            AS SpecPrimara,
-                       MAX(a.OreCurs)                       AS OreCursMax,
-                       SUM(a.OreAplicatii)                  AS OreAplicatiiMax,
-                       SUM(a.OreConv)                       AS OreConvMax
-                FROM Agregat a
-                GROUP BY a.NumeIntreg, a.DenumireMaterie, a.TipPost, a.Semestru
+                GROUP BY NumeIntreg, SpecializareCurata, DenumireMaterie, Semestru, TipPost
             )
-            SELECT c.NumeIntreg AS Profesor, c.SpecPrimara AS Specializare,
-                   c.DenumireMaterie AS Materie, c.TipPost, c.Semestru,
-                   ag.ID_Catedra,
-                   c.OreCursMax        AS NrOreCurs,
-                   c.OreAplicatiiMax   AS NrOreAplicatii,
-                   c.OreConvMax        AS NrOreConventionale,
-                   c.NrSpec,
-                   CASE WHEN c.NrSpec > 1 THEN (
-                       SELECT TOP 1 STUFF((
-                           SELECT ', ' + a2.SpecializareCurata
-                           FROM Agregat a2
-                           WHERE a2.NumeIntreg=c.NumeIntreg AND a2.DenumireMaterie=c.DenumireMaterie
-                             AND a2.TipPost=c.TipPost AND a2.Semestru=c.Semestru
-                             AND a2.SpecializareCurata <> c.SpecPrimara
-                           ORDER BY a2.SpecializareCurata
-                           FOR XML PATH(''),TYPE
-                       ).value('.','NVARCHAR(MAX)'),1,2,'')
-                       FROM Agregat WHERE NumeIntreg=c.NumeIntreg
-                   ) ELSE '' END AS SpecCuplate,
-                   SUM(c.OreConvMax) OVER(PARTITION BY c.NumeIntreg, c.TipPost) AS TotalTipPost,
-                   SUM(c.OreConvMax) OVER(PARTITION BY c.NumeIntreg)            AS TotalPost
-            FROM Cuplaje c
-            INNER JOIN Agregat ag
-                ON ag.NumeIntreg=c.NumeIntreg AND ag.DenumireMaterie=c.DenumireMaterie
-                AND ag.TipPost=c.TipPost AND ag.Semestru=c.Semestru
-                AND ag.SpecializareCurata=c.SpecPrimara
-            ORDER BY c.NumeIntreg, c.TipPost DESC, c.DenumireMaterie
+            SELECT NumeIntreg, SpecializareCurata AS Specializare, DenumireMaterie AS Materie,
+                   TipPost, Semestru,
+                   CAST(OreCurs      AS DECIMAL(10,2)) AS OreCurs,
+                   CAST(OreAplicatii AS DECIMAL(10,2)) AS OreAplicatii,
+                   CAST(OreConv      AS DECIMAL(10,2)) AS OreConv,
+                   DenumireCatedra, FormaInv
+            FROM Dedup
+            ORDER BY NumeIntreg, Specializare, Materie, Semestru
             OPTION (RECOMPILE)";
-        }
 
         [HttpGet("norma-profesori")]
-        public ActionResult GetNormaProfesori(string? anUniv, string? facultate, string? specializari,
-            string? profesor, int semestru = 0, string tipPost = "Toti",
-            string? formaInvatamant = "Toti", string? departament = "Toti")
+        public async Task<IActionResult> GetNormaProfesori(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] string? specializari,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildNormaSql(), conn);
-            cmd.CommandTimeout = 300;
-            AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                long idCat = reader["ID_Catedra"] != DBNull.Value ? Convert.ToInt64(reader["ID_Catedra"]) : 0;
+            cmd.CommandTimeout = 120;
+            AddBaseParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
                 result.Add(new
                 {
-                    Profesor = reader["Profesor"]?.ToString() ?? "",
+                    Profesor = reader["NumeIntreg"]?.ToString() ?? "",
                     Specializare = reader["Specializare"]?.ToString() ?? "",
                     Materie = reader["Materie"]?.ToString() ?? "",
                     TipPost = reader["TipPost"]?.ToString() ?? "",
-                    Semestru = reader["Semestru"],
-                    Departament = GetDenumireCatedra(idCat),
-                    NrOreCurs = reader["NrOreCurs"] != DBNull.Value ? Convert.ToDouble(reader["NrOreCurs"]) : 0.0,
-                    NrOreAplicatii = reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
-                    NrOreConventionale = reader["NrOreConventionale"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConventionale"]) : 0.0,
-                    Mentiuni = reader["SpecCuplate"] != DBNull.Value && !string.IsNullOrEmpty(reader["SpecCuplate"]?.ToString())
-                                             ? "Cuplaj cu: " + reader["SpecCuplate"]?.ToString() : "",
-                    TotalTipPost = reader["TotalTipPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalTipPost"]) : 0.0,
-                    TotalPost = reader["TotalPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalPost"]) : 0.0
+                    Semestru = reader["Semestru"] != DBNull.Value ? Convert.ToInt32(reader["Semestru"]) : 0,
+                    OreCurs = reader["OreCurs"] != DBNull.Value ? Convert.ToDecimal(reader["OreCurs"]) : 0m,
+                    OreAplicatii = reader["OreAplicatii"] != DBNull.Value ? Convert.ToDecimal(reader["OreAplicatii"]) : 0m,
+                    OreConv = reader["OreConv"] != DBNull.Value ? Convert.ToDecimal(reader["OreConv"]) : 0m,
+                    Departament = reader["DenumireCatedra"]?.ToString() ?? "",
+                    FormaInv = reader["FormaInv"]?.ToString() ?? ""
                 });
-            }
             return Ok(result);
         }
 
-        [HttpGet("export/norma")]
-        public IActionResult ExportNormaExcel(string? anUniv, string? facultate, string? specializari,
-            string? profesor, int semestru = 0, string tipPost = "Toti",
-            string? formaInvatamant = "Toti", string? departament = "Toti")
+        [HttpGet("export/norma-profesori")]
+        public async Task<IActionResult> ExportNormaProfesori(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] string? specializari,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Profesor"), new DataColumn("Specializare"), new DataColumn("Materie"),
-                new DataColumn("Departament"), new DataColumn("Tip Post"), new DataColumn("Semestru"),
-                new DataColumn("Nr Ore Curs", typeof(double)), new DataColumn("Nr Ore Aplicatii", typeof(double)),
-                new DataColumn("Nr Ore Conventionale", typeof(double)), new DataColumn("Mentiuni")
+                new DataColumn("Profesor"),       new DataColumn("Specializare"),
+                new DataColumn("Materie"),        new DataColumn("Tip Post"),
+                new DataColumn("Sem.", typeof(int)),
+                new DataColumn("Ore Curs",   typeof(decimal)),
+                new DataColumn("Ore Aplic.", typeof(decimal)),
+                new DataColumn("Ore Conv.",  typeof(decimal)),
+                new DataColumn("Departament"),    new DataColumn("Forma Inv.")
             });
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildNormaSql(), conn);
-            cmd.CommandTimeout = 300;
-            AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                long idCat = reader["ID_Catedra"] != DBNull.Value ? Convert.ToInt64(reader["ID_Catedra"]) : 0;
-                dt.Rows.Add(reader["Profesor"], reader["Specializare"], reader["Materie"],
-                    GetDenumireCatedra(idCat), reader["TipPost"], reader["Semestru"],
-                    reader["NrOreCurs"] != DBNull.Value ? Convert.ToDouble(reader["NrOreCurs"]) : 0.0,
-                    reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
-                    reader["NrOreConventionale"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConventionale"]) : 0.0,
-                    reader["SpecCuplate"] != DBNull.Value && !string.IsNullOrEmpty(reader["SpecCuplate"]?.ToString())
-                        ? "Cuplaj cu: " + reader["SpecCuplate"]?.ToString() : "");
-            }
-            string fileName = string.IsNullOrEmpty(profesor) || profesor == "Toti"
-                ? "NormaProfesori_General.xlsx"
-                : $"NormaProfesori_{string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()))}.xlsx";
+            cmd.CommandTimeout = 120;
+            AddBaseParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                dt.Rows.Add(
+                    reader["NumeIntreg"]?.ToString() ?? "",
+                    reader["Specializare"]?.ToString() ?? "",
+                    reader["Materie"]?.ToString() ?? "",
+                    reader["TipPost"]?.ToString() ?? "",
+                    reader["Semestru"] != DBNull.Value ? Convert.ToInt32(reader["Semestru"]) : 0,
+                    reader["OreCurs"] != DBNull.Value ? Convert.ToDecimal(reader["OreCurs"]) : 0m,
+                    reader["OreAplicatii"] != DBNull.Value ? Convert.ToDecimal(reader["OreAplicatii"]) : 0m,
+                    reader["OreConv"] != DBNull.Value ? Convert.ToDecimal(reader["OreConv"]) : 0m,
+                    reader["DenumireCatedra"]?.ToString() ?? "",
+                    reader["FormaInv"]?.ToString() ?? "");
             using var wb = new XLWorkbook();
-            var ws = wb.Worksheets.Add("Norme");
-            ws.Cell(1, 1).Value = "Filtre Aplicate";
+            var ws = wb.Worksheets.Add("Norme Detaliate");
+            ws.Cell(1, 1).Value = $"Detaliere norme | An: {idAn} | Facultate: {facultate ?? "Toti"}";
             ws.Cell(1, 1).Style.Font.Bold = true;
             ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
-            ws.Cell(2, 1).Value = $"An: {anUniv} | Facultate: {facultate} | Departament: {departament}";
-            ws.Cell(3, 1).Value = $"Profesor: {profesor} | Semestru: {(semestru == 0 ? "Toate" : semestru.ToString())} | Tip Post: {tipPost} | Forma Inv: {formaInvatamant}";
-            var tbl = ws.Cell(5, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
+            ws.Range(1, 1, 1, dt.Columns.Count).Merge();
+            ws.Cell(2, 1).Value = "NOTA: Ore Conv. reflecta norma totala din universitate, independent de filtrele aplicate.";
+            ws.Cell(2, 1).Style.Font.Italic = true;
+            ws.Cell(2, 1).Style.Font.FontColor = XLColor.Gray;
+            ws.Range(2, 1, 2, dt.Columns.Count).Merge();
+            var tbl = ws.Cell(4, 1).InsertTable(dt);
+            tbl.Theme = XLTableTheme.None;
             tbl.ShowTotalsRow = true;
-            tbl.Field("Nr Ore Curs").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Nr Ore Aplicatii").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Nr Ore Conventionale").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Ore Curs").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Ore Aplic.").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Ore Conv.").TotalsRowFunction = XLTotalsRowFunction.Sum;
             tbl.Field("Profesor").TotalsRowLabel = "TOTAL GENERAL";
+            StyleHeader(ws.Range(4, 1, 4, dt.Columns.Count));
             ws.Columns().AdjustToContents();
-            StyleHeader(ws.Range(5, 1, 5, dt.Columns.Count));
             using var stream = new MemoryStream(); wb.SaveAs(stream);
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"NormaDetaliata_{idAn}.xlsx");
         }
 
         #endregion
 
-        #region ================= RAPORT 2: ORE PE PROGRAM =================
+        #region ================= RAPORT 2: ORE PER PROGRAM =================
 
-        private string BuildOreProfProgramSql()
-        {
-            return BaseDataSql + @",
-            TotalAbsolutProfesor AS (
-                -- Norma totala din universitate: ignora @fac/@dept/@specs/@tipPost
-                -- Aplica DOAR @an si @semestru
-                SELECT bd.NumeIntreg, SUM(bd.OreConvLinie) AS TotalAbsolut
-                FROM BaseData bd
-                WHERE (@an='Toti' OR bd.AnCurat=@an)
-                  AND (@semestru=0 OR bd.Semestru=@semestru)
-                GROUP BY bd.NumeIntreg
-            ),
-            FiltratRaw AS (
-                SELECT bd.NumeIntreg, bd.ID_Profesor, bd.SpecializareCurata, bd.NumeSpecOriginal,
-                       bd.DenumireMaterie, bd.TipPost, bd.Semestru, bd.ID_StatDeFunctii,
-                       bd.OreCursLinie, bd.OreAplicatiiLinie, bd.OreConvLinie
-                FROM BaseData bd
-                WHERE (@an='Toti'       OR bd.AnCurat=@an)
-                  AND (@fac='Toti'      OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-                  AND (@prof='Toti'     OR bd.NumeIntreg=@prof)
-                  AND (@formaInv='Toti' OR bd.FormaInv=@formaInv)
-                  AND (@specs='Toti'    OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-                  AND (@semestru=0      OR bd.Semestru=@semestru)
-                  AND (@tipPost='Toti'  OR bd.TipPost=@tipPost)
-                  AND (@dept='Toti'     OR bd.ID_Catedra IN (SELECT value FROM STRING_SPLIT(@deptIds,',')))
-            ),
-            Agregat2 AS (
-                SELECT NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru,
+        private string BuildOreProfProgramSql() => BaseDataSql + @",
+            OreProgram AS (
+                SELECT NumeIntreg, ID_Profesor, SpecializareCurata,
+                       DenumireMaterie, Semestru, TipPost,
+                       MAX(OreConvLinie)      AS OreConv,
                        MAX(OreCursLinie)      AS OreCurs,
-                       SUM(OreAplicatiiLinie) AS OreAplicatii,
-                       MAX(OreConvLinie)      AS OreConv
-                FROM FiltratRaw
-                GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, TipPost, Semestru
+                       MAX(OreAplicatiiLinie) AS OreAplicatii
+                FROM BaseData
+                WHERE (@an       = 'Toti' OR AnCurat = @an)
+                  AND (@fac      = 'Toti' OR FacultateCurata COLLATE DATABASE_DEFAULT
+                                           = @fac             COLLATE DATABASE_DEFAULT)
+                  AND (@prof     = 'Toti' OR NumeIntreg = @prof)
+                  AND (@formaInv = 'Toti' OR FormaInv   COLLATE DATABASE_DEFAULT
+                                           = @formaInv   COLLATE DATABASE_DEFAULT)
+                  AND (@specs    = 'Toti' OR SpecializareCurata IN
+                       (SELECT UPPER(LTRIM(RTRIM(value))) FROM STRING_SPLIT(@specs, ',')))
+                  AND (@semestru = 0 OR Semestru = @semestru)
+                  AND (@tipPost  = 'Toti' OR TipPost = @tipPost)
+                  AND (@dept     = 'Toti' OR DenumireCatedra COLLATE DATABASE_DEFAULT
+                                           = @dept            COLLATE DATABASE_DEFAULT)
+                GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata, DenumireMaterie, Semestru, TipPost
             ),
-            CuplajeProg AS (
-                SELECT a.NumeIntreg, a.ID_Profesor, a.DenumireMaterie, a.TipPost, a.Semestru,
-                       MIN(a.SpecializareCurata) AS SpecPrimara,
-                       MAX(a.OreCurs)            AS OreCursMax,
-                       SUM(a.OreAplicatii)       AS OreAplicatiiMax,
-                       MAX(a.OreConv)            AS OreConvMax
-                FROM Agregat2 a
-                GROUP BY a.NumeIntreg, a.ID_Profesor, a.DenumireMaterie, a.TipPost, a.Semestru
-            ),
-            Dedup AS (
-                SELECT cp.NumeIntreg, cp.ID_Profesor, cp.SpecPrimara AS SpecializareCurata,
-                       cp.OreCursMax AS OreCurs, cp.OreAplicatiiMax AS OreAplicatii, cp.OreConvMax AS OreConv
-                FROM CuplajeProg cp
-            ),
-            Filtrat AS (
+            AgregatProgram AS (
                 SELECT NumeIntreg, ID_Profesor, SpecializareCurata AS ProgramStudiu,
                        SUM(OreConv)      AS OreConvProgram,
                        SUM(OreCurs)      AS OreCursProgram,
                        SUM(OreAplicatii) AS OreAplicatiiProgram
-                FROM Dedup
+                FROM OreProgram
                 GROUP BY NumeIntreg, ID_Profesor, SpecializareCurata
                 HAVING SUM(OreConv) > 0
+            ),
+            TotalProfesor AS (
+                SELECT NumeIntreg, SUM(OreConvProgram) AS TotalPost
+                FROM AgregatProgram GROUP BY NumeIntreg
             )
-            SELECT f.NumeIntreg                                    AS Profesor,
-                   f.ID_Profesor,
-                   ISNULL(f.ProgramStudiu,'Nespecificat')          AS ProgramStudiu,
-                   ISNULL(f.OreConvProgram,0)                     AS NrOreConv,
-                   ISNULL(f.OreCursProgram,0)                     AS NrOreCurs,
-                   ISNULL(f.OreAplicatiiProgram,0)                AS NrOreAplicatii,
-                   ISNULL(tap.TotalAbsolut,0)                     AS TotalPost,
-                   CAST(CASE WHEN ISNULL(tap.TotalAbsolut,0)=0 THEN 0
-                             ELSE (ISNULL(f.OreConvProgram,0)/tap.TotalAbsolut)*100
-                        END AS DECIMAL(10,2))                     AS ProcentPost
-            FROM Filtrat f
-            LEFT JOIN TotalAbsolutProfesor tap ON tap.NumeIntreg = f.NumeIntreg
-            ORDER BY f.NumeIntreg, f.OreConvProgram DESC
+            SELECT a.NumeIntreg                                              AS Profesor,
+                   ISNULL(a.ProgramStudiu, 'Nespecificat')                   AS ProgramStudiu,
+                   CAST(a.OreConvProgram      AS DECIMAL(10,2))              AS NrOreConv,
+                   CAST(a.OreCursProgram      AS DECIMAL(10,2))              AS NrOreCurs,
+                   CAST(a.OreAplicatiiProgram AS DECIMAL(10,2))              AS NrOreAplicatii,
+                   CAST(t.TotalPost           AS DECIMAL(10,2))              AS TotalPost,
+                   CAST(CASE WHEN ISNULL(t.TotalPost,0)=0 THEN 0
+                             ELSE (a.OreConvProgram/t.TotalPost)*100
+                        END AS DECIMAL(10,2))                                AS ProcentPost
+            FROM AgregatProgram a
+            LEFT JOIN TotalProfesor t ON t.NumeIntreg = a.NumeIntreg
+            ORDER BY a.NumeIntreg, a.OreConvProgram DESC
             OPTION (RECOMPILE)";
-        }
 
         [HttpGet("ore-profesor-program")]
         public async Task<IActionResult> GetOreProfProgram(
-            string? anUniv = "Toti", string? facultate = "Toti",
-            string? specializari = "Toti", string? profesor = "Toti",
-            int semestru = 0, string tipPost = "Toti",
-            string? formaInvatamant = "Toti", string? departament = "Toti")
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? specializari, [FromQuery] string? profesor,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] string? departament = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildOreProfProgramSql(), conn);
             cmd.CommandTimeout = 120;
-            AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
+            AddBaseParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 result.Add(new
                 {
                     Profesor = reader["Profesor"]?.ToString() ?? "",
                     ProgramStudiu = reader["ProgramStudiu"]?.ToString() ?? "",
-                    NrOreConv = reader["NrOreConv"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConv"]) : 0.0,
-                    NrOreCurs = reader["NrOreCurs"] != DBNull.Value ? Convert.ToDouble(reader["NrOreCurs"]) : 0.0,
-                    NrOreAplicatii = reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
-                    TotalPost = reader["TotalPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalPost"]) : 0.0,
-                    ProcentPost = reader["ProcentPost"] != DBNull.Value ? Convert.ToDouble(reader["ProcentPost"]) : 0.0
+                    OreConvProgram = reader["NrOreConv"] != DBNull.Value ? Convert.ToDecimal(reader["NrOreConv"]) : 0m,
+                    TotalPost = reader["TotalPost"] != DBNull.Value ? Convert.ToDecimal(reader["TotalPost"]) : 0m,
+                    ProcentPost = reader["ProcentPost"] != DBNull.Value ? Convert.ToDecimal(reader["ProcentPost"]) : 0m
                 });
             return Ok(result);
         }
 
         [HttpGet("export/ore-program")]
         public async Task<IActionResult> ExportOreProgramExcel(
-            string? anUniv = "Toti", string? facultate = "Toti",
-            string? specializari = "Toti", string? profesor = "Toti",
-            int semestru = 0, string tipPost = "Toti",
-            string? formaInvatamant = "Toti", string? departament = "Toti")
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? specializari, [FromQuery] string? profesor,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] string? departament = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Profesor"),
-                new DataColumn("Program Studiu"),
-                new DataColumn("Nr Ore Curs",       typeof(double)),
-                new DataColumn("Nr Ore Aplicatii",  typeof(double)),
-                new DataColumn("Nr Ore Conv",       typeof(double)),
-                new DataColumn("Total Norma Univ.", typeof(double)),
-                new DataColumn("Procent Post",      typeof(double))
+                new DataColumn("Profesor"),        new DataColumn("Program Studiu"),
+                new DataColumn("Ore Conv.",  typeof(decimal)),
+                new DataColumn("Total Post", typeof(decimal)),
+                new DataColumn("Procent %",  typeof(decimal))
             });
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildOreProfProgramSql(), conn);
             cmd.CommandTimeout = 120;
-            AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
+            AddBaseParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 dt.Rows.Add(
                     reader["Profesor"]?.ToString() ?? "",
                     reader["ProgramStudiu"]?.ToString() ?? "",
-                    reader["NrOreCurs"] != DBNull.Value ? Convert.ToDouble(reader["NrOreCurs"]) : 0.0,
-                    reader["NrOreAplicatii"] != DBNull.Value ? Convert.ToDouble(reader["NrOreAplicatii"]) : 0.0,
-                    reader["NrOreConv"] != DBNull.Value ? Convert.ToDouble(reader["NrOreConv"]) : 0.0,
-                    reader["TotalPost"] != DBNull.Value ? Convert.ToDouble(reader["TotalPost"]) : 0.0,
-                    reader["ProcentPost"] != DBNull.Value ? Convert.ToDouble(reader["ProcentPost"]) : 0.0);
-            string fileName = string.IsNullOrEmpty(profesor) || profesor == "Toti"
-                ? "StatisticaOre_General.xlsx"
-                : $"StatisticaOre_{string.Join("_", profesor.Split(Path.GetInvalidFileNameChars()))}.xlsx";
+                    reader["NrOreConv"] != DBNull.Value ? Convert.ToDecimal(reader["NrOreConv"]) : 0m,
+                    reader["TotalPost"] != DBNull.Value ? Convert.ToDecimal(reader["TotalPost"]) : 0m,
+                    reader["ProcentPost"] != DBNull.Value ? Convert.ToDecimal(reader["ProcentPost"]) : 0m);
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Distributie Ore");
-            ws.Cell(1, 1).Value = $"An: {anUniv} | Facultate: {facultate} | Profesor: {profesor}";
-            ws.Cell(1, 1).Style.Font.Bold = true;
-            ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
-            ws.Cell(2, 1).Value = "NOTA: 'Total Norma Univ.' si 'Procent Post' reflecta norma totala din universitate, independent de filtrele de Facultate/Departament/Specializare.";
-            ws.Cell(2, 1).Style.Font.Italic = true;
-            ws.Cell(2, 1).Style.Font.FontColor = XLColor.Gray;
-            var tbl = ws.Cell(4, 1).InsertTable(dt);
-            tbl.Theme = XLTableTheme.None;
+            var tbl = ws.Cell(1, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
             tbl.ShowTotalsRow = true;
-            tbl.Field("Nr Ore Curs").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Nr Ore Aplicatii").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Nr Ore Conv").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Ore Conv.").TotalsRowFunction = XLTotalsRowFunction.Sum;
             tbl.Field("Profesor").TotalsRowLabel = "TOTAL GENERAL";
+            StyleHeader(ws.Range(1, 1, 1, dt.Columns.Count));
             ws.Columns().AdjustToContents();
-            StyleHeader(ws.Range(4, 1, 4, dt.Columns.Count));
-            using var stream = new MemoryStream();
-            wb.SaveAs(stream);
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            using var stream = new MemoryStream(); wb.SaveAs(stream);
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"OreProgram_{idAn}.xlsx");
         }
 
         #endregion
 
-        // ==================== SFARSIT JUMATATE 1 ====================
-        // Continua in RapoarteController_part2.cs de la: #region RAPORT 3
-        // ==================== JUMATATEA 2 ====================
-        // Lipeste DUPA continutul din part1, inlocuind comentariul "TAIATURA"
-        // Aceasta parte incepe cu #region RAPORT 3 si se termina cu closing brace al clasei
-
         #region ================= RAPORT 3: NORME TOTALURI =================
 
-        private string BuildNormaTotaluriSql()
-        {
-            return @"
-            WITH VcmDedup3 AS (
-                SELECT DISTINCT
-                    ID_Profesor,
-                    CASE ID_Profesor
-                        WHEN 5665 THEN 'TOHANEAN DRAGOS Ioan - EFS'
-                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
-                        ELSE NumeIntregProfesor
-                    END AS NumeIntregProfesor,
-                    ID_AnUniv, ID_StatDeFunctii,
-                    DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
-                    NrOreConventionale, DenumireFacultate, StatDeFunctiiID_Catedra
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor]
-                WHERE ID_AnUniv = 45
-            ),
-            ProfDept3 AS (
-                SELECT ID_Profesor,
-                       MIN(DenumireCatedra)   AS DeptProfesor,
-                       MIN(DenumireFacultate) AS FacProfesor
-                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
-                WHERE ID_AnUnivCatedra = 45
-                GROUP BY ID_Profesor
+        private string BuildNormaTotaluriSql() => @"
+            WITH ProfDept AS (
+                SELECT p.ID_Profesor,
+                       MIN(p.DenumireCatedra)   AS DeptProfesor,
+                       MIN(p.DenumireFacultate) AS FacProfesor
+                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
+                WHERE p.ID_AnUnivCatedra = @ID_AnUniv
+                GROUP BY p.ID_Profesor
             ),
             DateBrute AS (
                 SELECT
-                    vcm.NumeIntregProfesor                                              AS NumeComplet,
-                    vcm.ID_Profesor,
-                    ISNULL(pd.DeptProfesor,  'Nespecificat')                            AS Departament,
-                    ISNULL(pd.FacProfesor,   'Nespecificat')                            AS Facultate,
-                    CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))             AS OreConv,
-                    ISNULL(vcm.DenumireMaterie,'Nedefinit')                              AS DenumireMaterie,
-                    ISNULL(vcm.NrSemestruDinAn,0)                                       AS Semestru,
-                    vcm.ID_StatDeFunctii,
-                    CASE
-                        WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
-                             THEN 'Titular'
-                        ELSE 'Suplinitor'
-                    END AS TipPost,
-                    CASE
-                        WHEN vcm.DenumireSpecializare LIKE '%-IFR%' OR vcm.DenumireSpecializare LIKE '% IFR%' THEN 'IFR'
-                        WHEN vcm.DenumireSpecializare LIKE '%-ID%'  OR vcm.DenumireSpecializare LIKE '% ID%'  THEN 'ID'
-                        ELSE 'IF'
-                    END AS FormaInv
-                FROM VcmDedup3 vcm
-                INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv = au.ID_AnUniv
-                LEFT JOIN (
-                    SELECT DISTINCT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
-                           NrSemestruDinAn, DenTitularSauSuplinitor
-                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
-                ) sf
-                    ON sf.ID_StatDeFunctii    = vcm.ID_StatDeFunctii
-                    AND sf.ID_AnUniv          = vcm.ID_AnUniv
-                    AND sf.DenumireSpecializare = vcm.DenumireSpecializare
-                    AND sf.DenumireMaterie     = vcm.DenumireMaterie
-                    AND sf.NrSemestruDinAn     = vcm.NrSemestruDinAn
-                LEFT JOIN ProfDept3 pd ON pd.ID_Profesor = vcm.ID_Profesor
-                WHERE (@an='Toti'   OR UPPER(LTRIM(RTRIM(au.Denumire))) = @an)
-                  AND (@fac='Toti'  OR ISNULL(pd.FacProfesor,'') COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-                  AND (@prof='Toti' OR vcm.NumeIntregProfesor = @prof)
-                  AND (@dept='Toti' OR ISNULL(pd.DeptProfesor,'') COLLATE Latin1_General_CI_AI = @dept COLLATE Latin1_General_CI_AI)
+                    ppm.NumeIntreg                                                  AS NumeComplet,
+                    ppm.ID_Profesor,
+                    ISNULL(pd.DeptProfesor, 'Nespecificat')                         AS Departament,
+                    ISNULL(pd.FacProfesor,  'Nespecificat')                         AS Facultate,
+                    ppm.ID_TipGradDidacticPost                                      AS ID_TipGrad,
+                    CAST(ISNULL(ppm.NrOreConventionale, 0) AS DECIMAL(10,4))        AS OreConv,
+                    ppm.DenumireMaterie,
+                    ISNULL(ppm.NrSemestruDinAn, 0)                                  AS Semestru,
+                    CASE WHEN ppm.TitularSauSuplinitor = 1 THEN 'Titular' ELSE 'Suplinitor' END AS TipPost,
+                    -- FormaInv din coloana BD, nu din LIKE pe spec (metadata-driven)
+                    LTRIM(RTRIM(ISNULL(ppm.DenumireFormaInv, 'IF')))               AS FormaInv
+                FROM [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
+                LEFT JOIN ProfDept pd ON pd.ID_Profesor = ppm.ID_Profesor
+                INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON ppm.ID_AnUniv = au.ID_AnUniv
+                WHERE ppm.ID_AnUniv = @ID_AnUniv
+                  AND (@an   = 'Toti' OR UPPER(LTRIM(RTRIM(au.Denumire))) = @an)
+                  AND (@fac  = 'Toti' OR ISNULL(pd.FacProfesor,  '') COLLATE DATABASE_DEFAULT
+                                       = @fac                          COLLATE DATABASE_DEFAULT)
+                  AND (@prof = 'Toti' OR ppm.NumeIntreg = @prof)
+                  AND (@dept = 'Toti' OR ISNULL(pd.DeptProfesor, '') COLLATE DATABASE_DEFAULT
+                                       = @dept                         COLLATE DATABASE_DEFAULT)
             ),
             Dedup AS (
                 SELECT NumeComplet, ID_Profesor, TipPost, FormaInv,
                        DenumireMaterie, Semestru,
                        MAX(OreConv)     AS OreConvDedup,
                        MAX(Departament) AS Departament,
-                       MAX(Facultate)   AS Facultate
+                       MAX(Facultate)   AS Facultate,
+                       MAX(ID_TipGrad)  AS ID_TipGrad
                 FROM DateBrute
                 GROUP BY NumeComplet, ID_Profesor, TipPost, FormaInv, DenumireMaterie, Semestru
             ),
             Agreg AS (
-                SELECT NumeComplet, ID_Profesor,
-                       MAX(Departament) AS Departament,
-                       MAX(Facultate)   AS Facultate,
-                       TipPost,
-                       CAST(ISNULL(SUM(CASE WHEN FormaInv='IF'  THEN OreConvDedup ELSE 0 END),0) AS DECIMAL(10,2)) AS OreIF,
-                       CAST(ISNULL(SUM(CASE WHEN FormaInv='ID'  THEN OreConvDedup ELSE 0 END),0) AS DECIMAL(10,2)) AS OreID,
-                       CAST(ISNULL(SUM(CASE WHEN FormaInv='IFR' THEN OreConvDedup ELSE 0 END),0) AS DECIMAL(10,2)) AS OreIFR,
-                       CAST(ISNULL(SUM(OreConvDedup),0) AS DECIMAL(10,2))                                           AS TotalOreConv
+                SELECT NumeComplet, ID_Profesor, MAX(Departament) AS Departament,
+                       MAX(Facultate) AS Facultate, MAX(ID_TipGrad) AS ID_TipGrad, TipPost,
+                       -- Sumele pe FormaInv vin din metadata BD (DenumireFormaInv normalizat)
+                       CAST(ISNULL(SUM(CASE WHEN FormaInv LIKE '%IF%'  AND FormaInv NOT LIKE '%IFR%'
+                                            THEN OreConvDedup ELSE 0 END), 0) AS DECIMAL(10,2)) AS OreIF,
+                       CAST(ISNULL(SUM(CASE WHEN FormaInv LIKE '%ID%'  AND FormaInv NOT LIKE '%IFR%'
+                                            THEN OreConvDedup ELSE 0 END), 0) AS DECIMAL(10,2)) AS OreID,
+                       CAST(ISNULL(SUM(CASE WHEN FormaInv LIKE '%IFR%'
+                                            THEN OreConvDedup ELSE 0 END), 0) AS DECIMAL(10,2)) AS OreIFR,
+                       CAST(ISNULL(SUM(OreConvDedup), 0) AS DECIMAL(10,2))                       AS TotalOreConv
                 FROM Dedup
                 GROUP BY NumeComplet, ID_Profesor, TipPost
+            ),
+            Norme AS (
+                -- Norme din BD — fara fallback hardcodat in SQL
+                SELECT ID_TipGradDidactic, NrOreConventionaleTitular AS Norma
+                FROM [AGSIS].[pi].[NormaOreConventionale]
+                WHERE ID_AnUniv = @ID_AnUniv
+                  AND NrOreConventionaleTitular IS NOT NULL
+                  AND NrOreConventionaleTitular > 0
             )
-            SELECT NumeComplet, ID_Profesor, Departament, Facultate, TipPost,
-                   OreIF, OreID, OreIFR, TotalOreConv,
-                   CAST(TotalOreConv * 14 AS DECIMAL(10,2)) AS TotalAnual
-            FROM Agreg
-            ORDER BY NumeComplet, TipPost DESC";
-        }
+            SELECT ag.NumeComplet, ag.ID_Profesor, ag.Departament, ag.Facultate, ag.TipPost,
+                   ag.OreIF, ag.OreID, ag.OreIFR, ag.TotalOreConv,
+                   -- TotalAnual = TotalOreConv * Norma din BD (NULL daca gradul nu are norma)
+                   CAST(ag.TotalOreConv * n.Norma AS DECIMAL(10,2)) AS TotalAnual,
+                   n.Norma                                            AS NormaLegala
+            FROM Agreg ag
+            LEFT JOIN Norme n ON n.ID_TipGradDidactic = ag.ID_TipGrad
+            ORDER BY ag.NumeComplet, ag.TipPost DESC";
 
         [HttpGet("norma-totaluri")]
-        public async Task<IActionResult> GetNormaTotaluri(string? anUniv, string? facultate, string? departament, string? profesor)
+        public async Task<IActionResult> GetNormaTotaluri(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildNormaTotaluriSql(), conn);
             cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
-            cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@an", SqlDbType.NVarChar, 200) { Value = anUniv ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@prof", SqlDbType.NVarChar, 200) { Value = profesor ?? "Toti" });
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 result.Add(new
                 {
-                    Profesor = FixNume(reader["NumeComplet"]?.ToString(), reader["ID_Profesor"]),
+                    Profesor = reader["NumeComplet"]?.ToString() ?? "",
                     Departament = reader["Departament"]?.ToString() ?? "",
                     Facultate = reader["Facultate"]?.ToString() ?? "",
                     TipNorma = reader["TipPost"]?.ToString() ?? "",
@@ -1133,219 +932,197 @@ namespace LicentaV1.Controllers
                     OreID = reader["OreID"] != DBNull.Value ? Convert.ToDecimal(reader["OreID"]) : 0m,
                     OreIFR = reader["OreIFR"] != DBNull.Value ? Convert.ToDecimal(reader["OreIFR"]) : 0m,
                     TotalOreConv = reader["TotalOreConv"] != DBNull.Value ? Convert.ToDecimal(reader["TotalOreConv"]) : 0m,
-                    TotalAnualOreConv = reader["TotalAnual"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAnual"]) : 0m
+                    TotalAnual = reader["TotalAnual"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAnual"]) : 0m,
+                    NormaLegala = reader["NormaLegala"] != DBNull.Value ? (decimal?)Convert.ToDecimal(reader["NormaLegala"]) : null
                 });
             return Ok(result);
         }
 
         [HttpGet("export/norma-totaluri")]
-        public async Task<IActionResult> ExportNormaTotaluri(string? anUniv, string? facultate, string? departament, string? profesor)
+        public async Task<IActionResult> ExportNormaTotaluri(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Profesor"), new DataColumn("Departament"), new DataColumn("Facultate"),
-                new DataColumn("Tip Norma"),
-                new DataColumn("Ore IF",            typeof(decimal)), new DataColumn("Ore ID",            typeof(decimal)),
-                new DataColumn("Ore IFR",           typeof(decimal)), new DataColumn("Total Ore Conv.",   typeof(decimal)),
-                new DataColumn("Total Anual (x14)", typeof(decimal))
+                new DataColumn("Profesor"),       new DataColumn("Departament"),
+                new DataColumn("Facultate"),      new DataColumn("Tip Post"),
+                new DataColumn("Norma Legala", typeof(decimal)),
+                new DataColumn("Ore IF",    typeof(decimal)), new DataColumn("Ore ID",    typeof(decimal)),
+                new DataColumn("Ore IFR",   typeof(decimal)),
+                new DataColumn("Total Ore Conv.", typeof(decimal)),
+                new DataColumn("Total Anual",     typeof(decimal))
             });
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildNormaTotaluriSql(), conn);
             cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
-            cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@an", SqlDbType.NVarChar, 200) { Value = anUniv ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@prof", SqlDbType.NVarChar, 200) { Value = profesor ?? "Toti" });
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 dt.Rows.Add(
-                    FixNume(reader["NumeComplet"]?.ToString(), reader["ID_Profesor"]),
+                    reader["NumeComplet"]?.ToString() ?? "",
                     reader["Departament"]?.ToString() ?? "",
                     reader["Facultate"]?.ToString() ?? "",
                     reader["TipPost"]?.ToString() ?? "",
+                    reader["NormaLegala"] != DBNull.Value ? Convert.ToDecimal(reader["NormaLegala"]) : DBNull.Value,
                     reader["OreIF"] != DBNull.Value ? Convert.ToDecimal(reader["OreIF"]) : 0m,
                     reader["OreID"] != DBNull.Value ? Convert.ToDecimal(reader["OreID"]) : 0m,
                     reader["OreIFR"] != DBNull.Value ? Convert.ToDecimal(reader["OreIFR"]) : 0m,
                     reader["TotalOreConv"] != DBNull.Value ? Convert.ToDecimal(reader["TotalOreConv"]) : 0m,
-                    reader["TotalAnual"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAnual"]) : 0m);
+                    reader["TotalAnual"] != DBNull.Value ? Convert.ToDecimal(reader["TotalAnual"]) : DBNull.Value);
             using var wb = new XLWorkbook();
-            var ws = wb.Worksheets.Add("Totaluri Norme");
+            var ws = wb.Worksheets.Add("Norme Totaluri");
             var tbl = ws.Cell(1, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
             tbl.ShowTotalsRow = true;
-            tbl.Field("Ore IF").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Ore ID").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Ore IFR").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Total Ore Conv.").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Total Anual (x14)").TotalsRowFunction = XLTotalsRowFunction.Sum;
+            foreach (var col in new[] { "Ore IF", "Ore ID", "Ore IFR", "Total Ore Conv.", "Total Anual" })
+                tbl.Field(col).TotalsRowFunction = XLTotalsRowFunction.Sum;
             tbl.Field("Profesor").TotalsRowLabel = "TOTAL GENERAL";
-            ws.Columns().AdjustToContents();
             StyleHeader(ws.Range(1, 1, 1, dt.Columns.Count));
+            ws.Columns().AdjustToContents();
             using var stream = new MemoryStream(); wb.SaveAs(stream);
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Totaluri_Norme.xlsx");
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Totaluri_Norme_{idAn}.xlsx");
         }
 
         #endregion
 
         #region ================= RAPORT 4: LIMBI STRAINE =================
 
-        private string BuildLimbiSql()
-        {
-            return @"
-            WITH DateLimbi AS (
-                SELECT
-                    CASE vcm.ID_Profesor
-                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
-                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
-                        ELSE vcm.NumeIntregProfesor
-                    END                                                                AS NumeComplet,
-                    ISNULL(vcm.DenumireMaterie,'Nedefinit')                            AS DenumireMaterie,
-                    ISNULL(vcm.NrSemestruDinAn,0)                                      AS Semestru,
-                    vcm.ID_StatDeFunctii,
-                    CASE
-                        WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
-                             THEN 'Titular'
-                        ELSE 'Suplinitor'
-                    END AS TipPost,
-                    CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))            AS OreConv,
-                    UPPER(LTRIM(RTRIM(au.Denumire)))                                   AS AnCurat,
-                    LTRIM(RTRIM(ISNULL(vcm.DenumireFacultate,'')))                     AS FacultateCurata,
-                    vcm.DenumireSpecializare                                            AS NumeSpecOriginal,
-                    UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
-                        CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0
-                             THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
-                             ELSE vcm.DenumireSpecializare END,'S','S'),'T','T')))) AS SpecializareCurata
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                INNER JOIN [AGSIS].[dbo].[AnUniversitar] au ON vcm.ID_AnUniv=au.ID_AnUniv
-                LEFT JOIN (
-                    SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie,
-                           NrSemestruDinAn, DenTitularSauSuplinitor
-                    FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
-                ) sf
-                    ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
-                    AND sf.DenumireSpecializare=vcm.DenumireSpecializare
-                    AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                WHERE vcm.ID_AnUniv = 45
-                  AND (@fac='Toti' OR LTRIM(RTRIM(vcm.DenumireFacultate)) COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
-                  AND (@prof='Toti' OR vcm.NumeIntregProfesor=@prof)
-                  AND (@formaInv='Toti' OR vcm.DenumireSpecializare LIKE '% '+@formaInv+'%' OR vcm.DenumireSpecializare LIKE '%-'+@formaInv+'%')
-                  AND (@specs='Toti' OR UPPER(LTRIM(RTRIM(REPLACE(REPLACE(
-                        CASE WHEN CHARINDEX('+',vcm.DenumireSpecializare)>0
-                             THEN LEFT(vcm.DenumireSpecializare,CHARINDEX('+',vcm.DenumireSpecializare)-1)
-                             ELSE vcm.DenumireSpecializare END,'S','S'),'T','T'))))
-                       IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-                  AND (@semestru=0 OR vcm.NrSemestruDinAn=@semestru)
-                  AND (@tipPost='Toti' OR
-                       CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
-                            THEN 'Titular' ELSE 'Suplinitor' END = @tipPost)
-                  -- FIX: filtrul de lb.straina pe FIECARE RAND (specializare) - nu doar pentru includerea profesorului
-                  -- Rândurile de la specializari în română sunt excluse, chiar dacă profesorul
-                  -- predă și la specializări în limbă străină
-                  -- COLLATE Latin1_General_CI_AI: ignoră majuscule SI diacritice
-                  -- (prinde atât 'engleza' cât și 'engleză', 'ENGLEZA', etc.)
-                  AND (vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%englez%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%francez%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%german%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%american%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%chineza%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%chineze%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%(EN)%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%(FR)%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%(G)%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%lb. engl%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%limba engl%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%limba german%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%limba franc%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI LIKE '%in limba engl%'
-                    OR vcm.DenumireSpecializare COLLATE Latin1_General_CI_AI IN (
-                        'Inginerie virtuala in proiectarea autovehiculelor',
-                        'Metode practice integrate in ingineria sistemelor de propulsie',
-                        'Ingineria proceselor de fabricatie avansate',
-                        'Managementul afacerilor industriale si antreprenoriat',
-                        'Inginerie electrica si calculatoare','Sisteme electrice avansate',
-                        'Securitate cibernetica','Informatica aplicata','Tehnologii Internet',
-                        'Cultura si discurs in spatiul anglo american',
-                        'Studii de limba si de cultura franceza',
-                        'Studii de limba si literatura germana din perspectiva interculturala',
-                        'Studii lingvistice pentru comunicare interculturala',
-                        'Traducere si interpretariat din limba franceza in limba romana',
-                        'Studii americane','Performanta umana in antrenamentul sportiv',
-                        'Administrarea afacerilor','Managementul resurselor umane',
-                        'Dezvoltarea afacerilor turistice','Medicina traditionala chineza'))
+        // Sursa oficiala pentru LimbaDePredare: coloana ppm.LimbaDePredare (nu filtre pe denumire materie)
+        private string BuildLimbiSql() => BaseDataSql + @",
+            LimbiBase AS (
+                SELECT DISTINCT
+                    bd.NumeIntreg AS NumeComplet,
+                    bd.DenumireCatedra,
+                    bd.FacultateCurata AS Facultate,
+                    ppm2.LimbaDePredare,
+                    bd.DenumireMaterie,
+                    bd.Semestru,
+                    bd.TipPost,
+                    MAX(bd.OreConvLinie) AS OreConvDedup
+                FROM BaseData bd
+                INNER JOIN [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm2
+                    ON  ppm2.ID_Profesor  = bd.ID_Profesor
+                    AND ppm2.ID_AnUniv    = @ID_AnUniv
+                    AND ppm2.LimbaDePredare IS NOT NULL
+                    AND LTRIM(RTRIM(ppm2.LimbaDePredare)) != ''
+                WHERE (@an       = 'Toti' OR bd.AnCurat = @an)
+                  AND (@fac      = 'Toti' OR bd.FacultateCurata COLLATE DATABASE_DEFAULT
+                                           = @fac                COLLATE DATABASE_DEFAULT)
+                  AND (@prof     = 'Toti' OR bd.NumeIntreg = @prof)
+                  AND (@formaInv = 'Toti' OR bd.FormaInv   COLLATE DATABASE_DEFAULT
+                                           = @formaInv      COLLATE DATABASE_DEFAULT)
+                  AND (@specs    = 'Toti' OR bd.SpecializareCurata IN
+                       (SELECT UPPER(LTRIM(RTRIM(value))) FROM STRING_SPLIT(@specs, ',')))
+                  AND (@semestru = 0 OR bd.Semestru = @semestru)
+                  AND (@tipPost  = 'Toti' OR bd.TipPost = @tipPost)
+                  AND (@dept     = 'Toti' OR bd.DenumireCatedra COLLATE DATABASE_DEFAULT
+                                           = @dept               COLLATE DATABASE_DEFAULT)
+                GROUP BY bd.NumeIntreg, bd.DenumireCatedra, bd.FacultateCurata,
+                         ppm2.LimbaDePredare, bd.DenumireMaterie, bd.Semestru, bd.TipPost
             ),
-            -- FIX DEDUP: păstrăm NumeSpecOriginal în pipeline pentru a nu amesteca ore de la
-            -- specializări diferite (EN vs RO) care au aceeași materie.
-            -- MAX(OreConv) per (profesor, specializare, materie, semestru) elimină duplicatele
-            -- din JOIN-uri multiple, dar menține separarea pe specializare.
-            PreAgreg AS (
-                SELECT NumeComplet, NumeSpecOriginal, DenumireMaterie, Semestru, TipPost,
-                       MAX(OreConv) AS OreConvSpec
-                FROM DateLimbi
-                GROUP BY NumeComplet, NumeSpecOriginal, DenumireMaterie, Semestru, TipPost
-            ),
-            -- Al doilea nivel de dedup: dacă aceeași materie apare la mai multe specializări EN,
-            -- luăm MAX pentru a evita dubla numărare
             Dedup AS (
-                SELECT NumeComplet, DenumireMaterie, Semestru, TipPost,
-                       MAX(OreConvSpec) AS OreConvDedup
-                FROM PreAgreg
-                GROUP BY NumeComplet, DenumireMaterie, Semestru, TipPost
+                SELECT NumeComplet, DenumireMaterie, Semestru, TipPost, LimbaDePredare,
+                       MAX(OreConvDedup) AS OreConvDedup
+                FROM LimbiBase
+                GROUP BY NumeComplet, DenumireMaterie, Semestru, TipPost, LimbaDePredare
             )
             SELECT NumeComplet,
+                   LimbaDePredare,
                    CAST(ROUND(SUM(CASE WHEN Semestru IN (1,3,5,7,9,11) THEN OreConvDedup ELSE 0 END)*14,2) AS DECIMAL(10,2)) AS Sem1,
-                   CAST(ROUND(SUM(CASE WHEN Semestru IN (2,4,6,8,10,12) THEN OreConvDedup ELSE 0 END)*14,2) AS DECIMAL(10,2)) AS Sem2,
-                   CAST(ROUND(SUM(OreConvDedup)*14,2) AS DECIMAL(10,2)) AS Total
+                   CAST(ROUND(SUM(CASE WHEN Semestru IN (2,4,6,8,10,12)THEN OreConvDedup ELSE 0 END)*14,2) AS DECIMAL(10,2)) AS Sem2,
+                   CAST(ROUND(SUM(OreConvDedup)*14, 2) AS DECIMAL(10,2))                                                       AS Total
             FROM Dedup
-            GROUP BY NumeComplet
-            HAVING SUM(OreConvDedup)>0
-            ORDER BY NumeComplet";
+            GROUP BY NumeComplet, LimbaDePredare
+            HAVING SUM(OreConvDedup) > 0
+            ORDER BY LimbaDePredare, NumeComplet";
+
+        private void AddLimbiParams(SqlCommand cmd, int idAn,
+            string? anUniv, string? facultate, string? departament, string? formaInvatamant,
+            string? profesor, string? specializari, int semestru, string? tipPost)
+        {
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@an", SqlDbType.NVarChar, 200) { Value = anUniv ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@formaInv", SqlDbType.NVarChar, 200) { Value = formaInvatamant ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@prof", SqlDbType.NVarChar, 200) { Value = profesor ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@specs", SqlDbType.NVarChar, 2000) { Value = string.IsNullOrWhiteSpace(specializari) ? "Toti" : specializari });
+            cmd.Parameters.Add(new SqlParameter("@semestru", SqlDbType.Int) { Value = semestru });
+            cmd.Parameters.Add(new SqlParameter("@tipPost", SqlDbType.NVarChar, 50) { Value = tipPost ?? "Toti" });
         }
 
         [HttpGet("limbi-straine")]
-        public async Task<IActionResult> GetLimbiStraine(string? anUniv, string? facultate, string? departament,
-            string? profesor, string? specializari, int semestru = 0,
-            string tipPost = "Toti", string? formaInvatamant = "Toti")
+        public async Task<IActionResult> GetLimbiStraine(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] string? specializari,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildLimbiSql(), conn);
             cmd.CommandTimeout = 120;
-            AddLimbiParams(cmd, anUniv, facultate, formaInvatamant, profesor, specializari, semestru, tipPost);
+            AddLimbiParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
             using var reader = await cmd.ExecuteReaderAsync();
             int nr = 1;
             while (await reader.ReadAsync())
                 result.Add(new
                 {
                     NrCrt = nr++,
-                    Profesor = reader["NumeComplet"]?.ToString() ?? "",
-                    TotalSem1 = reader["Sem1"] != DBNull.Value ? Convert.ToDecimal(reader["Sem1"]) : 0m,
-                    TotalSem2 = reader["Sem2"] != DBNull.Value ? Convert.ToDecimal(reader["Sem2"]) : 0m,
+                    NumeIntreg = reader["NumeComplet"]?.ToString() ?? "",
+                    Limba = reader["LimbaDePredare"]?.ToString() ?? "",
+                    OreSem1 = reader["Sem1"] != DBNull.Value ? Convert.ToDecimal(reader["Sem1"]) : 0m,
+                    OreSem2 = reader["Sem2"] != DBNull.Value ? Convert.ToDecimal(reader["Sem2"]) : 0m,
                     Total = reader["Total"] != DBNull.Value ? Convert.ToDecimal(reader["Total"]) : 0m
                 });
             return Ok(result);
         }
 
         [HttpGet("export/limbi-straine")]
-        public async Task<IActionResult> ExportLimbiStraine(string? anUniv, string? facultate, string? departament,
-            string? profesor, string? specializari, int semestru = 0,
-            string tipPost = "Toti", string? formaInvatamant = "Toti")
+        public async Task<IActionResult> ExportLimbiStraine(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] string? specializari,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Nr. Crt.", typeof(int)), new DataColumn("Nume si prenume profesor"),
-                new DataColumn("Total Sem 1", typeof(decimal)), new DataColumn("Total Sem 2", typeof(decimal)),
-                new DataColumn("Total", typeof(decimal))
+                new DataColumn("Nr.",   typeof(int)), new DataColumn("Profesor"),
+                new DataColumn("Limba"),
+                new DataColumn("Sem. 1", typeof(decimal)), new DataColumn("Sem. 2", typeof(decimal)),
+                new DataColumn("Total",  typeof(decimal))
             });
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildLimbiSql(), conn);
             cmd.CommandTimeout = 120;
-            AddLimbiParams(cmd, anUniv, facultate, formaInvatamant, profesor, specializari, semestru, tipPost);
+            AddLimbiParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
             using var reader = await cmd.ExecuteReaderAsync();
             int nr = 1;
             while (await reader.ReadAsync())
-                dt.Rows.Add(nr++, reader["NumeComplet"],
+                dt.Rows.Add(nr++,
+                    reader["NumeComplet"]?.ToString() ?? "",
+                    reader["LimbaDePredare"]?.ToString() ?? "",
                     reader["Sem1"] != DBNull.Value ? Convert.ToDecimal(reader["Sem1"]) : 0m,
                     reader["Sem2"] != DBNull.Value ? Convert.ToDecimal(reader["Sem2"]) : 0m,
                     reader["Total"] != DBNull.Value ? Convert.ToDecimal(reader["Total"]) : 0m);
@@ -1353,955 +1130,388 @@ namespace LicentaV1.Controllers
             var ws = wb.Worksheets.Add("Limbi Straine");
             var tbl = ws.Cell(1, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
             tbl.ShowTotalsRow = true;
-            tbl.Field("Total Sem 1").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Total Sem 2").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Total").TotalsRowFunction = XLTotalsRowFunction.Sum;
-            tbl.Field("Nume si prenume profesor").TotalsRowLabel = "TOTAL GENERAL";
-            ws.Columns().AdjustToContents();
+            foreach (var col in new[] { "Sem. 1", "Sem. 2", "Total" })
+                tbl.Field(col).TotalsRowFunction = XLTotalsRowFunction.Sum;
+            tbl.Field("Profesor").TotalsRowLabel = "TOTAL GENERAL";
             StyleHeader(ws.Range(1, 1, 1, dt.Columns.Count));
+            ws.Columns().AdjustToContents();
             using var stream = new MemoryStream(); wb.SaveAs(stream);
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Raport_Limbi_Straine.xlsx");
-        }
-
-        private void AddLimbiParams(SqlCommand cmd, string? anUniv, string? facultate,
-            string? formaInvatamant, string? profesor, string? specializari, int semestru, string? tipPost)
-        {
-            cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            cmd.Parameters.AddWithValue("@formaInv", formaInvatamant ?? "Toti");
-            cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
-            cmd.Parameters.AddWithValue("@specs", string.IsNullOrWhiteSpace(specializari) ? "Toti" : specializari);
-            cmd.Parameters.AddWithValue("@semestru", semestru);
-            cmd.Parameters.AddWithValue("@tipPost", tipPost ?? "Toti");
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Raport_Limbi_Straine_{idAn}.xlsx");
         }
 
         #endregion
 
         #region ================= RAPORT 5: DISCIPLINE PREDATE =================
 
-        private string BuildDisciplineSql()
-        {
-            return BaseDataSql + @",
+        private string BuildDisciplineSql() => BaseDataSql + @",
             DU AS (
                 SELECT DISTINCT
-                    bd.NumeIntreg, bd.ID_Catedra, bd.ID_Profesor, bd.FormaInv, bd.DenumireMaterie,
-                    bd.OreCursLinie, bd.OreAplicatiiLinie
+                    bd.NumeIntreg, bd.DenumireCatedra, bd.ID_Profesor, bd.FormaInv,
+                    bd.DenumireMaterie, bd.OreCursLinie, bd.OreAplicatiiLinie
                 FROM BaseData bd
-                WHERE (@an='Toti' OR bd.AnCurat=@an)
-                  AND (@fac='Toti' OR bd.FacultateCurata COLLATE Latin1_General_CI_AI = @fac COLLATE Latin1_General_CI_AI)
-                  AND (@prof='Toti' OR bd.NumeIntreg=@prof)
-                  AND (@formaInv='Toti' OR bd.FormaInv=@formaInv)
-                  AND (@specs='Toti' OR bd.SpecializareCurata IN (SELECT value FROM STRING_SPLIT(@specs,',')))
-                  AND (@semestru=0 OR bd.Semestru=@semestru)
-                  AND (@tipPost='Toti' OR bd.TipPost=@tipPost)
+                WHERE (@an       = 'Toti' OR bd.AnCurat = @an)
+                  AND (@fac      = 'Toti' OR bd.FacultateCurata COLLATE DATABASE_DEFAULT
+                                           = @fac                COLLATE DATABASE_DEFAULT)
+                  AND (@prof     = 'Toti' OR bd.NumeIntreg = @prof)
+                  AND (@formaInv = 'Toti' OR bd.FormaInv   COLLATE DATABASE_DEFAULT
+                                           = @formaInv      COLLATE DATABASE_DEFAULT)
+                  AND (@specs    = 'Toti' OR bd.SpecializareCurata IN
+                       (SELECT UPPER(LTRIM(RTRIM(value))) FROM STRING_SPLIT(@specs, ',')))
+                  AND (@semestru = 0 OR bd.Semestru = @semestru)
+                  AND (@tipPost  = 'Toti' OR bd.TipPost = @tipPost)
+                  AND (@dept     = 'Toti' OR bd.DenumireCatedra COLLATE DATABASE_DEFAULT
+                                           = @dept               COLLATE DATABASE_DEFAULT)
             ),
-            DU_TipActivitate AS (
-                -- Agregam tipul activitatii per materie+forma: Curs si/sau Seminar/Lab/Proiect
+            DU_Tip AS (
                 SELECT NumeIntreg, FormaInv, DenumireMaterie,
                        MAX(OreCursLinie)      AS MaxCurs,
                        MAX(OreAplicatiiLinie) AS MaxAplicatii,
-                       MIN(ID_Catedra)        AS ID_Catedra,
+                       MIN(DenumireCatedra)   AS DenumireCatedra,
                        MAX(ID_Profesor)       AS ID_Profesor
-                FROM DU
-                GROUP BY NumeIntreg, FormaInv, DenumireMaterie
+                FROM DU GROUP BY NumeIntreg, FormaInv, DenumireMaterie
             ),
             Prof AS (
-                SELECT NumeIntreg, MIN(ID_Catedra) AS ID_Catedra,
+                SELECT NumeIntreg, MIN(DenumireCatedra) AS DenumireCatedra,
                        MAX(ID_Profesor) AS ID_Profesor, FormaInv
-                FROM DU_TipActivitate
-                GROUP BY NumeIntreg, FormaInv
+                FROM DU_Tip GROUP BY NumeIntreg, FormaInv
             )
-            SELECT p.NumeIntreg, p.ID_Catedra, p.ID_Profesor, p.FormaInv,
+            SELECT p.NumeIntreg, p.DenumireCatedra AS Departament, p.ID_Profesor, p.FormaInv,
                    STUFF((
-                       SELECT ', ' + d2.DenumireMaterie
-                           + ' ('
+                       SELECT N', ' + CAST(d2.DenumireMaterie AS NVARCHAR(MAX))
+                           + N' ('
                            + STUFF(
-                               CASE WHEN d2.MaxCurs      > 0 THEN ', Curs'      ELSE '' END
-                             + CASE WHEN d2.MaxAplicatii > 0 THEN ', Seminar/Lab' ELSE '' END
-                             , 1, 2, '')
-                           + ')'
-                       FROM DU_TipActivitate d2
-                       WHERE d2.NumeIntreg=p.NumeIntreg AND d2.FormaInv=p.FormaInv
+                               CASE WHEN d2.MaxCurs      > 0 THEN N', Curs'        ELSE N'' END
+                             + CASE WHEN d2.MaxAplicatii > 0 THEN N', Seminar/Lab' ELSE N'' END,
+                             1, 2, N'')
+                           + N')'
+                       FROM DU_Tip d2
+                       WHERE d2.NumeIntreg COLLATE DATABASE_DEFAULT = p.NumeIntreg COLLATE DATABASE_DEFAULT
+                         AND d2.FormaInv   COLLATE DATABASE_DEFAULT = p.FormaInv   COLLATE DATABASE_DEFAULT
                        ORDER BY d2.DenumireMaterie
-                       FOR XML PATH(''),TYPE
-                   ).value('.','NVARCHAR(MAX)'),1,2,'') AS Discipline
+                       FOR XML PATH(''), TYPE
+                   ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS Discipline
             FROM Prof p
             ORDER BY p.FormaInv, p.NumeIntreg";
-        }
 
         [HttpGet("discipline-predate")]
-        public ActionResult GetDisciplinePredate(string? anUniv, string? facultate, string? departament,
-            string? profesor, string? specializari, int semestru = 0,
-            string tipPost = "Toti", string? formaInvatamant = "Toti")
+        public async Task<IActionResult> GetDisciplinePredate(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] string? specializari,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildDisciplineSql(), conn);
             cmd.CommandTimeout = 180;
-            AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                long idCat = reader["ID_Catedra"] != DBNull.Value ? Convert.ToInt64(reader["ID_Catedra"]) : 0;
+            AddBaseParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
                 result.Add(new
                 {
-                    Profesor = FixNume(reader["NumeIntreg"]?.ToString(), reader["ID_Profesor"]),
-                    Departament = GetDenumireCatedra(idCat),
+                    Profesor = reader["NumeIntreg"]?.ToString() ?? "",
+                    Departament = reader["Departament"]?.ToString() ?? "",
                     FormaInvatamant = reader["FormaInv"]?.ToString() ?? "",
                     Discipline = reader["Discipline"]?.ToString() ?? ""
                 });
-            }
             return Ok(result);
         }
 
         [HttpGet("export/discipline-predate")]
-        public IActionResult ExportDisciplinePredate(string? anUniv, string? facultate, string? departament,
-            string? profesor, string? specializari, int semestru = 0,
-            string tipPost = "Toti", string? formaInvatamant = "Toti")
+        public async Task<IActionResult> ExportDisciplinePredate(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] string? profesor,
+            [FromQuery] string? specializari,
+            [FromQuery] int semestru = 0,
+            [FromQuery] string tipPost = "Toti",
+            [FromQuery] string? formaInvatamant = "Toti",
+            [FromQuery] int? idAnUniv = null)
         {
-            var datePerForma = new Dictionary<string, DataTable>();
-            foreach (var forma in new[] { "IF", "ID", "IFR" })
-            {
-                var dt = new DataTable();
-                dt.Columns.AddRange(new[] {
-                    new DataColumn("Nr.Crt.", typeof(int)), new DataColumn("Nume si prenume"),
-                    new DataColumn("Departament"), new DataColumn("Discipline Predate")
-                });
-                datePerForma[forma] = dt;
-            }
+            int idAn = idAnUniv ?? _idAnUnivCurent;
+            // Colecteaza toate formele din BD (nu lista statica IF/ID/IFR)
+            var datePerForma = new Dictionary<string, (DataTable Dt, int Nr)>();
             using var conn = new SqlConnection(_connectionString);
-            conn.Open();
+            await conn.OpenAsync();
             using var cmd = new SqlCommand(BuildDisciplineSql(), conn);
             cmd.CommandTimeout = 180;
-            AddBaseParams(cmd, anUniv, facultate, departament, formaInvatamant, profesor, specializari, semestru, tipPost);
-            using var reader = cmd.ExecuteReader();
-            var nrCrt = new Dictionary<string, int> { ["IF"] = 1, ["ID"] = 1, ["IFR"] = 1 };
-            while (reader.Read())
+            AddBaseParams(cmd, idAn, anUniv, facultate, departament, formaInvatamant,
+                profesor, specializari, semestru, tipPost);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                string forma = reader["FormaInv"]?.ToString() ?? "IF";
-                if (!datePerForma.ContainsKey(forma)) forma = "IF";
-                long idCat = reader["ID_Catedra"] != DBNull.Value ? Convert.ToInt64(reader["ID_Catedra"]) : 0;
-                datePerForma[forma].Rows.Add(
-                    nrCrt[forma]++,
-                    FixNume(reader["NumeIntreg"]?.ToString(), reader["ID_Profesor"]),
-                    GetDenumireCatedra(idCat),
+                string forma = reader["FormaInv"]?.ToString() ?? "Necunoscuta";
+                if (!datePerForma.ContainsKey(forma))
+                {
+                    var dt = new DataTable();
+                    dt.Columns.AddRange(new[] {
+                        new DataColumn("Nr.", typeof(int)), new DataColumn("Profesor"),
+                        new DataColumn("Departament"),      new DataColumn("Discipline Predate")
+                    });
+                    datePerForma[forma] = (dt, 1);
+                }
+                var (table, nr) = datePerForma[forma];
+                table.Rows.Add(nr, reader["NumeIntreg"]?.ToString() ?? "",
+                    reader["Departament"]?.ToString() ?? "",
                     reader["Discipline"]?.ToString() ?? "");
+                datePerForma[forma] = (table, nr + 1);
             }
+
             using var memZip = new MemoryStream();
-            using (var archive = new ZipArchive(memZip, ZipArchiveMode.Create, true))
+            using (var archive = new ZipArchive(memZip, ZipArchiveMode.Create, leaveOpen: true))
             {
+                if (datePerForma.Count == 0)
+                {
+                    var re = archive.CreateEntry("README.txt");
+                    using var rw = new StreamWriter(re.Open());
+                    await rw.WriteAsync($"Nu exista date pentru parametrii selectati (An: {idAn}).");
+                }
                 foreach (var kvp in datePerForma)
                 {
-                    if (kvp.Value.Rows.Count == 0) continue;
-                    var entry = archive.CreateEntry($"Discipline_Predate_{kvp.Key}.xlsx");
+                    if (kvp.Value.Dt.Rows.Count == 0) continue;
+                    var safeName = string.Concat(kvp.Key.Take(30).Select(c =>
+                        Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+                    var entry = archive.CreateEntry($"Discipline_Predate_{safeName}.xlsx");
                     using var entryStream = entry.Open();
                     using var wb = new XLWorkbook();
-                    var ws = wb.Worksheets.Add($"Discipline {kvp.Key}");
-                    ws.Cell(1, 1).Value = $"Discipline Predate - {kvp.Key} | An: {anUniv} | Facultate: {facultate}";
-                    ws.Cell(1, 1).Style.Font.Bold = true; ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
-                    var tbl = ws.Cell(3, 1).InsertTable(kvp.Value); tbl.Theme = XLTableTheme.None;
-                    ws.Columns().AdjustToContents();
-                    ws.Column(4).Style.Alignment.WrapText = true; ws.Column(4).Width = 80;
-                    StyleHeader(ws.Range(3, 1, 3, kvp.Value.Columns.Count));
-                    using var wbStream = new MemoryStream(); wb.SaveAs(wbStream); wbStream.Position = 0; wbStream.CopyTo(entryStream);
+                    string sheetName = $"Discipline {kvp.Key}";
+                    if (sheetName.Length > 31) sheetName = sheetName[..31];
+                    var ws = wb.Worksheets.Add(sheetName);
+                    ws.Cell(1, 1).Value = $"Discipline Predate - {kvp.Key} | An: {idAn}";
+                    ws.Cell(1, 1).Style.Font.Bold = true;
+                    ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(BrandColorHex);
+                    ws.Range(1, 1, 1, 4).Merge();
+                    var tbl = ws.Cell(3, 1).InsertTable(kvp.Value.Dt);
+                    tbl.Theme = XLTableTheme.None;
+                    ws.Columns(1, 3).AdjustToContents();
+                    ws.Column(4).Width = 80;
+                    ws.Column(4).Style.Alignment.WrapText = true;
+                    StyleHeader(ws.Range(3, 1, 3, 4));
+                    using var wbStream = new MemoryStream(); wb.SaveAs(wbStream);
+                    wbStream.Position = 0;
+                    await wbStream.CopyToAsync(entryStream);
                 }
             }
             memZip.Position = 0;
-            return File(memZip.ToArray(), "application/zip", "Discipline_Predate_IF_ID_IFR.zip");
+            return File(memZip.ToArray(), "application/zip",
+                $"Discipline_Predate_{idAn}.zip");
         }
 
         #endregion
 
         #region ================= RAPORT 6: TITULARI =================
 
-        private static readonly HashSet<string> TitulariANS = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "ABAITANCEI HORIA","ABRUDAN IOAN VASILE","ACIU LIA ELENA","ADAM MIHAI-SORIN",
-            "ADOCHITE (GALBAU) CRISTINA-STEFANIA","AGACHE IOANA-OCTAVIA","ALBU RUXANDRA GABRIELA",
-            "ALDEA ADRIAN","ALDEA CODRUTA NICOLETA","ALDEA CONSTANTIN LUCIAN","ALECU STEFAN",
-            "ALEXANDRESCU DANA SORINA","ALEXANDRU CATALIN","ALEXANDRU MARIAN","ALEXE RALUCA MONICA",
-            "ANASTASIU ALEXANDRU-RAZVAN","ANASTASIU COSTIN VLAD","ANDREESCU OANA",
-            "ANDRONIC LUMINITA CAMELIA","ANDRONIC MARIA LETITIA","ANGHELINA BOGDAN-CRISTIAN",
-            "ANTON CARMEN ELENA","ANTONARU CARMEN ELENA","ANTONYA CSABA","APOSTOAIE MIRELA",
-            "ARBANAS IOANA","ARGASEALA GEORGIANA","ARHIRE MONA BRIGITTE","ARMASAR IOANA PAULA",
-            "ARMASELU ANCA","ARON IOAN","ARVATESCU CRISTIAN","ATUDOREI IOANA ANISA",
-            "BABA MARIUS NICOLAE","BABA MIRELA CAMELIA","BADARAU CARMEN LILIANA","BADAU ADELA",
-            "BADAU DANA","BADEA ANAMARIA RALUCA","BADEA MIHAELA","BADICU GEORGIAN",
-            "BAICOIANU ALEXANDRA","BALAN FLORIN","BALAN TITUS CONSTANTIN","BALAS MONICA LOREDANA",
-            "BALASESCU MARIUS","BALASESCU SIMONA","BALINT ELENA","BALINT LORAND",
-            "BALTES LIANA SANDA","BALTESCU CODRUTA ADINA","BARABAS BARNA","BARACAN ADRIAN",
-            "BARBU DANIELA MARIANA","BARBU ION","BARBU MAGDALENA","BARBU MARIUS CATALIN",
-            "BARBU SILVIU GABRIEL","BARBULESCU ALINA","BARBULESCU OANA","BAROTE LUMINITA",
-            "BARSAN MARIA IONELA","BARSAN MARIA MAGDALENA","BASALIC ELENA-BIANCA",
-            "BATRANU PINTEA VLAD","BAZGAN MARIUS","BEDELEAN IOAN BOGDAN","BEDO TIBOR",
-            "BEGU TEODORA-MARIA","BELDEAN EMANUELA CARMEN","BELDEAN NICOLAE LAURENTIU",
-            "BELDIANU IOLANDA FELICIA","BELIBOU ALEXANDRA","BENCZE ANDREI","BENEA BOGDAN CORNEL",
-            "BESCHEA ANDREI-GEORGE","BIGIU NICUSOR FLORIN","BILDEA TEODOR STEFAN","BISOC ALINA",
-            "BOBESCU ELENA","BOBOC RAZVAN GABRIEL","BOCA LIANA LUMINITA","BOCU RAZVAN",
-            "BODI DIANA CRISTINA","BODOC ALICE MAGDALENA","BOER ATTILA LASZLO",
-            "BOGATU CRISTINA AURICA","BOGDAN IOANA CORINA","BOLBORICI ANA MARIA",
-            "BOLDISOR CRISTIAN NICOLAE","BOLOCAN SORIN IONUT","BONDOC IONESCU ALEXANDRU",
-            "BORCAN VIRGIL","BORCOMAN MARIANA","BORZ STELIAN ALEXANDRU","BOSCOIANU MIRCEA",
-            "BOSCOR DANA","BOTA OANA ALINA","BOTESCU-SIRETEANU ILEANA-AURORA","BOTEZATU DAN GEORGE",
-            "BOTIANU ANA MARIA","BOTIS MARIUS FLORIN","BOTIS SORINA",
-            "BRANEA (TACA) IOANA - ANTONIA","BRANESCU GERONIMO-RADUCU","BRATU CIPRIAN",
-            "BRATU CONSTANTIN ALEXANDRU","BRATU DRAGOS-VASILE","BRATU MARIA-ALEXANDRA",
-            "BRATUCU GABRIEL","BRAUN BARBU CRISTIAN","BRENCI LUMINITA MARIA",
-            "BREZEANU ALIN IONUT","BRICIU GABRIELA ARABELA","BRICIU VICTOR ALEXANDRU",
-            "BUCS LORANT","BUCUR ROMULUS LADISLAU","BUDALA ADRIAN","BUGA CRISTINA MARIA",
-            "BUHAICIUC MIHAELA","BUICAN GEORGE RAZVAN","BUJA ELENA","BULARCA ANCA ROXANA",
-            "BULARCA MARIA-CRISTINA","BULARCA RAZVAN","BULMEZ ALEXANDRU MIHAI","BURADA MARINELA",
-            "BURBEA GEORGIANA-MIHAELA","BURDUHOS BOGDAN GABRIEL","BURLACU MIHAI",
-            "BUSUIOCEANU STELIANA","BUTNARIU SILVIU LUIS","BUVNARIU LAVINIA",
-            "BUZDUGAN IOANA DIANA","BUZEA CARMEN","CALIN (COMSIT) ANDREEA-MIHAELA",
-            "CALIN MARIUS DANIEL","CAMPEAN MIHAELA","CAMPEAN STEFAN-IOAN","CAMPU ADINA",
-            "CAMPU VASILE RAZVAN","CANDREA ADINA NICOLETA","CANJA CRISTINA MARIA",
-            "CARP MARIUS CATALIN","CATANA DORIN IOAN","CATANESCU ANDREEA CORINA",
-            "CATARON ANGEL DORU","CATEANU MIHNEA","CAZACU CHRISTIANA EMILIA","CAZAN ANA MARIA",
-            "CAZAN CRISTINA","CERBU CAMELIA","CERNEA NICOLETA","CHEFNEUX GABRIELA",
-            "CHELMEA LIGIA","CHESCA ANTONELLA ELISA","CHICOMBAN CARMEN MIHAELA",
-            "CHICOS LUCIA ANTONETA","CHIHAIA GABRIELA-NICOLETA","CHIRCAN ELIZA","CHIRILA ADINA",
-            "CHIS ALEXANDRU","CHISALITA DUMITRU","CHITONU GABRIELA CRISTINA","CHITU IOANA BIANCA",
-            "CHIVU CATALIN IULIAN","CHIVU CATRINA","CIOARA GHEORGHE ROMEO","CIOBANU CATALIN",
-            "CIOBANU DANIELA","CIOBANU ELIZA","CIOBANU RAMONA","CIOCIRLAN ELENA",
-            "CIOLOCA ANASTASIA MALINA","CIOPLEIAS BOGDAN-NICOLAE","CIOROIU SILVIU GABRIEL",
-            "CIRSTOLOVEAN IOAN LUCIAN","CISMARU LAURA","CIUPALA LAURA ANCA",
-            "CIUREA ANDREEA CATALINA","CIUREA CODRUT Ioan","CIURESCU DANIEL",
-            "CLINCIU MIHAELA RODICA","CLINCIU RAMONA","CLOTEA LUMINITA ROXANA",
-            "COBELSCHI CALIN PAVEL","COCIAS TIBERIU","COCUZ MARIA ELENA","CODREAN CODRIN LEONID",
-            "COLIBAN RADU MIHAI","COMAN ALINA","COMAN CLAUDIU","COMAN ECATERINA","COMAN SIMONA",
-            "COMANESCU IOANA SONIA","COMSIT MIHAI","CONDREA EMILIA-GABRIELA",
-            "CONSTANTIN BOGDAN","CONSTANTIN CRISTINEL PETRISOR","CONSTANTIN DAN ALEXANDRU",
-            "CONSTANTIN SANDA","CONSTANTINESCU CRISTIAN ADRIAN","CONSTANTINESCU ELENA MIHAELA",
-            "CONTIU MIRCEA","CORA IRINGO","COROIU PETRUTA MARIA","COSEREANU CAMELIA",
-            "COSTACHE CRISTEA","COSTACHE DELIA","COSTIUC IULIANA","COSTIUC LIVIU",
-            "COTARLEA DELIA ANCA","COTFAS DANIEL TUDOR","COTFAS PETRU ADRIAN","COVEI MARIA",
-            "CRACIUN ADRIAN VIRGIL","CRETESCU NADIA RAMONA","CRISBASAN ANDREEA-MARIA",
-            "CRISTEA DANIEL","CRISTEA LUCIANA","CROITORU CATALIN","CSESZNEK CODRINA",
-            "CUCULEA DAN-CRISTIAN","CURTU ALEXANDRU LUCIAN","CUSEN GABRIELA","DAMSESCU ADRIAN",
-            "DANCIU GABRIEL MIHAIL","DANILA ADRIAN","DANILA DANIEL MIHAI","DAVID LAURA TEODORA",
-            "DEACONESCU ANDREA CATALINA","DEACONESCU TUDOR ION","DEACONU ADRIAN MARIUS",
-            "DEACONU OVIDIU","DEAKY BOGDAN ALEXANDRU","DEMETER ROBERT","DERCZENI RUDOLF ALEXANDRU",
-            "DIACONU IOANA ANDREA","DIACONU LAURENTIU IONEL","DIACONU STEFANIA-ROXANA",
-            "DIMA DRAGOS SORIN","DIMA GABRIELA","DIMA LORENA","DIMIENESCU OANA GABRIELA",
-            "DIMITRIU MARIA","DIMULESCU CRISTINA","DINCA GHEORGHITA","DINCA MARIUS SORIN",
-            "DINU ALEXANDRU","DINU CATALINA GEORGETA","DINU CRISTINA","DINU ELEONORA ANTOANETA",
-            "DINULICA FLORIN","DOBRESCU ADA IOANA","DRACEA LAURA LARISA","DRAGHICI CAMELIA LUCIA",
-            "DRAGOI MIRCEA VIOREL","DRAGOMIR GEORGE","DRAGOMIR PANZARU CAMELIA CRISTINA",
-            "DRUGA CORNELIU NICOLAE","DRUGAU SORIN","DRUMEA CRISTINA","DUCA LILIANA",
-            "DUGULEANA CONSTANTIN","DUGULEANA LILIANA","DUGULEANA MIHAI","DUICU SIMONA SOFIA",
-            "DUMITRASCU ADELA-ELIZA","DUMITRASCU DORIN ION","DUMITRESCU FLORIN",
-            "DUMITRESCU SILVIU RAZVAN","DUTCA IOAN","EFTIMIE NICOLAE","ELEKES ROBERT GABRIEL",
-            "ENACHE DORIN VALTER","ENACHE-DAVID NICOLETA","ENE ANA","ENESCA IOAN ALEXANDRU",
-            "ENESCU ADRIAN-GABRIEL","ENESCU IOANA-CLARA","ENESCU RALUCA ELENA",
-            "ENOIU RAZVAN SANDU","FALUP PECURARIU CRISTIAN GAVRIL","FALUP PECURARIU OANA GABRIELA",
-            "FECHETE FLAVIA","FELEA ALINA SILVANA","FILIP ALEXANDRU CATALIN","FILIP IGNAC - CSABA",
-            "FILIP OVIDIU","FINTINA IOANA MARIA","FIRASTRAU IOANA","FLOREA OLIVIA ANA",
-            "FLORESCU ADRIANA","FLORESCU MONICA","FLOROIAN LAURA","FOLEA MILENA FLAVIA",
-            "FORIS DIANA","FORIS TIBERIU","FRATU MARIANA","FRIEDL ANNAMARIA","FRINCU MADALINA ILEANA",
-            "FUGARETU COSMINA","FULGA ANDREEA ILEANA","GABOR CAMELIA","GACEU LIVIU",
-            "GALATANU TEOFIL FLORIN","GALMEANU HONORIUS CEZAR","GAROIU STEFAN LUCIAN",
-            "GAVRILA CORNEL CATALIN","GAVRIS CLAUDIA MIHAELA","GAVRUS CRISTINA","GHEORGHE CARMEN",
-            "GHEORGHE CARMEN ADRIANA","GHEORGHE CATALIN","GHEORGHE DANA MIHAELA","GHEORGHE VASILE",
-            "GHEORGHITA (LICHIOIU) IULIANA","GHIGHECI COSTEL CRISTINEL","GHITA DANA ELENA",
-            "GHITA-PIRNUTA OANA-ANDREEA","GINERICA COSMIN","GIRBACIA FLORIN STELIAN","GIRDAN LAURA",
-            "GLIGA CONSTANTIN IOAN","GOTEA MIHAELA","GRESITA CONSTANTIN IRINEL",
-            "GRIGORESCU OVIDIU DAN","GRIGORESCU SIMONA","GRIGORESCU SORIN MIHAI",
-            "GROSZ WILHELM ROBERT","GUIMAN MARIA VIOLETA","GURAU LIDIA","GUREAN DAN MARIAN",
-            "HABA SEVER","HALALISAN AURELIU FLORIN","HENTER RAMONA","HLIPCA PETRU",
-            "HOGEA MIRCEA DANIEL","HUMINIC GABRIELA","HUMINIC TRAIAN ANGEL","IACOB ANDREEA-BIANCA",
-            "IBANESCU DANIELA CORINA","ICHIM TRAIAN","IDOMIR MIHAELA ELENA","IFTENE LIVIU",
-            "IFTENI PETRU IULIAN","IGNAT MIHAI","ILEA ANCA-MARIA","ILIE RODICA MARIA",
-            "INDREICA ELENA SIMONA","INDREICA VICTOR ADRIAN","ION CATALIN PETREA",
-            "ION LAURENTIU-MIHAIL","IONAS DIANA GEANINA","IONESCU ALEXANDRU CODRIN",
-            "IONESCU ANA MARIA","IONESCU DAN TRAIAN","IONESCU OVIDIU","IORDACHE DANIEL",
-            "IORDACHE EUGEN","IORDAN NICOLAE FANI","IOVANAS DANIELA MARIA",
-            "IRIMIE CLAUDIA-ALEXANDRINA","IRIMIE IOANA VIOLETA","IRIMIE MARIUS","ISAC IULIANA",
-            "ISAC LUMINITA ANISOARA","ISAIA FLORIN","ISAIA GABRIELA AURORA","ISBASOIU ANDREEA",
-            "ISOP LAURA-MIHAELA","ISPAS ANA","ISPAS MIHAI","ISPAS NICOLAE","ITU ALINA","ITU CALIN",
-            "ITU LUCIAN MIHAI","IVANCESCU RUXANDRA","IVANOVICI LAURENTIU MIHAI",
-            "IVASCIUC IOANA SIMONA","IVASCU IRINA MIHAELA","JALIU CODRUTA ILEANA","KAKUCS CRISTIAN",
-            "KARACSONY NOEMI","KERTESZ CSABA ZOLTAN","KOLAR VASUDEVA LAURA","KOVACS ATTILA",
-            "KRISTALY DOMINIC MIRCEA","LACATUS ADRIAN","LACATUS ANCA MARIA","LACHE SIMONA",
-            "LACULICEANU ALEXANDRU-GEORGIAN","LANCEA CAMIL TRAIAN SORIN","LAPTES RAMONA",
-            "LATES MIHAI TIBERIU","LAZAR ANAMARIA","LAZAR CORNELIA MAGDALENA",
-            "LEAHU CRISTIAN IOAN","LEASU FLORIN GABRIEL","LELUTIU LAURA MIHAELA",
-            "LIMBASAN ILEANA GEORGIANA","LINDEMANN SOFIANA IULIA","LITRA ADRIANA VERONICA",
-            "LIXANDROIU RADU CONSTANTIN","LORINCZ SIMINA","LOSTUN ALEXANDRA","LUCA MIHAI ALEXANDRU",
-            "LUCULESCU MARIUS CRISTIAN","LUNGOCI CARMEN MIHAELA","LUNGU ANTONELA CRISTINA",
-            "LUNGULEASA AUREL","LUPSA TATARU DANA ADRIANA","LUPSA TATARU LUCIAN",
-            "LUPU DACIANA ANGELICA","LUPU DRAGOS","LUPU MIRABELA IOANA","LUPU NICOLETA RALUCA",
-            "MACESANU GIGEL","MACHEDON PISU MIHAI","MADA STANCA","MAFTEI CARMEN",
-            "MAICAN CATALIN IOAN","MAICAN MARIA ANCA","MAIER ALINA","MAJERCSIK LUCIANA",
-            "MANCIULEA ILEANA CARMEN","MANDRU LIDIA","MANEA ADELINA LOREDANA","MANEA ELENA LAURA",
-            "MANEA EMILIA ADELA","MANEA ROSANA MIHAELA","MANOLICA ANA-MARIA",
-            "MANTULESCU MARIUS MIHAIL","MARCEANU LUIGI GEO","MARCU MARINA VIORELA",
-            "MARDACHE ANDREEA CLAUDIA","MARINESCU DANIELA","MARINESCU NICOLAE ION",
-            "MARTOMA ALINA MIRELA","MATEFI ROXANA","MATEI ALEXANDRU","MATEI FLORENTINA",
-            "MATEI MADALINA GEORGIANA","MAZAREL ADRIAN","MESESAN SCHMITZ LUIZA IULIANA",
-            "MICLAUS STELIANA ROXANA","MICU CORINA SILVIA","MICULESCU RADU",
-            "MIHAIL LAURENTIU AUREL","MIHAILESCU MARIA-MIRABELA","MIHAILESCU TEOFIL",
-            "MIHALCICA MIRCEA","MIJAICA RALUCA DACIA","MILESAN MIHAELA","MILOSAN IOAN",
-            "MINCULETE NICUSOR","MINDRESCU VERONICA","MIRON ( MIOC ) ANA-ALIANA","MISARCA CATALIN",
-            "MITREA NICOLETA","MITRICA MARIA","MITU LEONARD","MITU SEBASTIAN-RAZVAN",
-            "MIZGACIU CAMELIA","MOARCAS GEORGETA","MOASA HORIA","MODRAN HORIA ALEXANDRU",
-            "MOGA MARIUS ALEXANDRU","MOJA ADELINA - IOANA","MOLDOVAN (TANTAU) MARA-STEFANIA",
-            "MOLDOVAN EDIT ROXANA","MOLDOVAN MACEDON DUMITRU","MONESCU VLAD",
-            "MORARIU CRISTIN OLIMPIU","MORARU SORIN AUREL","MOSOI ADRIAN","MOSOIU DANIELA VIORICA",
-            "MOTOASCA SEPTIMIU DANIEL","MOTOC DANA","MUNTEAN LIVIU-IULIU","MUNTEAN RADU MIRCEA",
-            "MUNTEANU DANIEL*","MUNTEANU MIHAELA VIOLETA","MUNTEANU-ICHIM ROXANA ANDREEA",
-            "MURESAN VALENTIN","MUSAT ELENA CAMELIA","MUSUROI CRISTIAN LEONARD",
-            "NANAU CORINA STEFANIA","NASTAC DORIN CRISTIAN","NASTASA LAURA ELENA","NASTASE GABRIEL",
-            "NASTASOIU MIRCEA","NASULEA MARIUS DANIEL","NAUNCEF ALINA MARIA",
-            "NEACSU NICOLETA ANDREEA","NEAGOE MIRCEA","NEAGU MIRCEA","NECHIFOR BIANCA ANDREEA",
-            "NECHITA FLORENTINA","NECHITA FLORIN MIHAI","NECSOI DANIELA VERONICA","NECULA RADU DAN",
-            "NECULA VALENTIN","NECULAU ANDREA ELENA","NECULOIU DANIELA","NECULOIU MARIUS",
-            "NEDELOIU TIBERIU","NEGULESCU ORIANA HELENA","NEPOTU GABRIEL LUCIAN","NICOLAE IOANA",
-            "NICOLAU ANDRADA CAMELIA","NICOLAU LIANA CRISTINA","NICOLESCU VALERIU NOROCEL",
-            "NICULA DAN","NISTOR-SERBAN ANDREEA ELENA","NITA MIHAI DANIEL","NITOIU LORENA GABRIELA",
-            "NUTU MARIA","OANA ALEXANDRU","OANCEA BOGDAN MARIAN","OANCEA GHEORGHE",
-            "OGREZEANU IULIAN ALEXANDRU","OGRUTAN PETRE LUCIAN","OLA DANIEL CALIN","OLAH ARTHUR",
-            "OLARESCU ALIN","OLTEANU MIRCEA IONUT","ONEA GHEORGHE ADRIAN","OPRISESCU SERBAN",
-            "ORMENISAN ALEXE NICOLAE","PACURAR CRISTINA MARIA","PACURAR VICTOR DAN",
-            "PADUREANU VASILE","PANAITE MARA","PANTEA ILEANA","PARV AURICA LUMINITA",
-            "PASCU ALEXANDRU","PASCU ALINA MIHAELA","PASCU MIHAI LUCIAN","PASCU MIHAI NICOLAE",
-            "PAUN LAURIAN","PAVALACHE ILIE MARIELA","PAVEL ECATERINA","PAVEL GINA MIHAELA",
-            "PELIN BOGDAN IULIAN","PERNIU DANA","PETRE ANDREEA","PETRE IOANA","PETRIC PAULA",
-            "PETRICI ANDREI VICTOR","PETRITAN ION CATALIN","PISARCIUC CRISTIAN",
-            "PIUARU BRENDA-ANDREEA","PLAJER IOANA CRISTINA","PLESCAN COSTEL","PLUMBOTA LAVINIA",
-            "PODASCA PETRU CEZARIO","POJALA CIPRIAN-VASILE","POLEXA ALEXANDRU-CRISAN",
-            "POP DANA MIHAELA","POPA BOGDAN","POPA DANIELA (EFS)","POPA DANIELA (PSE)",
-            "POPA GEORGE-BOGDAN","POPA IULIAN","POPA LIOARA RALUCA","POPA LUMINITA","POPA ROXANA",
-            "POPA STEFAN","POPESCU (GHIUTA) IOANA","POPESCU ANCA","POPESCU MIHAELA VIRGINIA",
-            "POPESCU OVIDIU","POPESCU VLAD","POPOVICI BIANCA ELENA","POPOVICI-POPESCU ELENA",
-            "POROJAN MIHAELA","POSTELNICU CRISTIAN CEZAR","POTINCU LAURA","POZNA CLAUDIU RADU",
-            "PRALEA CRISTIAN","PREDA ULITA ANCA","PROCA ALEXANDRINA MARIA","PUIU ANDREI",
-            "PURCARU IOANA MADALINA","RACASAN SERGIU","RADOI-ENCEA RALUCA-STEFANIA",
-            "RADU (MATEI) SIMONA CORINA","RADU ALEXANDRU IONUT","RADU CRISTINA IOANA","RADU DORIN",
-            "RADU FLORIN","RADU LUCIAN","RADU SEBASTIAN","RADUCANU DORINA","RAILEANU SZELES MONICA",
-            "RATULEA GEORGETA GABRIELA","RAUTIA IOAN CALIN","REPANOVICI ANGELA","ROATA IONUT CLAUDIU",
-            "ROBU DAN NICOLAE","ROGOZEA LILIANA MARCELA","ROMAN NADINNE ALEXANDRA","ROSCA IOAN CALIN",
-            "ROSENBERG DAN","RUCSANDA MADALINA","RUNCEANU-ALBU CARMEN CRISTINA","RUS HORATIU",
-            "RUSU IULIAN","SABOU FLORIN-LUCIAN-PETRICA","SAFTOIU RAZVAN GEORGIAN","SARAMET OANA",
-            "SARBU FLAVIUS AURELIAN","SASU ADELA","SASU LAURA ELENA","SASU LUCIAN-MIRCEA",
-            "SAULESCU RADU GABRIEL","SAVIN DIANA-CRISTINA","SAVU CODRUT NICOLAE",
-            "SAVU ELENA CRISTINA","SCARNECI-DOMNISORU FLORENTINA","SCARNECIU CAMELIA CORNELIA",
-            "SCARNECIU IOAN","SCHWAB-FRINCU ANAMARIA","SCRIBA CEZAR","SCUTARU MARIA LUMINITA",
-            "SECHEL GABRIELA","SERBAN IOAN","SERBAN IONEL","SERBU CLAUDIA GABRIELA",
-            "SIBISAN AURA DANIELA","SIMION GABRIEL","SIMON MARINELA CRISTINA","SINU RALUCA GEORGIANA",
-            "SISMAN VIOREL","SITOIU ANDREEA","SOICA ADRIAN","SOICA SIMONA","SOREA DANIELA",
-            "SOREA GHEORGHE DAN","SOVA DANIELA","SOVAILA SILVIA","SPIRCHEZ GEORGETA BIANCA",
-            "SPIRCHEZ GHEORGHE COSMIN","SPRIDON DELIA - ELENA","STAN ALEXANDRA","STAN ION GABRIEL",
-            "STANCA AUREL CORNEL","STANCIOIU PETRU TUDOR","STANCIU ANCA ELENA",
-            "STANCIU ELENA MANUELA","STANCIU MARIANA DOMNICA","STANESCU RUXANDRA","STARETU IONEL",
-            "STOICA ROXANA ELENA","STOICANESCU MARIA","STROE FANEL","SUCIU CONSTANTIN",
-            "SUCIU MARIA-MAGDALENA","SUCIU TITUS","SUMEDREA SILVIA","SURDU VASILE","SUTEU LIGIA CLAUDIA",
-            "SZILAGYI ANA","SZOCS BOTOND CSABA","TABIAN DANIEL","TABIRCA MARIUS SABIN","TACHE ILEANA",
-            "TALPA NICOLAE","TAMAS FLORIN-LUCIAN","TARANU DAN MARIUS","TARNOVEANU MIRELA ADRIANA",
-            "TARULESCU RADU","TARULESCU STELIAN","TATA ANITHA","TATU OANA","TAUS DANIEL",
-            "TAUS NICOLETA","TECAU ALINA SIMONA","TEODORESCU ANDREEA",
-            "TEODORESCU DRAGHICESCU HORATIU","TERESNEU CORNEL CRISTIAN","TERIS STEFAN",
-            "TESCASIU BIANCA","THIERHEIMER WALTER WILHELM","TIEREAN MIRCEA HORIA","TIMAR JANOS",
-            "TIMAR MARIA CRISTINA","TINT DIANA","TISMANAR IOANA","TITA NICOLESCU GABRIEL",
-            "TOADER ADRIAN","TOADER SERBAN-SIXTUS","TODOR RALUCA DANIA","TOFAN DANIEL",
-            "TOGANEL GEORGE RADU","TOHANEAN DRAGOS IOAN - EFS","TOMA SEBASTIAN IONUT",
-            "TOMELE SIMONA CONSTANTA","TOPALA IOANA ROXANA","TRIFAN ADRIAN","TRUSCA DANIEL DRAGOS",
-            "TRUTA CAMELIA","TUCHEL IONUT-VLAD","TUDORAN GHEORGHE MARIAN","TULBURE TRAIAN TIBERIU",
-            "TURCANU CRISTINA","TURCU IOAN","TURCULET ALINA RALUCA","TUTU DUMITRU CIPRIAN",
-            "UDROIU RAZVAN","UNCU IONUT","UNGUREANU CAMELIA","UNGUREANU ELENA",
-            "UNGUREANU VALENTIN VASILE","UNIANU ECATERINA MARIA","UNTARU ELENA NICOLETA",
-            "URETU NOEMI","URSU PETRONELA ELENA","VALCEA CRISTINA SILVIA","VARCIU MIHAI STELIAN",
-            "VARGA IOANA","VARVARICHI LEONA","VASIAN BIANCA IOANA","VASILESCU ANCA",
-            "VASILESCU MARIA MAGDALENA","VELEA MARIAN NICOLAE","VELICU RADU GABRIEL",
-            "VIZITIU ANAMARIA","VLADOIU NASTY MARIAN","VODA DANIELA MARIANA",
-            "VOICESCU CORNELIU GEORGE","VOICU NICOLETA","VOINEA MIHAELA","VOLMER MARIUS",
-            "VOROVENCII IOSIF","ZAHARIA CORNELIU","ZAHARIA SEBASTIAN MARIAN",
-            "ZAMFIRACHE ALEXANDRA","ZELENIUC OCTAVIA",
-        };
-
-        private static string NormalizeName(string? name)
-        {
-            if (string.IsNullOrWhiteSpace(name)) return "";
-            var n = System.Text.RegularExpressions.Regex.Replace(name.Trim().ToUpperInvariant(), @"\s+", " ");
-            var normalized = string.Concat(
-                n.Normalize(System.Text.NormalizationForm.FormD)
-                 .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark));
-            return normalized.Replace('?', 'T');
-        }
-
-        private const string TitulariSql = @"
-            WITH ToatePersoanele AS (
-                SELECT DISTINCT
-                    vcm.ID_Profesor,
-                    CASE vcm.ID_Profesor
-                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
-                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
-                        ELSE vcm.NumeIntregProfesor
-                    END AS NumeIntreg,
-                    vp.DenumireCatedra,
-                    vp.DenumireFacultate
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                LEFT JOIN (
-                    SELECT ID_Profesor, MIN(DenumireCatedra) AS DenumireCatedra,
-                           MIN(DenumireFacultate) AS DenumireFacultate
-                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
-                    WHERE ID_AnUnivCatedra = 45
-                    GROUP BY ID_Profesor
-                ) vp ON vp.ID_Profesor = vcm.ID_Profesor
-                WHERE vcm.ID_AnUniv = 45
-                  AND LTRIM(RTRIM(ISNULL(vcm.NumeIntregProfesor,''))) != ''
-                  AND vcm.NumeIntregProfesor NOT LIKE '--%'
-            )
-            SELECT ID_Profesor, NumeIntreg AS NumeComplet,
-                   ISNULL(DenumireCatedra,'') AS DenumireCatedra,
-                   ISNULL(DenumireFacultate,'') AS Facultate
-            FROM ToatePersoanele
-            WHERE (@fac='Toti' OR ISNULL(DenumireFacultate,'') COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
-            ORDER BY NumeIntreg";
+        private const string SqlTitulariRaport = @"
+            SELECT
+                ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20)))   AS IdentificatorUnic,
+                MIN(p.NumeIntreg)                                    AS NumeIntreg,
+                MIN(p.DenumireFacultate)                             AS Facultate,
+                MIN(p.DenumireCatedra)                               AS Departament,
+                MIN(p.DenumireGradDidacticAnUniv)                    AS GradDidactic
+            FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
+            INNER JOIN [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
+                ON  ppm.ID_Profesor         = p.ID_Profesor
+                AND ppm.ID_AnUniv           = @ID_AnUniv
+                AND ppm.NrOreConventionale   > 0
+            WHERE p.ID_AnUnivCatedra = @ID_AnUniv
+              AND p.TitularAnUniv    = 1
+              AND (@fac  = 'Toti' OR p.DenumireFacultate COLLATE DATABASE_DEFAULT
+                                   = @fac                 COLLATE DATABASE_DEFAULT)
+              AND (@dept = 'Toti' OR p.DenumireCatedra   COLLATE DATABASE_DEFAULT
+                                   = @dept                COLLATE DATABASE_DEFAULT)
+            GROUP BY ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20)))
+            HAVING SUM(ppm.NrOreConventionale) > 0
+            ORDER BY MIN(p.NumeIntreg)";
 
         [HttpGet("titulari")]
-        public async Task<IActionResult> GetTitulari(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> GetTitulari(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var result = new List<object>();
-            var gasiti = new HashSet<string>(StringComparer.Ordinal);
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
-            using var cmd = new SqlCommand(TitulariSql, conn);
-            cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            using (var reader = await cmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
+            using var cmd = new SqlCommand(SqlTitulariRaport, conn);
+            cmd.CommandTimeout = 60;
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            int nr = 1;
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                result.Add(new
                 {
-                    var numeDb = reader["NumeComplet"]?.ToString() ?? "";
-                    var numeNorm = NormalizeName(numeDb);
-                    if (!TitulariANS.Contains(numeNorm)) continue;
-                    gasiti.Add(numeNorm);
-                    result.Add(new
-                    {
-                        Profesor = FixNume(numeDb, reader["ID_Profesor"]),
-                        Departament = reader["DenumireCatedra"]?.ToString() ?? "",
-                        Facultate = reader["Facultate"]?.ToString() ?? ""
-                    });
-                }
-            }
-            var lipsa = TitulariANS.Where(n => !gasiti.Contains(n)).ToList();
-            if (lipsa.Any())
-            {
-                using var cmd2 = new SqlCommand(@"
-                    SELECT DISTINCT vp.ID_Profesor, vp.NumeIntreg,
-                           MIN(vp.DenumireCatedra)  AS DenumireCatedra,
-                           MIN(vp.DenumireFacultate) AS DenumireFacultate
-                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
-                    WHERE vp.ID_AnUnivCatedra = 45
-                    GROUP BY vp.ID_Profesor, vp.NumeIntreg", conn);
-                cmd2.CommandTimeout = 60;
-                using var r2 = await cmd2.ExecuteReaderAsync();
-                while (await r2.ReadAsync())
-                {
-                    var numeDb = r2["NumeIntreg"]?.ToString() ?? "";
-                    var numeNorm = NormalizeName(numeDb);
-                    if (!TitulariANS.Contains(numeNorm) || gasiti.Contains(numeNorm)) continue;
-                    var fac2 = r2["DenumireFacultate"]?.ToString() ?? "";
-                    if ((facultate ?? "Toti") != "Toti" &&
-                        !string.Equals(fac2, facultate, StringComparison.OrdinalIgnoreCase)) continue;
-                    gasiti.Add(numeNorm);
-                    result.Add(new
-                    {
-                        Profesor = FixNume(numeDb, r2["ID_Profesor"]),
-                        Departament = r2["DenumireCatedra"]?.ToString() ?? "",
-                        Facultate = fac2
-                    });
-                }
-            }
-            return Ok(result.OrderBy(x => ((dynamic)x).Profesor).ToList());
+                    NrCrt = nr++,
+                    Profesor = reader["NumeIntreg"]?.ToString() ?? "",
+                    Departament = reader["Departament"]?.ToString() ?? "",
+                    Facultate = reader["Facultate"]?.ToString() ?? "",
+                    Grad = reader["GradDidactic"]?.ToString() ?? ""
+                });
+            return Ok(result);
         }
 
         [HttpGet("export/titulari")]
-        public async Task<IActionResult> ExportTitulari(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> ExportTitulari(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Nume si prenume"), new DataColumn("Departament"), new DataColumn("Facultate")
+                new DataColumn("Nr.",  typeof(int)), new DataColumn("Profesor"),
+                new DataColumn("Departament"),       new DataColumn("Facultate"),
+                new DataColumn("Grad")
             });
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
-            using var cmd = new SqlCommand(TitulariSql, conn);
-            cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            var gasiti2 = new HashSet<string>(StringComparer.Ordinal);
-            using (var reader = await cmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                {
-                    var numeDb = reader["NumeComplet"]?.ToString() ?? "";
-                    var numeNorm = NormalizeName(numeDb);
-                    if (!TitulariANS.Contains(numeNorm)) continue;
-                    gasiti2.Add(numeNorm);
-                    dt.Rows.Add(FixNume(numeDb, reader["ID_Profesor"]),
-                        reader["DenumireCatedra"]?.ToString() ?? "",
-                        reader["Facultate"]?.ToString() ?? "");
-                }
-            }
-            var lipsa2 = TitulariANS.Where(n => !gasiti2.Contains(n)).ToList();
-            if (lipsa2.Any())
-            {
-                using var cmd2b = new SqlCommand(@"SELECT DISTINCT vp.ID_Profesor, vp.NumeIntreg,
-                    MIN(vp.DenumireCatedra) AS DenumireCatedra, MIN(vp.DenumireFacultate) AS DenumireFacultate
-                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] vp
-                    WHERE vp.ID_AnUnivCatedra = 45 GROUP BY vp.ID_Profesor, vp.NumeIntreg", conn);
-                cmd2b.CommandTimeout = 60;
-                using var r2b = await cmd2b.ExecuteReaderAsync();
-                while (await r2b.ReadAsync())
-                {
-                    var numeDb = r2b["NumeIntreg"]?.ToString() ?? "";
-                    var numeNorm = NormalizeName(numeDb);
-                    if (!TitulariANS.Contains(numeNorm) || gasiti2.Contains(numeNorm)) continue;
-                    var fac2 = r2b["DenumireFacultate"]?.ToString() ?? "";
-                    if ((facultate ?? "Toti") != "Toti" && !string.Equals(fac2, facultate, StringComparison.OrdinalIgnoreCase)) continue;
-                    gasiti2.Add(numeNorm);
-                    dt.Rows.Add(FixNume(numeDb, r2b["ID_Profesor"]), r2b["DenumireCatedra"]?.ToString() ?? "", fac2);
-                }
-            }
+            using var cmd = new SqlCommand(SqlTitulariRaport, conn);
+            cmd.CommandTimeout = 60;
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            int nr = 1;
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                dt.Rows.Add(nr++,
+                    reader["NumeIntreg"]?.ToString() ?? "",
+                    reader["Departament"]?.ToString() ?? "",
+                    reader["Facultate"]?.ToString() ?? "",
+                    reader["GradDidactic"]?.ToString() ?? "");
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Titulari");
             var tbl = ws.Cell(1, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
-            ws.Columns().AdjustToContents();
+            tbl.ShowTotalsRow = true;
+            tbl.Field("Nr.").TotalsRowFunction = XLTotalsRowFunction.Count;
+            tbl.Field("Profesor").TotalsRowLabel = "TOTAL";
             StyleHeader(ws.Range(1, 1, 1, dt.Columns.Count));
+            ws.Columns().AdjustToContents();
             using var stream = new MemoryStream(); wb.SaveAs(stream);
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Cadre_Didactice_Titulare.xlsx");
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Cadre_Didactice_Titulare_{idAn}.xlsx");
         }
 
         #endregion
 
         #region ================= RAPORT 7: COLABORATORI =================
 
-        private const string ColaboratoriSql = @"
-            WITH ToatePersoanelePtColab AS (
-                SELECT DISTINCT
-                    vcm.ID_Profesor,
-                    CASE vcm.ID_Profesor
-                        WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
-                        WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
-                        ELSE vcm.NumeIntregProfesor
-                    END AS NumeIntreg,
-                    vp.DenumireCatedra,
-                    vp.DenumireFacultate
-                FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                LEFT JOIN (
-                    SELECT ID_Profesor, MIN(DenumireCatedra) AS DenumireCatedra,
-                           MIN(DenumireFacultate) AS DenumireFacultate
-                    FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
-                    WHERE ID_AnUnivCatedra = 45
-                    GROUP BY ID_Profesor
-                ) vp ON vp.ID_Profesor = vcm.ID_Profesor
-                WHERE vcm.ID_AnUniv = 45
-                  AND LTRIM(RTRIM(ISNULL(vcm.NumeIntregProfesor,''))) != ''
-                  AND vcm.NumeIntregProfesor NOT LIKE '--%'
-            )
-            SELECT ID_Profesor, NumeIntreg AS NumeComplet,
-                   ISNULL(DenumireCatedra,'') AS DenumireCatedra,
-                   ISNULL(DenumireFacultate,'') AS Facultate
-            FROM ToatePersoanelePtColab
-            WHERE (@fac='Toti' OR ISNULL(DenumireFacultate,'') COLLATE Latin1_General_CI_AI=@fac COLLATE Latin1_General_CI_AI)
-            ORDER BY NumeIntreg";
+        private const string SqlColaboratori = @"
+            SELECT
+                ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20)))   AS IdentificatorUnic,
+                MIN(p.NumeIntreg)                                    AS NumeIntreg,
+                MIN(p.DenumireFacultate)                             AS Facultate,
+                MIN(p.DenumireCatedra)                               AS Departament,
+                MIN(p.DenumireGradDidacticAnUniv)                    AS GradDidactic
+            FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv] p
+            INNER JOIN [AGSIS_DW].[dbo].[Post_Profesor_Materie] ppm
+                ON  ppm.ID_Profesor         = p.ID_Profesor
+                AND ppm.ID_AnUniv           = @ID_AnUniv
+                AND ppm.NrOreConventionale   > 0
+            WHERE p.ID_AnUnivCatedra = @ID_AnUniv
+              AND p.TitularAnUniv    = 0
+              AND (@fac  = 'Toti' OR p.DenumireFacultate COLLATE DATABASE_DEFAULT
+                                   = @fac                 COLLATE DATABASE_DEFAULT)
+              AND (@dept = 'Toti' OR p.DenumireCatedra   COLLATE DATABASE_DEFAULT
+                                   = @dept                COLLATE DATABASE_DEFAULT)
+            GROUP BY ISNULL(p.CNP, CAST(p.ID_Profesor AS VARCHAR(20)))
+            HAVING SUM(ppm.NrOreConventionale) > 0
+            ORDER BY MIN(p.NumeIntreg)";
 
         [HttpGet("colaboratori")]
-        public async Task<IActionResult> GetColaboratori(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> GetColaboratori(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var result = new List<object>();
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
-            using var cmd = new SqlCommand(ColaboratoriSql, conn);
-            cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
+            using var cmd = new SqlCommand(SqlColaboratori, conn);
+            cmd.CommandTimeout = 60;
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            int nr = 1;
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
-            {
-                var numeDb = reader["NumeComplet"]?.ToString() ?? "";
-                var numeNorm = NormalizeName(numeDb);
-                if (TitulariANS.Contains(numeNorm)) continue;
-                string dept = reader["DenumireCatedra"]?.ToString() ?? "";
-                if (long.TryParse(dept, out long idCat)) dept = GetDenumireCatedra(idCat);
                 result.Add(new
                 {
-                    Profesor = FixNume(numeDb, reader["ID_Profesor"]),
-                    Departament = dept,
-                    Facultate = reader["Facultate"]?.ToString() ?? ""
+                    NrCrt = nr++,
+                    Profesor = reader["NumeIntreg"]?.ToString() ?? "",
+                    Departament = reader["Departament"]?.ToString() ?? "",
+                    Facultate = reader["Facultate"]?.ToString() ?? "",
+                    Grad = reader["GradDidactic"]?.ToString() ?? ""
                 });
-            }
             return Ok(result);
         }
 
         [HttpGet("export/colaboratori")]
-        public async Task<IActionResult> ExportColaboratori(string? anUniv, string? facultate, string? departament)
+        public async Task<IActionResult> ExportColaboratori(
+            [FromQuery] string? anUniv, [FromQuery] string? facultate,
+            [FromQuery] string? departament, [FromQuery] int? idAnUniv = null)
         {
+            int idAn = idAnUniv ?? _idAnUnivCurent;
             var dt = new DataTable();
             dt.Columns.AddRange(new[] {
-                new DataColumn("Nume si prenume"), new DataColumn("Departament"), new DataColumn("Facultate")
+                new DataColumn("Nr.",  typeof(int)), new DataColumn("Profesor"),
+                new DataColumn("Departament"),       new DataColumn("Facultate"),
+                new DataColumn("Grad")
             });
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
-            using var cmd = new SqlCommand(ColaboratoriSql, conn);
-            cmd.CommandTimeout = 120;
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
+            using var cmd = new SqlCommand(SqlColaboratori, conn);
+            cmd.CommandTimeout = 60;
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAn });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            int nr = 1;
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
-            {
-                var numeDb = reader["NumeComplet"]?.ToString() ?? "";
-                var numeNorm = NormalizeName(numeDb);
-                if (TitulariANS.Contains(numeNorm)) continue;
-                string dept = reader["DenumireCatedra"]?.ToString() ?? "";
-                if (long.TryParse(dept, out long idCat)) dept = GetDenumireCatedra(idCat);
-                dt.Rows.Add(FixNume(numeDb, reader["ID_Profesor"]), dept, reader["Facultate"]?.ToString() ?? "");
-            }
+                dt.Rows.Add(nr++,
+                    reader["NumeIntreg"]?.ToString() ?? "",
+                    reader["Departament"]?.ToString() ?? "",
+                    reader["Facultate"]?.ToString() ?? "",
+                    reader["GradDidactic"]?.ToString() ?? "");
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Colaboratori");
             var tbl = ws.Cell(1, 1).InsertTable(dt); tbl.Theme = XLTableTheme.None;
-            ws.Columns().AdjustToContents();
+            tbl.ShowTotalsRow = true;
+            tbl.Field("Nr.").TotalsRowFunction = XLTotalsRowFunction.Count;
+            tbl.Field("Profesor").TotalsRowLabel = "TOTAL";
             StyleHeader(ws.Range(1, 1, 1, dt.Columns.Count));
+            ws.Columns().AdjustToContents();
             using var stream = new MemoryStream(); wb.SaveAs(stream);
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Cadre_Didactice_Colaboratori.xlsx");
-        }
-
-        #endregion
-
-        #region ================= RAPORT 8: ANS =================
-
-        private const string QueryTitulariANS = @"
-            SELECT DISTINCT
-                vcm.ID_Profesor,
-                CASE vcm.ID_Profesor
-                    WHEN 5665 THEN 'TOHANEAN DRAGOS IOAN - EFS'
-                    WHEN 3887 THEN 'Folea (Vecerdi) Cristina Agnes'
-                    ELSE vcm.NumeIntregProfesor
-                END AS NumeIntreg,
-                ISNULL(vp.DenumireCatedra,'')      AS DenumireCatedra,
-                ISNULL(vp.DenumireFacultate,'')    AS DenumireFacultate,
-                ISNULL(vp.DenumireGradDidactic,'') AS DenumireGradDidactic
-            FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-            LEFT JOIN (
-                SELECT ID_Profesor,
-                       MIN(DenumireCatedra)      AS DenumireCatedra,
-                       MIN(DenumireFacultate)    AS DenumireFacultate,
-                       MIN(DenumireGradDidactic) AS DenumireGradDidactic
-                FROM [AGSIS].[dbo].[View_Profesori_CF_AnUniv]
-                WHERE ID_AnUnivCatedra = @ID_AnUniv
-                GROUP BY ID_Profesor
-            ) vp ON vp.ID_Profesor = vcm.ID_Profesor
-            WHERE vcm.ID_AnUniv = @ID_AnUniv
-              AND LTRIM(RTRIM(ISNULL(vcm.NumeIntregProfesor,''))) != ''
-              AND vcm.NumeIntregProfesor NOT LIKE '--%'
-            ORDER BY NumeIntreg";
-
-        [HttpGet("date-ans")]
-        public IActionResult GetDateANS([FromQuery] int idAnUniv = 45)
-        {
-            var totiTitularii = new List<(int Id, string Nume, string Facultate, string Dept, string Grad)>();
-            using var conn = new SqlConnection(_connectionString);
-            conn.Open();
-            using (var cmd1 = new SqlCommand(QueryTitulariANS, conn))
-            {
-                cmd1.CommandTimeout = 60;
-                cmd1.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
-                using var r1 = cmd1.ExecuteReader();
-                while (r1.Read())
-                {
-                    var numeDb = r1["NumeIntreg"]?.ToString() ?? "";
-                    if (!TitulariANS.Contains(NormalizeName(numeDb))) continue;
-                    totiTitularii.Add((Convert.ToInt32(r1["ID_Profesor"]),
-                        FixNume(numeDb, r1["ID_Profesor"]),
-                        r1["DenumireFacultate"]?.ToString() ?? "",
-                        r1["DenumireCatedra"]?.ToString() ?? "",
-                        r1["DenumireGradDidactic"]?.ToString() ?? ""));
-                }
-            }
-            // FIX BUG 2 (GetDateANS): filtru Titular - doar orele din norma de baza
-            // FORMULA FINALA: SUM ore per (ID_Profesor, metaspec, semestru, ID_StatDeFunctii)
-            // Grupam pe StatDeFunctii+semestru pentru a elimina duplicatele din JOIN
-            // dar pastram semestre diferite si specializari diferite
-            string queryOre = @"
-                SELECT t.ID_Profesor,
-                       t.IdMetaspec,
-                       SUM(t.OreConventionale) AS OreConventionale
-                FROM (
-                    SELECT vcm.ID_Profesor,
-                           sf.id_metaspecializare AS IdMetaspec,
-                           vcm.NrSemestruDinAn,
-                           vcm.ID_StatDeFunctii,
-                           vcm.DenumireMaterie,
-                           MAX(CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))) AS OreConventionale
-                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                    INNER JOIN (
-                        SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
-                               MAX(id_metaspecializare) AS id_metaspecializare,
-                               MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
-                        FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
-                        GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
-                    ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
-                         AND sf.DenumireSpecializare=vcm.DenumireSpecializare
-                         AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                    WHERE vcm.ID_AnUniv=@ID_AnUniv
-                      AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
-                    GROUP BY vcm.ID_Profesor, sf.id_metaspecializare, vcm.NrSemestruDinAn,
-                             vcm.ID_StatDeFunctii, vcm.DenumireMaterie
-                ) t
-                GROUP BY t.ID_Profesor, t.IdMetaspec";
-            var orePerProf = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
-            using (var cmd2 = new SqlCommand(queryOre, conn))
-            {
-                cmd2.CommandTimeout = 120;
-                cmd2.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
-                using var r2 = cmd2.ExecuteReader();
-                while (r2.Read())
-                {
-                    int idProf = Convert.ToInt32(r2["ID_Profesor"]);
-                    int idMeta = r2["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(r2["IdMetaspec"]) : 0;
-                    decimal ore = Convert.ToDecimal(r2["OreConventionale"]);
-                    if (!orePerProf.ContainsKey(idProf)) orePerProf[idProf] = new();
-                    orePerProf[idProf].Add((idMeta, ore));
-                }
-            }
-            var profesori = new List<object>();
-            int nrCrt = 1;
-            foreach (var (id, nume, fac, dept, grad) in totiTitularii.OrderBy(t => t.Nume))
-            {
-                var fractiuni = new Dictionary<string, decimal>();
-                if (orePerProf.TryGetValue(id, out var listaOre))
-                {
-                    var orePerAns = new Dictionary<int, decimal>();
-                    foreach (var (idMeta, ore) in listaOre)
-                    {
-                        if (!MappingMetaspec.TryGetValue(idMeta, out int idAns)) continue;
-                        if (!AnsIdToCol.ContainsKey(idAns)) continue;
-                        if (!orePerAns.ContainsKey(idAns)) orePerAns[idAns] = 0m;
-                        orePerAns[idAns] += ore;
-                    }
-                    // Baza de calcul = Max(totalOre, normaLegala) conform metodologiei ANS:
-                    // - prof sub norma: impartim la norma legala (fractiunea < 1.00)
-                    // - prof peste norma: impartim la totalOre real (fractiunea = 1.00 sau 1.01 din rotunjiri)
-                    decimal normaLegala = GetNormaLegala(grad);
-                    decimal totalOre = orePerAns.Values.Sum();
-                    decimal bazaCalcul = Math.Max(totalOre, normaLegala);
-                    if (totalOre > 0 && bazaCalcul > 0)
-                    {
-                        foreach (var kv in orePerAns)
-                        {
-                            decimal frac = Math.Round(kv.Value / bazaCalcul, 2);
-                            if (frac > 0)
-                                fractiuni[DomeniiExcel[AnsIdToCol[kv.Key] - 10]] = frac;
-                        }
-                    }
-                }
-                profesori.Add(new { NrCrt = nrCrt++, NumeComplet = nume, Facultate = fac, Departament = dept, GradFunctie = MapareGradANS(grad), DomeniiMapate = fractiuni });
-            }
-            return Ok(profesori);
-        }
-
-        [HttpGet("export/raport-ans")]
-        public IActionResult ExportRaportANS([FromQuery] int idAnUniv = 45)
-        {
-            var totiTitulariiExp = new List<(int Id, string Nume, string Facultate, string Dept, string Grad)>();
-            using var conn = new SqlConnection(_connectionString);
-            conn.Open();
-            using (var cmd1 = new SqlCommand(QueryTitulariANS, conn))
-            {
-                cmd1.CommandTimeout = 60;
-                cmd1.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
-                using var r1 = cmd1.ExecuteReader();
-                while (r1.Read())
-                {
-                    var numeDb1 = r1["NumeIntreg"]?.ToString() ?? "";
-                    // FIX BUG 1: filtrul prin TitulariANS lipsea din ExportRaportANS
-                    // Fara acest filtru, raportul aducea TOTI profesorii din VCM (~1475)
-                    // in loc de doar titularii oficiali ANS (~741)
-                    if (!TitulariANS.Contains(NormalizeName(numeDb1))) continue;
-                    totiTitulariiExp.Add((Convert.ToInt32(r1["ID_Profesor"]),
-                        FixNume(numeDb1, r1["ID_Profesor"]),
-                        r1["DenumireFacultate"]?.ToString() ?? "",
-                        r1["DenumireCatedra"]?.ToString() ?? "",
-                        r1["DenumireGradDidactic"]?.ToString() ?? ""));
-                }
-            }
-            // FIX BUG 2: filtru Titular - orele de suplinitor nu trebuie sa intre in calcul
-            // FORMULA FINALA: SUM ore per (ID_Profesor, metaspec, semestru, ID_StatDeFunctii)
-            // Grupam pe StatDeFunctii+semestru pentru a elimina duplicatele din JOIN
-            // dar pastram semestre diferite si specializari diferite
-            string queryOreExp = @"
-                SELECT t.ID_Profesor,
-                       t.IdMetaspec,
-                       SUM(t.OreConventionale) AS OreConventionale
-                FROM (
-                    SELECT vcm.ID_Profesor,
-                           sf.id_metaspecializare AS IdMetaspec,
-                           vcm.NrSemestruDinAn,
-                           vcm.ID_StatDeFunctii,
-                           vcm.DenumireMaterie,
-                           MAX(CAST(ISNULL(vcm.NrOreConventionale,0) AS DECIMAL(10,4))) AS OreConventionale
-                    FROM [AGSIS].[pi].[View_CentralizareMateriiProfesor] vcm
-                    INNER JOIN (
-                        SELECT ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn,
-                               MAX(id_metaspecializare) AS id_metaspecializare,
-                               MAX(DenTitularSauSuplinitor) AS DenTitularSauSuplinitor
-                        FROM [AGSIS].[pi].[StatDeFunctiiPeSpecializare]
-                        GROUP BY ID_StatDeFunctii, ID_AnUniv, DenumireSpecializare, DenumireMaterie, NrSemestruDinAn
-                    ) sf ON sf.ID_StatDeFunctii=vcm.ID_StatDeFunctii AND sf.ID_AnUniv=vcm.ID_AnUniv
-                         AND sf.DenumireSpecializare=vcm.DenumireSpecializare
-                         AND sf.DenumireMaterie=vcm.DenumireMaterie AND sf.NrSemestruDinAn=vcm.NrSemestruDinAn
-                    WHERE vcm.ID_AnUniv=@ID_AnUniv
-                      AND UPPER(LTRIM(RTRIM(ISNULL(sf.DenTitularSauSuplinitor,'')))) IN ('TIT','TITULAR','TITULARA')
-                    GROUP BY vcm.ID_Profesor, sf.id_metaspecializare, vcm.NrSemestruDinAn,
-                             vcm.ID_StatDeFunctii, vcm.DenumireMaterie
-                ) t
-                GROUP BY t.ID_Profesor, t.IdMetaspec";
-            var orePerProfExp = new Dictionary<int, List<(int IdMeta, decimal Ore)>>();
-            using (var cmd2 = new SqlCommand(queryOreExp, conn))
-            {
-                cmd2.CommandTimeout = 120;
-                cmd2.Parameters.AddWithValue("@ID_AnUniv", idAnUniv);
-                using var r2 = cmd2.ExecuteReader();
-                while (r2.Read())
-                {
-                    int idProf = Convert.ToInt32(r2["ID_Profesor"]);
-                    int idMeta = r2["IdMetaspec"] != DBNull.Value ? Convert.ToInt32(r2["IdMetaspec"]) : 0;
-                    decimal ore = Convert.ToDecimal(r2["OreConventionale"]);
-                    if (!orePerProfExp.ContainsKey(idProf)) orePerProfExp[idProf] = new();
-                    orePerProfExp[idProf].Add((idMeta, ore));
-                }
-            }
-            var profesori = new List<ProfANS>();
-            foreach (var (id, nume, fac, dept, grad) in totiTitulariiExp.OrderBy(t => t.Nume))
-            {
-                var fractiuni = new Dictionary<int, decimal>();
-                if (orePerProfExp.TryGetValue(id, out var listaOreE))
-                {
-                    var orePerCol = new Dictionary<int, decimal>();
-                    foreach (var (idMeta, ore) in listaOreE)
-                    {
-                        if (!MappingMetaspec.TryGetValue(idMeta, out int idAns)) continue;
-                        if (!AnsIdToCol.ContainsKey(idAns)) continue;
-                        int col = AnsIdToCol[idAns];
-                        if (!orePerCol.ContainsKey(col)) orePerCol[col] = 0m;
-                        orePerCol[col] += ore;
-                    }
-                    // Baza de calcul = Max(totalOre, normaLegala) conform metodologiei ANS:
-                    // - prof sub norma: impartim la norma legala (fractiunea < 1.00)
-                    // - prof peste norma: impartim la totalOre real (fractiunea = 1.00 sau 1.01 din rotunjiri)
-                    decimal normaLegalaExp = GetNormaLegala(grad);
-                    decimal totalOre = orePerCol.Values.Sum();
-                    decimal bazaCalculExp = Math.Max(totalOre, normaLegalaExp);
-                    if (totalOre > 0 && bazaCalculExp > 0)
-                    {
-                        foreach (var kv in orePerCol)
-                        {
-                            decimal frac = Math.Round(kv.Value / bazaCalculExp, 2);
-                            if (frac > 0) fractiuni[kv.Key] = frac;
-                        }
-                    }
-                }
-                profesori.Add(new ProfANS { NumeComplet = nume, Departament = dept, Facultate = fac, GradFunctie = MapareGradANS(grad), Fractiuni = fractiuni });
-            }
-            var overrides = new Dictionary<string, Dictionary<int, decimal>>
-            {
-                ["VOLMER MARIUS"] = new() { { AnsIdToCol[7], 0.83m }, { AnsIdToCol[12], 0.17m } },
-                ["ZAHARIA SEBASTIAN MARIAN"] = new() { { AnsIdToCol[12], 0.74m }, { AnsIdToCol[9], 0.27m } },
-                ["ZAHARIA CORNELIU"] = new() { { AnsIdToCol[7], 0.86m }, { AnsIdToCol[11], 0.14m } },
-                // Vorovencii: 18 ore titular / Max(18,11)=18 -> teoretic 1.00, dar mici
-                // diferente de pontaj in AGSIS pot da 0.99. Override garanteaza 1.00.
-                ["VOROVENCII IOSIF"] = new() { { AnsIdToCol[10], 1.00m } },
-            };
-            foreach (var prof in profesori)
-                if (overrides.TryGetValue(prof.NumeComplet, out var ov)) prof.Fractiuni = ov;
-            profesori = profesori.OrderBy(p => p.NumeComplet).ToList();
-            var wb = BuildANSWorkbookFromScratch();
-            var ws = wb.Worksheets.First();
-            int dataStartRow = 9;
-            if (profesori.Count > 0) ws.Row(dataStartRow).InsertRowsBelow(profesori.Count - 1);
-            for (int i = 0; i < profesori.Count; i++)
-            {
-                var prof = profesori[i]; int r = dataStartRow + i;
-                ws.Cell(r, 1).Value = i + 1; ws.Cell(r, 2).Value = prof.NumeComplet;
-                ws.Cell(r, 3).Value = ""; ws.Cell(r, 4).Value = prof.GradFunctie;
-                ws.Cell(r, 5).Value = 1; ws.Cell(r, 6).Value = 0; ws.Cell(r, 7).Value = "";
-                ws.Cell(r, 8).Value = prof.Facultate; ws.Cell(r, 9).Value = prof.Departament;
-                foreach (var kv in prof.Fractiuni) ws.Cell(r, kv.Key).Value = kv.Value;
-                ws.Cell(r, 50).FormulaA1 = $"=SUM(J{r}:AW{r})";
-                if (i % 2 != 0) for (int c = 1; c <= 50; c++) ws.Cell(r, c).Style.Fill.BackgroundColor = XLColor.FromHtml("#f5f5f5");
-            }
-            int totalRow = dataStartRow + profesori.Count;
-            ws.Cell(totalRow, 1).Value = "Total general:"; ws.Cell(totalRow, 1).Style.Font.Bold = true;
-            for (int c = 10; c <= 49; c++) { string cl = ColumnLetter(c); ws.Cell(totalRow, c).FormulaA1 = $"=SUM({cl}{dataStartRow}:{cl}{totalRow - 1})"; ws.Cell(totalRow, c).Style.Font.Bold = true; }
-            ws.Cell(totalRow, 50).FormulaA1 = $"=SUM(J{totalRow}:AW{totalRow})"; ws.Cell(totalRow, 50).Style.Font.Bold = true;
-            using var stream = new MemoryStream(); wb.SaveAs(stream); wb.Dispose();
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Date_ANS_{idAnUniv}.xlsx");
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Cadre_Didactice_Colaboratori_{idAn}.xlsx");
         }
 
         #endregion
 
         #region ================= HELPERS =================
 
-        // =====================================================================
-        // NormaOreConventionale din AGSIS pentru ID_AnUniv=45:
-        //   ID_TipGradDidactic=1  (Profesor)           -> 11 ore
-        //   ID_TipGradDidactic=2  (Conferentiar)       -> 12 ore
-        //   ID_TipGradDidactic=3  (Lector/Sef Lucrari) -> 14 ore
-        //   ID_TipGradDidactic=4  (Asistent)           -> 15 ore
-        //   ID_TipGradDidactic=7  (Doctorand)          -> 18 ore
-        //   ID_TipGradDidactic=9  (Nespecificat)       -> 15 ore
-        //   ID_TipGradDidactic=10 (Sef Lucrari)        -> 14 ore
-        //   ID_TipGradDidactic=11 (Lector)             -> 14 ore
-        //   ID_TipGradDidactic=18 (Doctorand DCF)      ->  2 ore
-        // Sursa: SELECT * FROM [AGSIS].[pi].[NormaOreConventionale] WHERE ID_AnUniv=45
-        // =====================================================================
-        private static readonly Dictionary<int, decimal> NormaLegalaPerId = new Dictionary<int, decimal>
+        private void AddBaseParams(SqlCommand cmd, int idAnUniv,
+            string? anUniv, string? facultate, string? departament,
+            string? formaInvatamant, string? profesor, string? specializari,
+            int semestru, string? tipPost)
         {
-            { 1,  11m }, // Profesor
-            { 2,  12m }, // Conferentiar
-            { 3,  14m }, // Lector/Sef Lucrari
-            { 4,  15m }, // Asistent
-            { 7,  18m }, // Doctorand cu frecventa
-            { 9,  15m }, // Nespecificat
-            { 10, 14m }, // Sef Lucrari
-            { 11, 14m }, // Lector
-            { 18,  2m }, // Doctorand DCF
-        };
-
-        // gradFunctie = string din MapareGradANS() ex: "Prof. dr.", "Conf. dr.", "Șef lucr. dr.", "Asist. dr."
-        private decimal GetNormaLegala(string gradFunctie)
-        {
-            string g = gradFunctie?.ToUpperInvariant() ?? "";
-            if (g.Contains("PROF")) return 11m;       // ID_TipGrad=1
-            if (g.Contains("CONF")) return 12m;       // ID_TipGrad=2
-            if (g.Contains("SEF") || g.Contains("ȘEF") || g.Contains("LECT")) return 14m; // ID_TipGrad=3/10/11
-            if (g.Contains("ASIST")) return 15m;      // ID_TipGrad=4 (era 16, acum CORECT 15!)
-            if (g.Contains("PREPAR")) return 18m;     // ID_TipGrad=7
-            if (g.Contains("CS I") || g.Contains("CS II") || g.Contains("CS III") || g.Contains("CS")) return 14m;
-            return 15m; // fallback
-        }
-
-        private string GetDeptIds(string? departament)
-        {
-            var deptNorm = departament?.Trim().ToUpperInvariant() ?? "TOTI";
-            if (deptNorm == "TOTI") return "0";
-            var ids = string.Join(",", MapareCatedra
-                .Where(kv => kv.Value.ToUpperInvariant() == deptNorm)
-                .Select(kv => kv.Key.ToString()));
-            return string.IsNullOrEmpty(ids) ? "-1" : ids;
-        }
-
-        private void AddBaseParams(SqlCommand cmd, string? anUniv, string? facultate, string? departament,
-            string? formaInvatamant, string? profesor, string? specializari, int semestru, string? tipPost)
-        {
-            cmd.Parameters.AddWithValue("@an", anUniv ?? "Toti");
-            cmd.Parameters.AddWithValue("@fac", facultate ?? "Toti");
-            cmd.Parameters.AddWithValue("@dept", departament ?? "Toti");
-            cmd.Parameters.AddWithValue("@deptIds", GetDeptIds(departament));
-            cmd.Parameters.AddWithValue("@formaInv", formaInvatamant ?? "Toti");
-            cmd.Parameters.AddWithValue("@prof", profesor ?? "Toti");
-            cmd.Parameters.AddWithValue("@specs", string.IsNullOrWhiteSpace(specializari) ? "Toti" : specializari);
-            cmd.Parameters.AddWithValue("@semestru", semestru);
-            cmd.Parameters.AddWithValue("@tipPost", tipPost ?? "Toti");
+            cmd.Parameters.Add(new SqlParameter("@ID_AnUniv", SqlDbType.Int) { Value = idAnUniv });
+            cmd.Parameters.Add(new SqlParameter("@an", SqlDbType.NVarChar, 200) { Value = anUniv ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@fac", SqlDbType.NVarChar, 200) { Value = facultate ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@dept", SqlDbType.NVarChar, 200) { Value = departament ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@formaInv", SqlDbType.NVarChar, 200) { Value = formaInvatamant ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@prof", SqlDbType.NVarChar, 200) { Value = profesor ?? "Toti" });
+            cmd.Parameters.Add(new SqlParameter("@specs", SqlDbType.NVarChar, 2000) { Value = string.IsNullOrWhiteSpace(specializari) ? "Toti" : specializari });
+            cmd.Parameters.Add(new SqlParameter("@semestru", SqlDbType.Int) { Value = semestru });
+            cmd.Parameters.Add(new SqlParameter("@tipPost", SqlDbType.NVarChar, 50) { Value = tipPost ?? "Toti" });
         }
 
         private void StyleHeader(IXLRange range)
@@ -2318,120 +1528,17 @@ namespace LicentaV1.Controllers
             return result;
         }
 
-        private string MapareGradANS(string? gradDidactic)
+        // Helpers pentru citire sigura din SqlDataReader (coloana poate lipsi in SP)
+        private static int? TryGetInt(SqlDataReader r, string col)
         {
-            if (string.IsNullOrWhiteSpace(gradDidactic)) return "Asist. dr.";
-            string g = gradDidactic.ToUpperInvariant().Trim();
-            if (g.Contains("PROFESOR UNIVERSITAR") || (g.Contains("PROFESOR") && !g.Contains("CONSULTANT"))) return "Prof. dr.";
-            if (g.Contains("CONFERENTIAR") || g.Contains("CONFERENȚIAR")) return "Conf. dr.";
-            if (g.Contains("LECTOR") || g.Contains("SEF LUCR") || g.Contains("ȘEF LUCR")
-                || g.Contains("SEFUL LUCR") || (g.Contains("SEF") && g.Contains("LUCRARI"))
-                || (g.Contains("ȘEF") && g.Contains("LUCRĂRI"))) return "Șef lucr. dr.";
-            if (g.Contains("ASISTENT")) return "Asist. dr.";
-            if (g.Contains("PREPARATOR")) return "Preparator";
-            if (g.Contains("CERCET") && g.Contains(" I ")) return "CS I";
-            if (g.Contains("CERCET") && g.Contains(" II")) return "CS II";
-            if (g.Contains("CERCET") && g.Contains(" III")) return "CS III";
-            if (g.Contains("CERCET")) return "CS";
-            return "Asist. dr.";
+            try { return r[col] != DBNull.Value ? (int?)Convert.ToInt32(r[col]) : null; }
+            catch { return null; }
         }
 
-        private XLWorkbook BuildANSWorkbookFromScratch()
+        private static string? TryGetString(SqlDataReader r, string col)
         {
-            var wb = new XLWorkbook();
-            var ws = wb.Worksheets.Add("CD DRU");
-            ws.Cell(2, 1).Value = "Anexa 1. Tabel institutional privind normarea si activitatea cadrelor didactice si de cercetare";
-            ws.Range(2, 1, 2, 50).Merge();
-            ws.Cell(3, 1).Value = "Universitatea Transilvania din Brasov"; ws.Range(3, 1, 3, 6).Merge();
-            ws.Cell(4, 1).Value = "NOTA: Se includ in tabel toate cadrele didactice si de cercetare titulare (cu norma de baza in universitate), indiferent de forma de angajare.";
-            ws.Range(4, 1, 4, 9).Merge();
-            ws.Cell(4, 10).Value = "NOTA: IMPORTANT! Va rugam sa completati in prima faza, in sectiunile aferente, fractiunile de norma pentru fiecare domeniu de stiinta.";
-            ws.Range(4, 10, 4, 27).Merge(); ws.Range(4, 28, 4, 50).Merge();
-            ws.Cell(5, 1).Value = "Nr. \nCrt."; ws.Cell(5, 2).Value = "Nume si prenume cadru didactic";
-            ws.Cell(5, 3).Value = "CNP"; ws.Cell(5, 4).Value = "Functie cadru didactic sau cercetare";
-            ws.Cell(5, 5).Value = "Forma de angajare"; ws.Cell(5, 6).Value = "Calitate conducator doctorat";
-            ws.Cell(5, 7).Value = "Varsta"; ws.Cell(5, 8).Value = "Facultate"; ws.Cell(5, 9).Value = "Departament";
-            ws.Cell(5, 10).Value = "Matematica si stiinte ale naturii"; ws.Cell(5, 15).Value = "Stiinte ingineresti";
-            ws.Cell(5, 22).Value = "Stiinte biologice si biomedicale"; ws.Cell(5, 28).Value = "Stiinte sociale";
-            ws.Cell(5, 37).Value = "Stiinte umaniste si arte"; ws.Cell(5, 50).Value = "Total";
-            ws.Range(5, 1, 7, 1).Merge(); ws.Range(5, 2, 7, 2).Merge(); ws.Range(5, 3, 7, 3).Merge();
-            ws.Range(5, 4, 7, 4).Merge(); ws.Range(5, 5, 7, 5).Merge(); ws.Range(5, 6, 7, 6).Merge();
-            ws.Range(5, 7, 7, 7).Merge(); ws.Range(5, 8, 7, 8).Merge(); ws.Range(5, 9, 7, 9).Merge();
-            ws.Range(5, 10, 5, 14).Merge(); ws.Range(5, 15, 5, 21).Merge();
-            ws.Range(5, 22, 5, 27).Merge(); ws.Range(5, 28, 5, 36).Merge();
-            ws.Range(5, 37, 5, 49).Merge(); ws.Range(5, 50, 7, 50).Merge();
-            string[] subdomenii = {
-                "Matematica","Informatica","Fizica","Chimie si inginerie chimica","Stiintele pamantului si atmosferei",
-                "Inginerie civila","Inginerie electrica, electronica si telecomunicatii",
-                "Inginerie geologica, mine, petrol si gaze","Ingineria transporturilor",
-                "Ingineria resurselor vegetale si animale",
-                "Ingineria sistemelor, calculatoare si tehnologia informatiei",
-                "Inginerie mecanica, mecatronica, inginerie industriala si management",
-                "Biologie","Biochimie","Medicina","Medicina veterinara","Medicina dentara","Farmacie",
-                "Stiinte juridice","Stiinte administrative","Stiinte ale comunicarii","Sociologie",
-                "Stiinte politice","Stiinte militare, informatii si ordine publica",
-                "Stiinte economice (doar Cibernetica, statistica si informatica economica)",
-                "Stiinte economice (fara Cibernetica, statistica si informatica economica)",
-                "Psihologie si stiinte comportamentale","Filologie","Filosofie","Istorie","Teologie",
-                "Studii culturale","Arhitectura si urbanism","Arte vizuale (fara Istoria si teoria artei)",
-                "Arte vizuale (doar Istoria si teoria artei)","Teatru si artele spectacolului",
-                "Cinematografie si media","Muzica (doar Interpretare muzicala)",
-                "Muzica (fara Interpretare muzicala)","Stiintele Sportului si Educatiei Fizice"
-            };
-            for (int i = 0; i < subdomenii.Length; i++) { ws.Cell(6, 10 + i).Value = subdomenii[i]; ws.Range(6, 10 + i, 7, 10 + i).Merge(); }
-            for (int i = 0; i < 9; i++) ws.Cell(8, i + 1).Value = ((char)('A' + i)).ToString();
-            for (int i = 0; i < 41; i++) ws.Cell(8, 10 + i).Value = i + 1;
-            ws.Cell(8, 50).Value = "40";
-            var headerFill = XLColor.FromHtml(BrandColorHex);
-            for (int r = 5; r <= 8; r++) for (int c = 1; c <= 50; c++)
-            {
-                ws.Cell(r, c).Style.Font.Bold = true; ws.Cell(r, c).Style.Font.FontColor = XLColor.Black;
-                ws.Cell(r, c).Style.Fill.BackgroundColor = XLColor.White;
-                ws.Cell(r, c).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                ws.Cell(r, c).Style.Alignment.WrapText = true;
-                ws.Cell(r, c).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-                ws.Cell(r, c).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
-            }
-            ws.Range(5, 1, 5, 50).Style.Fill.BackgroundColor = headerFill;
-            ws.Range(5, 1, 5, 50).Style.Font.FontColor = XLColor.White;
-            ws.Column(1).Width = 5; ws.Column(2).Width = 30; ws.Column(3).Width = 14;
-            ws.Column(4).Width = 22; ws.Column(5).Width = 10; ws.Column(6).Width = 12;
-            ws.Column(7).Width = 8; ws.Column(8).Width = 28; ws.Column(9).Width = 28;
-            for (int c = 10; c <= 50; c++) ws.Column(c).Width = 12;
-            return wb;
-        }
-
-        private string MapareFunctieANSbyId(int idTipGrad) => idTipGrad switch
-        {
-            1 => "Prof. dr.",
-            2 => "Conf. dr.",
-            3 => "Șef lucr. dr.",
-            4 => "Asist. dr.",
-            7 => "Preparator",
-            9 => "Asist. dr.",
-            10 => "CS III",
-            11 => "Șef lucr. dr.",
-            18 => "CS I",
-            _ => "Asist. dr."
-        };
-
-        public class ProfANS
-        {
-            public string NumeComplet { get; set; } = "";
-            public string Departament { get; set; } = "";
-            public string Facultate { get; set; } = "";
-            public string GradFunctie { get; set; } = "";
-            public Dictionary<int, decimal> Fractiuni { get; set; } = new();
-        }
-
-        public class RandSqlANS
-        {
-            public string NumeComplet { get; set; } = "";
-            public string Facultate { get; set; } = "";
-            public string Departament { get; set; } = "";
-            public string GradDidactic { get; set; } = "";
-            public decimal OreConventionale { get; set; }
-            public int IdANS { get; set; }
+            try { return r[col]?.ToString(); }
+            catch { return null; }
         }
 
         #endregion
