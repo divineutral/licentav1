@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BI Dashboard - Transilvania</title>
+    <title>BI Dashboard — Transilvania</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     <style>
         :root {
-            --sidebar-w: 250px;
-            --accent: #56723e;
-            --accent-light: #e8efe1;
-            --accent-dark: #3d5229;
+            --a: #56723e;
+            --al: #e8efe1;
+            --ad: #3d5229;
+            --sw: 240px;
         }
 
         body {
@@ -20,57 +20,55 @@
             font-family: 'Segoe UI',sans-serif;
         }
 
-        /* Sidebar */
         .sidebar {
-            width: var(--sidebar-w);
+            width: var(--sw);
             background: #212529;
             min-height: 100vh;
             position: fixed;
-            z-index: 1000;
+            z-index: 999;
         }
 
             .sidebar .nav-link {
                 color: rgba(255,255,255,.7);
                 margin: 4px 12px;
                 border-radius: 8px;
-                transition: .25s;
-                font-size: .88rem;
+                transition: .2s;
+                font-size: .87rem;
             }
 
                 .sidebar .nav-link.active, .sidebar .nav-link:hover {
-                    background: var(--accent);
+                    background: var(--a);
                     color: #fff;
                     font-weight: 600;
                 }
 
-            .sidebar .logo-box {
-                padding: 18px;
-                background: rgba(255,255,255,.05);
-                border-radius: 10px;
-                margin: 12px;
+        .main {
+            margin-left: var(--sw);
+            padding: 24px;
+        }
+
+        .fb {
+            background: #fff;
+            padding: 14px 16px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+            border-top: 4px solid var(--a);
+        }
+
+            .fb label {
+                font-size: .73rem;
+                font-weight: 700;
+                color: #6c757d;
+                display: block;
+                margin-bottom: 3px;
             }
 
-        .main-content {
-            margin-left: var(--sidebar-w);
-            padding: 28px;
-        }
-
-        /* Filter bar */
-        .filter-bar {
-            background: #fff;
-            padding: 18px 20px;
-            border-radius: 14px;
-            margin-bottom: 22px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.06);
-            border-top: 5px solid var(--accent);
-        }
-
-        /* Accordion */
         .accordion-item {
             border: none;
-            border-radius: 14px;
+            border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 18px;
+            margin-bottom: 12px;
             box-shadow: 0 3px 10px rgba(0,0,0,.06);
         }
 
@@ -78,11 +76,12 @@
             background: #fff;
             font-weight: 600;
             color: #495057;
+            font-size: .89rem;
         }
 
             .accordion-button:not(.collapsed) {
                 background: #f1f3ee;
-                color: var(--accent);
+                color: var(--a);
                 box-shadow: none;
             }
 
@@ -90,338 +89,343 @@
                 box-shadow: none;
             }
 
-        /* Select2 */
         .select2-container .select2-selection--single {
-            height: 38px !important;
+            height: 34px !important;
             border: 1px solid #dee2e6 !important;
             display: flex;
             align-items: center;
         }
 
         .select2-container--default .select2-selection--single .select2-selection__arrow {
-            top: 6px;
+            top: 4px;
+        }
+        /* Table */
+        .etbl {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .77rem;
         }
 
-        .select2-container--default .select2-selection--multiple {
-            border: 1px solid #dee2e6 !important;
-            min-height: 38px;
-        }
-
-        /* ============ EXCEL PREVIEW BOX ============ */
-        .excel-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 7px 12px;
-            background: #f1f3ee;
-            border-radius: 8px 8px 0 0;
-            border-bottom: 2px solid var(--accent);
-            user-select: none;
-            flex-wrap: wrap;
-        }
-
-            .excel-toolbar .lbl {
-                font-size: .75rem;
-                color: var(--accent);
+            .etbl th {
+                background: var(--a);
+                color: #fff;
                 font-weight: 600;
+                padding: 7px 9px;
+                position: sticky;
+                top: 0;
+                z-index: 5;
                 white-space: nowrap;
             }
 
-            .excel-toolbar input[type=range] {
-                width: 100px;
-                accent-color: var(--accent);
-                cursor: pointer;
+            .etbl td {
+                padding: 6px 9px;
+                border-bottom: 1px solid #f0f0f0;
+                vertical-align: middle;
             }
 
-            .excel-toolbar .zval {
-                font-size: .75rem;
-                font-weight: 700;
-                color: #495057;
-                min-width: 36px;
-                text-align: center;
-            }
-
-            .excel-toolbar .zbtn {
-                background: #fff;
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-                padding: 1px 7px;
-                font-size: .85rem;
-                cursor: pointer;
-                color: var(--accent);
-                font-weight: bold;
-                line-height: 1.5;
-            }
-
-                .excel-toolbar .zbtn:hover {
-                    background: var(--accent-light);
-                }
-
-        .excel-preview-box {
-            overflow: auto;
-            border: 1px solid #c8d4b8;
-            border-radius: 0 0 8px 8px;
-            background: #fff;
-            max-height: 480px;
-            position: relative;
-        }
-
-            .excel-preview-box::-webkit-scrollbar {
-                width: 10px;
-                height: 10px;
-            }
-
-            .excel-preview-box::-webkit-scrollbar-track {
-                background: #f1f3ee;
-                border-radius: 5px;
-            }
-
-            .excel-preview-box::-webkit-scrollbar-thumb {
-                background: var(--accent);
-                border-radius: 5px;
-                border: 2px solid #f1f3ee;
-            }
-
-                .excel-preview-box::-webkit-scrollbar-thumb:hover {
-                    background: var(--accent-dark);
-                }
-
-            .excel-preview-box::-webkit-scrollbar-corner {
-                background: #f1f3ee;
-            }
-
-        .excel-preview-box {
-            scrollbar-width: thin;
-            scrollbar-color: var(--accent) #f1f3ee;
-        }
-
-        .scale-wrap {
-            transform-origin: top left;
-            display: inline-block;
-            min-width: 100%;
-        }
-
-        /* ============ TABLE STYLES ============ */
-        .etbl {
-            border-collapse: separate;
-            border-spacing: 0;
-            white-space: nowrap;
-            font-size: .79rem;
-        }
-
-            .etbl th, .etbl td {
-                border: 1px solid #dee2e6;
-                padding: 5px 8px;
-            }
-
-            .etbl thead th {
-                position: sticky;
-                top: 0;
-                z-index: 10;
-                background: var(--accent);
-                color: #fff;
-                font-weight: bold;
-                text-align: center;
-            }
-            /* Sticky col 1 */
-            .etbl th:nth-child(1), .etbl td:nth-child(1) {
-                position: sticky;
-                left: 0;
-                z-index: 9;
-                background: var(--accent);
-                color: #fff;
-                min-width: 42px;
-                text-align: center;
-            }
-            /* Sticky col 2 */
-            .etbl th:nth-child(2), .etbl td:nth-child(2) {
-                position: sticky;
-                left: 42px;
-                z-index: 9;
-                background: #fff;
-                min-width: 200px;
-                font-weight: 600;
-                border-right: 2px solid #c8d4b8;
-            }
-
-            .etbl thead th:nth-child(1), .etbl thead th:nth-child(2) {
-                background: var(--accent);
-                color: #fff;
-                z-index: 12;
+            .etbl tbody tr:hover td {
+                background: var(--al);
             }
 
             .etbl tbody tr:nth-child(even) td {
-                background: #f9fafb;
+                background: #fafafa;
             }
 
-                .etbl tbody tr:nth-child(even) td:nth-child(2) {
-                    background: #f9fafb;
-                }
-
-            .etbl tbody tr:hover td {
-                background: var(--accent-light) !important;
+            .etbl tbody tr:nth-child(even):hover td {
+                background: var(--al);
             }
 
-        .etbl-ans {
-            min-width: 2800px;
+        .twrap {
+            overflow: auto;
+            max-height: 460px;
+            border: 1px solid #dee2e6;
+            border-radius: 0 0 8px 8px;
         }
 
-        .frac-poz {
-            background: #d4edda !important;
-            color: #155724;
+        .tfoot-row td {
+            background: #e9ecef !important;
+            font-weight: 700;
+            font-size: .77rem;
+        }
+        /* Badges */
+        .bt {
+            background: var(--a);
+            color: #fff;
+            font-size: .71rem;
+            padding: 2px 7px;
+            border-radius: 4px;
             font-weight: 600;
-            text-align: center;
         }
 
-        .prog-wrap {
+        .bs {
+            background: #ffc107;
+            color: #212529;
+            font-size: .71rem;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .bif {
+            background: #0d6efd;
+            color: #fff;
+            font-size: .71rem;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .bifr {
+            background: #6f42c1;
+            color: #fff;
+            font-size: .71rem;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .bid {
+            background: #20c997;
+            color: #212529;
+            font-size: .71rem;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+        /* Progress bars for distributie */
+        .pbar-wrap {
             display: flex;
             align-items: center;
-            gap: 5px;
-            min-width: 120px;
+            gap: 6px;
+            min-width: 140px;
         }
 
-        .prog-track {
+        .pbar-track {
             flex: 1;
-            height: 6px;
+            height: 7px;
             background: #e9ecef;
-            border-radius: 3px;
+            border-radius: 4px;
+            overflow: hidden;
         }
 
-        .prog-fill {
-            height: 6px;
-            border-radius: 3px;
+        .pbar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width .4s;
         }
-
-        .tr-total td {
-            background: #e9ecef !important;
-            font-weight: bold;
+        /* ANS fracție pozitivă */
+        .frac-cell {
+            background: #d4edda;
+            color: #155724;
+            font-weight: 700;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-
-    <!-- SIDEBAR -->
     <div class="sidebar d-flex flex-column p-2">
-        <div class="logo-box text-center mb-3">
-            <img src="images/logo.png" alt="Logo" style="max-width:160px;width:100%;object-fit:contain;"
-                 onerror="this.style.display='none';this.parentElement.innerHTML='<h4 class=\'text-white mb-0\'>BI</h4>'">
+        <div class="text-center p-3 mb-2" style="background:rgba(255,255,255,.06);border-radius:10px;">
+            <img src="images/logo.png" style="max-width:160px;width:100%;object-fit:contain;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='<h5 class=\'text-white mb-0\'>BI Dashboard</h5>'">
         </div>
-        <ul class="nav nav-pills flex-column mb-auto">
+        <ul class="nav nav-pills flex-column">
             <li><a href="#" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
         </ul>
-        <div class="p-2 border-top border-secondary text-center small text-muted mt-auto">Licenta 2026</div>
+        <div class="mt-auto p-2 text-center small text-secondary">Licență 2026</div>
     </div>
 
-    <!-- MAIN -->
-    <div class="main-content">
-        <h2 class="mb-4 fw-bold text-dark" style="border-left:5px solid var(--accent);padding-left:14px;">
-            Academic Year Overview
+    <div class="main">
+        <h2 class="mb-3 fw-bold" style="border-left:4px solid var(--a);padding-left:12px;color:#212529;">
+            Dashboard Cadre Didactice
         </h2>
 
         <!-- FILTRE -->
-        <div class="filter-bar row g-2 align-items-end">
-            <div class="col-auto">
-                <label class="small fw-bold text-muted d-block">An Univ</label>
-                <select id="anUnivSelect" class="form-select" style="min-width:140px;"></select>
-            </div>
-            <div class="col-auto">
-                <label class="small fw-bold text-muted d-block">Facultate</label>
-                <select id="facultateSelect" class="form-select" style="min-width:190px;"></select>
-            </div>
-            <div class="col-auto">
-                <label class="small fw-bold text-muted d-block">Departament</label>
-                <select id="departamentSelect" class="form-select" style="min-width:190px;"></select>
-            </div>
-            <div class="col-auto">
-                <label class="small fw-bold text-muted d-block">Forma Inv.</label>
-                <select id="formaInvSelect" class="form-select">
-                    <option value="Toti">Toate</option>
-                    <option value="Cu frecvență">IF</option>
-                    <option value="Frecvență redusă">IFR</option>
-                    <option value="Învățământ la distanță">ID</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="small fw-bold text-muted d-block">Specializare</label>
-                <select id="specializareSelect" class="form-select w-100" multiple="multiple"></select>
-            </div>
-            <div class="col-auto">
-                <label class="small fw-bold text-muted d-block">Semestru</label>
-                <select id="semestruSelect" class="form-select">
-                    <option value="0">Toate</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                </select>
-            </div>
-            <div class="col-auto">
-                <label class="small fw-bold text-muted d-block">Tip Post</label>
-                <select id="tipPostSelect" class="form-select">
-                    <option value="Toti">Toate</option>
-                    <option value="Titular">Titular</option>
-                    <option value="Suplinitor">Suplinitor</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="small fw-bold text-muted d-block">Profesor</label>
-                <select id="profesorSelect" class="form-select w-100"></select>
-            </div>
-            <div class="col-auto mt-1">
-                <button class="btn btn-secondary btn-sm" onclick="resetView()">
-                    <i class="bi bi-arrow-counterclockwise"></i> Reset
-                </button>
+        <div class="fb">
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label>An Universitar</label>
+                    <select id="sAn" class="form-select form-select-sm" style="min-width:150px;"></select>
+                </div>
+                <div class="col-auto">
+                    <label>Facultate</label>
+                    <select id="sFac" class="form-select form-select-sm" style="min-width:195px;"></select>
+                </div>
+                <div class="col-auto">
+                    <label>Departament</label>
+                    <select id="sDept" class="form-select form-select-sm" style="min-width:195px;"></select>
+                </div>
+                <div class="col-auto">
+                    <label>Tip Post</label>
+                    <select id="sTip" class="form-select form-select-sm" style="min-width:108px;">
+                        <option value="Toti">Toate</option>
+                        <option value="Titular">Titular</option>
+                        <option value="Suplinitor">Suplinitor</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label>Forma Inv.</label>
+                    <select id="sForma" class="form-select form-select-sm" style="min-width:110px;">
+                        <option value="Toti">Toate</option>
+                        <option value="Cu frecvență">IF</option>
+                        <option value="Frecvență redusă">IFR</option>
+                        <option value="Învățământ la distanță">ID</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label>Semestru</label>
+                    <select id="sSem" class="form-select form-select-sm" style="min-width:88px;">
+                        <option value="0">Toate</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                    </select>
+                </div>
+                <div class="col-auto" style="min-width:175px;">
+                    <label>Specializare</label>
+                    <select id="sSpec" class="form-select form-select-sm w-100"></select>
+                </div>
+                <div class="col-auto" style="min-width:175px;">
+                    <label>Profesor</label>
+                    <select id="sProf" class="form-select form-select-sm w-100"></select>
+                </div>
+                <div class="col-auto">
+                    <label class="invisible">.</label>
+                    <button class="btn btn-sm btn-secondary d-block" onclick="resetAll()">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- ACCORDION -->
         <div class="accordion" id="acc">
 
             <!-- R1: Norme -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cNorme">
-                        <i class="bi bi-table me-2"></i> Detaliere Norme Profesori
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r1">
+                        <i class="bi bi-table me-2"></i>Detaliere Norme Profesori
                     </button>
                 </h2>
-                <div id="cNorme" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r1" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-end mb-2">
-                            <button class="btn btn-success btn-sm" onclick="dl('norma')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
+                            <button class="btn btn-success btn-sm" onclick="dl('norma')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
                         </div>
-                        <div id="box-norme"></div>
+                        <div class="twrap">
+                            <table class="etbl">
+                                <thead>
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Profesor</th>
+                                        <th>Dept.</th>
+                                        <th>Specializare</th>
+                                        <th>Materie</th>
+                                        <th>Tip</th>
+                                        <th>Sem.</th>
+                                        <th>Forma</th>
+                                        <th class="text-end">Ore C.</th>
+                                        <th class="text-end">Ore A.</th>
+                                        <th class="text-end">Ore Conv.</th>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-end">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="b1">
+                                    <tr>
+                                        <td colspan="13" class="text-center py-3 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- R2: Ore Program -->
+            <!-- R2: Totaluri -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cOre">
-                        <i class="bi bi-bar-chart-fill me-2"></i> Distributie Ore Profesor pe Programe
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r2">
+                        <i class="bi bi-calculator me-2"></i>Totaluri Norme (IF / ID / IFR)
                     </button>
                 </h2>
-                <div id="cOre" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r2" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-end mb-2">
-                            <button class="btn btn-success btn-sm" onclick="dl('ore-program')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
+                            <button class="btn btn-success btn-sm" onclick="dl('norma-totaluri')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
                         </div>
-                        <div id="box-ore"></div>
+                        <div class="twrap">
+                            <table class="etbl">
+                                <thead>
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Profesor</th>
+                                        <th>Facultate</th>
+                                        <th>Dept.</th>
+                                        <th>Tip</th>
+                                        <th class="text-end">Ore IF</th>
+                                        <th class="text-end">Ore ID</th>
+                                        <th class="text-end">Ore IFR</th>
+                                        <th class="text-end">Total Ore Conv.</th>
+                                        <th class="text-end">Total Anual (×14)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="b2">
+                                    <tr>
+                                        <td colspan="10" class="text-center py-3 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- R3: Totaluri Norme -->
+            <!-- R3: Distributie Ore -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cTotal">
-                        <i class="bi bi-calculator me-2"></i> Totaluri Norme Profesori
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r3">
+                        <i class="bi bi-bar-chart-fill me-2"></i>Distribuție Ore pe Programe
                     </button>
                 </h2>
-                <div id="cTotal" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r3" class="accordion-collapse collapse">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2">
-                            <button class="btn btn-success btn-sm" onclick="dl('norma-totaluri')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small text-muted">
+                                Procent = (Ore program / Total ore universitate profesor) × 100
+                            </span>
+                            <button class="btn btn-success btn-sm" onclick="dl('distributie-ore')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
                         </div>
-                        <div id="box-total"></div>
+                        <div class="twrap">
+                            <table class="etbl">
+                                <thead>
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Profesor</th>
+                                        <th>Dept.</th>
+                                        <th>Program Studiu</th>
+                                        <th class="text-end">Ore Program</th>
+                                        <th class="text-end">Total Univ.</th>
+                                        <th style="min-width:180px;">Procent</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="b3">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-3 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -429,16 +433,39 @@
             <!-- R4: Limbi -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cLimbi">
-                        <i class="bi bi-translate me-2"></i> Raport Limbi Straine
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r4">
+                        <i class="bi bi-translate me-2"></i>Raport Limbi Străine
                     </button>
                 </h2>
-                <div id="cLimbi" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r4" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-end mb-2">
-                            <button class="btn btn-success btn-sm" onclick="dl('limbi-straine')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
+                            <button class="btn btn-success btn-sm" onclick="dl('limbi-straine')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
                         </div>
-                        <div id="box-limbi"></div>
+                        <div class="twrap">
+                            <table class="etbl">
+                                <thead>
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Profesor</th>
+                                        <th class="text-end">Sem. 1 (h)</th>
+                                        <th class="text-end">Sem. 2 (h)</th>
+                                        <th class="text-end">Total (h)</th>
+                                        <th>Limbi Predate</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="b4">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -446,16 +473,40 @@
             <!-- R5: Discipline -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cDisc">
-                        <i class="bi bi-book me-2"></i> Raport Discipline Predate
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r5">
+                        <i class="bi bi-book me-2"></i>Discipline Predate per Profesor
                     </button>
                 </h2>
-                <div id="cDisc" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r5" class="accordion-collapse collapse">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2">
-                            <button class="btn btn-success btn-sm" onclick="dl('discipline-predate')"><i class="bi bi-file-earmark-excel"></i> Export ZIP</button>
+                        <div class="d-flex justify-content-end mb-2 gap-2">
+                            <button class="btn btn-outline-success btn-sm" onclick="dl('discipline-zip')">
+                                <i class="bi bi-file-earmark-zip"></i> Export ZIP (IF+IFR+ID)
+                            </button>
                         </div>
-                        <div id="box-disc"></div>
+                        <div class="twrap">
+                            <table class="etbl">
+                                <thead>
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Profesor</th>
+                                        <th>Facultate</th>
+                                        <th>Dept.</th>
+                                        <th>Grad</th>
+                                        <th class="text-center">Nr. Disc.</th>
+                                        <th>Discipline</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="b5">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-3 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -463,17 +514,39 @@
             <!-- R6: Titulari -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cTit">
-                        <i class="bi bi-person-check me-2"></i> Raport Cadre Didactice Titulare
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r6">
+                        <i class="bi bi-person-check me-2"></i>Cadre Didactice Titulare
                     </button>
                 </h2>
-                <div id="cTit" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r6" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Filtru: <code>TitularAnUniv=1</code></span>
-                            <button class="btn btn-success btn-sm" onclick="dl('titulari')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
+                            <span class="badge bg-secondary small">TitularAnUniv = 1</span>
+                            <button class="btn btn-success btn-sm" onclick="dl('titulari')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
                         </div>
-                        <div id="box-tit"></div>
+                        <div class="twrap">
+                            <table class="etbl">
+                                <thead>
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Profesor</th>
+                                        <th>Facultate</th>
+                                        <th>Departament</th>
+                                        <th>Grad Didactic</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="b6">
+                                    <tr>
+                                        <td colspan="5" class="text-center py-3 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -481,17 +554,39 @@
             <!-- R7: Colaboratori -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cCol">
-                        <i class="bi bi-people me-2"></i> Raport Asociati / Colaboratori
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r7">
+                        <i class="bi bi-people me-2"></i>Asociați / Colaboratori
                     </button>
                 </h2>
-                <div id="cCol" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r7" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Filtru: <code>TitularAnUniv=0</code></span>
-                            <button class="btn btn-success btn-sm" onclick="dl('colaboratori')"><i class="bi bi-file-earmark-excel"></i> Export Excel</button>
+                            <span class="badge bg-secondary small">TitularAnUniv = 0</span>
+                            <button class="btn btn-success btn-sm" onclick="dl('colaboratori')">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
                         </div>
-                        <div id="box-col"></div>
+                        <div class="twrap">
+                            <table class="etbl">
+                                <thead>
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Profesor</th>
+                                        <th>Facultate</th>
+                                        <th>Departament</th>
+                                        <th>Grad Didactic</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="b7">
+                                    <tr>
+                                        <td colspan="5" class="text-center py-3 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -499,464 +594,456 @@
             <!-- R8: ANS -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cANS">
-                        <i class="bi bi-file-earmark-spreadsheet me-2"></i> Raport Domenii ANS
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#r8">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Raport Domenii ANS
                     </button>
                 </h2>
-                <div id="cANS" class="accordion-collapse collapse" data-bs-parent="#acc">
+                <div id="r8" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>50+ coloane dinamice. Scroll orizontal activ.</span>
-                            <button class="btn btn-success btn-sm" onclick="dl('raport-ans')"><i class="bi bi-file-earmark-excel"></i> Export Excel ANS</button>
+                            <span class="small text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Titulari oficiali (741) — coloane dinamice din DB
+                            </span>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="loadAns()">
+                                    <i class="bi bi-eye"></i> Previzualizare
+                                </button>
+                                <button class="btn btn-success btn-sm" onclick="dl('raport-ans')">
+                                    <i class="bi bi-file-earmark-excel"></i> Export Excel ANS
+                                </button>
+                            </div>
                         </div>
-                        <div id="box-ans"></div>
+                        <div class="twrap" id="ansWrap" style="display:none;">
+                            <table class="etbl" id="tAns">
+                                <thead><tr id="ansHead"></tr></thead>
+                                <tbody id="b8"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
 
-        </div><!-- /accordion -->
-    </div><!-- /main-content -->
+        </div>
+    </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        // =====================================================================
-        // CACHE - evita re-fetch la re-deschidere fara schimbare filtre
-        // =====================================================================
-        const cache = {};
-        function cKey() { return JSON.stringify(getP()); }
-        function isDirty(k) { return cache[k] !== cKey(); }
-        function markClean(k) { cache[k] = cKey(); }
+        const S = {
+            idAn: 0, idFac: 0, idCatedra: 0, spec: 'Toti', prof: 'Toti',
+            tipPost: 'Toti', formaInv: 'Toti', sem: 0
+        };
+        const loaded = {};
 
-        // =====================================================================
-        // FILTRE
-        // =====================================================================
-        function getP() {
-            const specs = $('#specializareSelect').val();
-            return {
-                idAnUniv: $('#anUnivSelect').val() || 45,
-                facultate: $('#facultateSelect').val() || 'Toti',
-                departament: $('#departamentSelect').val() || 'Toti',
-                formaInvatamant: $('#formaInvSelect').val() || 'Toti',
-                specializari: (specs && specs.length) ? specs.join(',') : 'Toti',
-                semestru: $('#semestruSelect').val() || 0,
-                tipPost: $('#tipPostSelect').val() || 'Toti',
-                profesor: $('#profesorSelect').val() || 'Toti'
-            };
+        function key() { return JSON.stringify(S); }
+        function dirty(id) { return loaded[id] !== key(); }
+        function clean(id) { loaded[id] = key(); }
+
+        function resetAll() {
+            document.querySelectorAll('.accordion-collapse.show').forEach(el =>
+                bootstrap.Collapse.getInstance(el)?.hide());
+            Object.keys(loaded).forEach(k => delete loaded[k]);
         }
-        function resetView() { $('.accordion-collapse').collapse('hide'); Object.keys(cache).forEach(k => delete cache[k]); }
 
-        // =====================================================================
-        // INIT
-        // =====================================================================
-        $(document).ready(function () {
-            $('#specializareSelect').select2({ placeholder: 'Alege specializari', allowClear: true, width: 'resolve' });
-            $('#profesorSelect').select2({ placeholder: 'Cauta profesor...', allowClear: true, width: 'resolve' });
+        function ap() {
+            const p = new URLSearchParams();
+            if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+            if (S.idFac > 0) p.append('idFacultate', S.idFac);
+            if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+            if (S.spec !== 'Toti') p.append('specializare', S.spec);
+            if (S.prof !== 'Toti') p.append('profesor', S.prof);
+            if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
+            if (S.formaInv !== 'Toti') p.append('formaInvatamant', S.formaInv);
+            if (S.sem > 0) p.append('semestru', S.sem);
+            return p;
+        }
 
-            fetch('/api/Rapoarte/liste/ani-universitari').then(r => r.json()).then(data => {
-                const s = document.getElementById('anUnivSelect');
-                data.forEach(a => s.innerHTML += `<option value="${a.id}">${a.nume}</option>`);
-                if (data.length) s.value = data[0].id;
-                $('#facultateSelect').trigger('change');
-            });
+        function bTip(t) {
+            if (!t) return '<span class="badge bg-secondary">-</span>';
+            return t.toLowerCase().includes('tit')
+                ? `<span class="bt">${t}</span>` : `<span class="bs">${t}</span>`;
+        }
+        function bForma(f) {
+            if (!f) return '';
+            if (f.includes('distanță')) return '<span class="bid">ID</span>';
+            if (f.includes('redusă')) return '<span class="bifr">IFR</span>';
+            return '<span class="bif">IF</span>';
+        }
+        function spin(c) { return `<tr><td colspan="${c}" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Se actualizează...</td></tr>`; }
+        function empty(c) { return `<tr><td colspan="${c}" class="text-center py-2 text-muted"><i class="bi bi-inbox me-1"></i>Nu există date.</td></tr>`; }
+        function err(c, m) { return `<tr><td colspan="${c}" class="text-center text-danger small">Eroare: ${m}</td></tr>`; }
 
-            fetch('/api/Rapoarte/liste/facultati').then(r => r.json()).then(data => {
-                const s = document.getElementById('facultateSelect');
-                s.innerHTML = ""; // Curățăm lista existentă
-                data.forEach(f => {
-                    // Verificăm dacă 'f' este obiect sau string (pentru siguranță)
-                    const id = (f && typeof f === 'object') ? (f.id || f.nume) : f;
-                    const nume = (f && typeof f === 'object') ? f.nume : f;
-
-                    // Folosim nume pentru afișare și ID/nume pentru valoarea din spate
-                    s.innerHTML += `<option value="${id}">${nume}</option>`;
-                });
-            });
-
-            $('#anUnivSelect').on('change', () => { $('#facultateSelect').trigger('change'); resetView(); });
-            $('#departamentSelect, #formaInvSelect, #semestruSelect, #tipPostSelect, #profesorSelect').on('change', resetView);
-
-            $('#facultateSelect').on('change', function () {
-                const idAn = $('#anUnivSelect').val();
-                const idFac = $(this).val(); // Acesta este ID-ul (ex: 14)
-
-                // Incarca Departamente (folosind ID-ul facultatii pentru filtrare)
-                fetch(`/api/Rapoarte/liste/departamente?idAnUniv=${idAn}&numeFacultate=${idFac}`)
-                    .then(r => r.json()).then(data => {
-                        const $d = $('#departamentSelect').empty();
-                        data.forEach(d => $d.append(new Option(d.nume, d.id)));
-                        $d.trigger('change');
-                    });
-
-                // Incarca Specializari (folosind procedura IL cu ID_Facultate)
-                fetch(`/api/Rapoarte/liste/specializari?idFacultate=${idFac}`)
-                    .then(r => r.json()).then(data => {
-                        const $s = $('#specializareSelect').empty();
-                        data.forEach(s => $s.append(new Option(s.nume, s.id)));
-                        $s.trigger('change');
-                    });
-            });
-            // La schimbarea specializării, facultății sau departamentului, reîncărcăm lista de profesori
-            $('#facultateSelect, #departamentSelect, #specializareSelect').on('change', function () {
-                const p = getP();
-                resetView(); // Opțional: ascunde tabelele deschise când se schimbă filtrele
-
-                // Folosim noua rută care acceptă ID-uri numerice sau "Toti"
-                const url = `/api/Rapoarte/liste/profesori?idAnUniv=${p.idAnUniv}&facultate=${p.facultate}&departament=${p.departament}`;
-
-                fetch(url)
-                    .then(r => r.json())
-                    .then(data => {
-                        const $prof = $('#profesorSelect').empty();
-                        // Adăugăm prima opțiune implicită
-                        $prof.append(new Option('Toți profesorii', 'Toti'));
-
-                        data.forEach(nume => {
-                            if (nume !== 'Toti') {
-                                $prof.append(new Option(nume, nume));
-                            }
-                        });
-                        // CRITIC: Anunțăm Select2 că datele s-au schimbat pentru a se randa corect
-                        $prof.trigger('change.select2');
-                    })
-                    .catch(err => console.error("Eroare la incarcarea profesorilor:", err));
-            });
-
-            // Accordion listeners
-            $('#cNorme').on('show.bs.collapse', () => { if (isDirty('norme')) { loadNorme(); markClean('norme'); } });
-            $('#cOre').on('show.bs.collapse', () => { if (isDirty('ore')) { loadOre(); markClean('ore'); } });
-            $('#cTotal').on('show.bs.collapse', () => { if (isDirty('total')) { loadTotal(); markClean('total'); } });
-            $('#cLimbi').on('show.bs.collapse', () => { if (isDirty('limbi')) { loadLimbi(); markClean('limbi'); } });
-            $('#cDisc').on('show.bs.collapse', () => { if (isDirty('disc')) { loadDisc(); markClean('disc'); } });
-            $('#cTit').on('show.bs.collapse', () => { if (isDirty('tit')) { loadTit(); markClean('tit'); } });
-            $('#cCol').on('show.bs.collapse', () => { if (isDirty('col')) { loadCol(); markClean('col'); } });
-            $('#cANS').on('shown.bs.collapse', () => { if (isDirty('ans')) { loadANS(); markClean('ans'); } });
-        });
-
-        // =====================================================================
-        // EXCEL PREVIEW BOX - builder generic
-        // =====================================================================
-        let zoomState = {};
-        function buildBox(containerId, tableId, extraClass = '') {
-            const sid = 'sl-' + containerId, vid = 'zv-' + containerId, wid = 'sw-' + containerId;
-            document.getElementById(containerId).innerHTML = `
-        <div class="excel-toolbar">
-            <span class="lbl"><i class="bi bi-zoom-in me-1"></i>Zoom:</span>
-            <button class="zbtn" onclick="adjZ('${sid}','${wid}','${vid}',-10)">−</button>
-            <input type="range" id="${sid}" min="30" max="150" value="100" step="5"
-                   oninput="applyZ('${sid}','${wid}','${vid}')">
-            <button class="zbtn" onclick="adjZ('${sid}','${wid}','${vid}',10)">+</button>
-            <span class="zval" id="${vid}">100%</span>
-            <button class="zbtn" onclick="resetZ('${sid}','${wid}','${vid}')">Reset</button>
-        </div>
-        <div class="excel-preview-box">
-            <div class="scale-wrap" id="${wid}">
-                <table class="etbl table-bordered mb-0 ${extraClass}" id="${tableId}">
-                    <thead id="${tableId}-head"><tr><th colspan="10" class="text-center py-3">
-                        <div class="spinner-border spinner-border-sm text-light"></div>
-                    </th></tr></thead>
-                    <tbody id="${tableId}-body"></tbody>
-                </table>
+        function progBar(pct) {
+            const p = +pct || 0;
+            const color = p > 50 ? '#56723e' : p >= 20 ? '#f0ad4e' : '#d9534f';
+            return `<div class="pbar-wrap">
+            <span style="min-width:38px;font-size:.75rem;font-weight:600">${p.toFixed(1)}%</span>
+            <div class="pbar-track">
+                <div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${color};"></div>
             </div>
         </div>`;
-            zoomState[sid] = 100;
-        }
-        function applyZ(sid, wid, vid) {
-            const v = parseInt(document.getElementById(sid).value);
-            zoomState[sid] = v;
-            const w = document.getElementById(wid);
-            w.style.transform = `scale(${v / 100})`;
-            w.style.width = (10000 / v) + '%';
-            document.getElementById(vid).textContent = v + '%';
-        }
-        function adjZ(sid, wid, vid, delta) {
-            const s = document.getElementById(sid);
-            s.value = Math.min(150, Math.max(30, parseInt(s.value) + delta));
-            applyZ(sid, wid, vid);
-        }
-        function resetZ(sid, wid, vid) {
-            document.getElementById(sid).value = 100; applyZ(sid, wid, vid);
         }
 
-        // =====================================================================
-        // HELPERS
-        // =====================================================================
-        function badge(t) {
-            if (!t) return '<span class="badge bg-secondary">-</span>';
-            if (t.toLowerCase().includes('tit')) return `<span class="badge" style="background:var(--accent);">${t}</span>`;
-            return `<span class="badge bg-warning text-dark">${t}</span>`;
-        }
-        function progBar(p) {
-            const cc = p > 50 ? 'var(--accent)' : p < 10 ? '#ffc107' : '#0dcaf0';
-            return `<div class="prog-wrap"><span class="small" style="min-width:34px">${p}%</span>
-            <div class="prog-track"><div class="prog-fill" style="width:${Math.min(p, 100)}%;background:${cc};"></div></div></div>`;
-        }
+        $(function () {
+            $('#sSpec').select2({ placeholder: 'Toate', allowClear: true, width: 'resolve' });
+            $('#sProf').select2({ placeholder: 'Cauta...', allowClear: true, width: 'resolve' });
 
-        // =====================================================================
-        // R1: NORME
-        // =====================================================================
-        async function loadNorme() {
-            buildBox('box-norme', 'tNorme');
-            document.getElementById('tNorme-head').innerHTML = `<tr>
-            <th>Nr.</th><th>Profesor</th><th>Departament</th><th>Specializare</th>
-            <th>Materie</th><th>Tip Post</th><th>Sem.</th>
-            <th>Ore Curs</th><th>Ore Aplic.</th><th>Ore Conv.</th></tr>`;
-            const p = getP();
-            const params = new URLSearchParams({
-                idAnUniv: p.idAnUniv, facultate: p.facultate,
-                departament: p.departament, profesor: p.profesor, formaInvatamant: p.formaInvatamant,
-                semestru: p.semestru, tipPost: p.tipPost
+            fetch('/api/Rapoarte/liste/ani-universitari').then(r => r.json()).then(data => {
+                const s = document.getElementById('sAn');
+                data.forEach(a => s.appendChild(new Option(a.nume, a.id)));
+                if (data.length) { S.idAn = data[0].id; s.value = data[0].id; }
+                loadFacultati();
             });
-            const data = await fetch(`/api/norma?${params}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tNorme-body');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="10" class="text-center">Nu exista date.</td></tr>'; return; }
-            let html = '', tc = 0, ta = 0, tv = 0;
-            data.forEach(n => {
-                const c = +n.nrOreCurs || 0, a = +n.nrOreAplicatii || 0, v = +n.nrOreConventionale || 0;
-                tc += c; ta += a; tv += v;
-                html += `<tr>
-                <td>${n.nrCrt}</td><td>${n.profesor || ''}</td><td>${n.departament || ''}</td>
-                <td>${n.specializare || ''}</td><td>${n.materie || ''}</td>
-                <td>${badge(n.tipPost)}</td><td class="text-center">${n.semestru || ''}</td>
-                <td class="text-center">${c}</td><td class="text-center">${a}</td>
-                <td class="text-center fw-bold">${v}</td></tr>`;
+
+            $('#sAn').on('change', function () { S.idAn = +this.value || 0; resetAll(); loadFacultati(); });
+            $('#sFac').on('change', function () { S.idFac = +this.value || 0; resetAll(); loadDept(); loadSpec(); });
+            $('#sDept').on('change', function () { S.idCatedra = +this.value || 0; resetAll(); loadSpec(); });
+            $('#sSpec').on('change', function () { S.spec = $(this).val() || 'Toti'; resetAll(); loadProf(); });
+            $('#sProf').on('change', function () { S.prof = $(this).val() || 'Toti'; resetAll(); });
+            $('#sTip').on('change', function () { S.tipPost = this.value || 'Toti'; resetAll(); });
+            $('#sForma').on('change', function () { S.formaInv = this.value || 'Toti'; resetAll(); });
+            $('#sSem').on('change', function () { S.sem = +this.value || 0; resetAll(); });
+
+            bindR('r1', loadR1); bindR('r2', loadR2); bindR('r3', loadR3);
+            bindR('r4', loadR4); bindR('r5', loadR5);
+            bindR('r6', loadR6); bindR('r7', loadR7);
+        });
+
+        function bindR(id, fn) {
+            document.getElementById(id)?.addEventListener('show.bs.collapse', () => {
+                if (dirty(id)) { fn(); clean(id); }
             });
-            html += `<tr class="tr-total"><td colspan="7" class="text-end">TOTAL:</td>
-            <td class="text-center">${tc.toFixed(2)}</td>
-            <td class="text-center">${ta.toFixed(2)}</td>
-            <td class="text-center text-success">${tv.toFixed(2)}</td></tr>`;
-            tb.innerHTML = html;
         }
 
-        // =====================================================================
-        // R2: ORE PROGRAM
-        // =====================================================================
-        async function loadOre() {
-            buildBox('box-ore', 'tOre');
-            document.getElementById('tOre-head').innerHTML = `<tr>
-            <th>Nr.</th><th>Profesor</th><th>Program Studiu</th>
-            <th>Nr Ore Curs</th><th>Nr Ore Aplic.</th>
-            <th>Ore Conv.</th><th>% Post</th><th>Total Post</th></tr>`;
-            const p = getP();
-            const params = new URLSearchParams({
-                idAnUniv: p.idAnUniv, facultate: p.facultate,
-                departament: p.departament, profesor: p.profesor
+        function loadFacultati() {
+            fetch('/api/Rapoarte/liste/facultati').then(r => r.json()).then(data => {
+                const s = document.getElementById('sFac');
+                s.innerHTML = '';
+                data.forEach(f => s.appendChild(new Option(f.nume, f.id)));
+                s.value = 0; S.idFac = 0;
+                loadDept(); loadSpec();
             });
-            const data = await fetch(`/api/oreprogram?${params}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tOre-body');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center">Nu exista date.</td></tr>'; return; }
-            let html = '';
-            data.forEach(item => {
-                const pr = +item.procentPost || 0;
-                html += `<tr>
-                <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
-                <td>${item.programStudiu || ''}</td>
-                <td class="text-center">${(+item.nrOreCurs || 0).toFixed(2)}</td>
-                <td class="text-center">${(+item.nrOreAplicatii || 0).toFixed(2)}</td>
-                <td class="text-center">${(+item.oreConvProgram || 0).toFixed(2)}</td>
-                <td>${progBar(pr)}</td>
-                <td class="text-center fw-bold" style="color:var(--accent);">${(+item.totalPost || 0).toFixed(2)}</td></tr>`;
-            });
-            tb.innerHTML = html;
         }
-
-        // =====================================================================
-        // R3: TOTALURI NORME
-        // =====================================================================
-        async function loadTotal() {
-            buildBox('box-total', 'tTotal');
-            document.getElementById('tTotal-head').innerHTML = `<tr>
-            <th>Nr.</th><th>Profesor</th><th>Departament</th><th>Facultate</th>
-            <th>Ore IF</th><th>Ore ID</th><th>Ore IFR</th>
-            <th>Total Ore Conv.</th><th>Total Anual</th></tr>`;
-            const p = getP();
-            const params = new URLSearchParams({
-                idAnUniv: p.idAnUniv, facultate: p.facultate,
-                departament: p.departament, profesor: p.profesor
-            });
-            const data = await fetch(`/api/normatotaluri?${params}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tTotal-body');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="9" class="text-center">Nu exista date.</td></tr>'; return; }
-            let html = '', go = 0, ga = 0;
-            data.forEach(item => {
-                const o = +item.totalOreConv || 0, a = +item.totalAnual || 0; go += o; ga += a;
-                html += `<tr>
-                <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
-                <td>${item.departament || ''}</td><td>${item.facultate || ''}</td>
-                <td class="text-center">${(+item.oreIF || 0).toFixed(2)}</td>
-                <td class="text-center">${(+item.oreID || 0).toFixed(2)}</td>
-                <td class="text-center">${(+item.oreIFR || 0).toFixed(2)}</td>
-                <td class="text-center fw-bold">${o.toFixed(2)}</td>
-                <td class="text-center fw-bold text-primary">${a.toFixed(2)}</td></tr>`;
-            });
-            html += `<tr class="tr-total"><td colspan="7" class="text-end">TOTAL:</td>
-            <td class="text-center">${go.toFixed(2)}</td>
-            <td class="text-center text-success">${ga.toFixed(2)}</td></tr>`;
-            tb.innerHTML = html;
+        function loadDept() {
+            const s = document.getElementById('sDept');
+            s.innerHTML = '<option value="0">Se încarcă...</option>';
+            fetch(`/api/Rapoarte/liste/departamente?idAnUniv=${S.idAn}&idFacultate=${S.idFac}`)
+                .then(r => r.json()).then(data => {
+                    s.innerHTML = '';
+                    data.forEach(d => s.appendChild(new Option(d.nume, d.id)));
+                    s.value = 0; S.idCatedra = 0;
+                }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
         }
-
-        // =====================================================================
-        // R4: LIMBI STRAINE
-        // =====================================================================
-        async function loadLimbi() {
-            buildBox('box-limbi', 'tLimbi');
-            document.getElementById('tLimbi-head').innerHTML = `<tr>
-            <th>Nr.</th><th>Profesor</th><th>Facultate</th>
-            <th>Departament</th><th>Limba</th>
-            <th>Ore Sem.1</th><th>Ore Sem.2</th><th>Total</th></tr>`;
-            const p = getP();
-            const data = await fetch(`/api/foreignlang?idAnUniv=${p.idAnUniv}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tLimbi-body');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center">Nu exista date.</td></tr>'; return; }
-            let html = '', s1 = 0, s2 = 0, st = 0;
-            data.forEach(item => {
-                const o1 = +item.oreSem1 || 0, o2 = +item.oreSem2 || 0, t = +item.total || 0;
-                s1 += o1; s2 += o2; st += t;
-                html += `<tr>
-                <td>${item.nrCrt}</td><td class="fw-bold">${item.numeIntreg || ''}</td>
-                <td>${item.facultate || ''}</td><td>${item.departament || ''}</td>
-                <td><span class="badge" style="background:var(--accent);">${item.limba || ''}</span></td>
-                <td class="text-center">${o1.toFixed(2)}</td>
-                <td class="text-center">${o2.toFixed(2)}</td>
-                <td class="text-center fw-bold text-success">${t.toFixed(2)}</td></tr>`;
-            });
-            html += `<tr class="tr-total"><td colspan="5" class="text-end">TOTAL:</td>
-            <td class="text-center">${s1.toFixed(2)}</td>
-            <td class="text-center">${s2.toFixed(2)}</td>
-            <td class="text-center text-success">${st.toFixed(2)}</td></tr>`;
-            tb.innerHTML = html;
-        }
-
-        // =====================================================================
-        // R5: DISCIPLINE
-        // =====================================================================
-        async function loadDisc() {
-            buildBox('box-disc', 'tDisc');
-            document.getElementById('tDisc-head').innerHTML = `<tr>
-            <th>Nr.</th><th>Profesor</th>
-            <th>Departament</th><th>Forma Inv.</th><th>Discipline Predate</th></tr>`;
-            const p = getP();
-            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
-            const data = await fetch(`/api/discipline?${params}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tDisc-body');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center">Nu exista date.</td></tr>'; return; }
-            let html = '';
-            data.forEach((item, idx) => {
-                html += `<tr>
-                <td>${idx + 1}</td><td class="fw-bold">${item.profesor || ''}</td>
-                <td>${item.departament || ''}</td>
-                <td><span class="badge bg-secondary">${item.formaInvatamant || ''}</span></td>
-                <td style="white-space:normal;max-width:450px;">${item.discipline || ''}</td></tr>`;
-            });
-            tb.innerHTML = html;
-        }
-
-        // =====================================================================
-        // R6: TITULARI
-        // =====================================================================
-        async function loadTit() {
-            buildBox('box-tit', 'tTit');
-            document.getElementById('tTit-head').innerHTML = `<tr>
-            <th>Nr.</th><th>Profesor</th>
-            <th>Departament</th><th>Facultate</th><th>Grad</th></tr>`;
-            const p = getP();
-            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
-            const data = await fetch(`/api/titulari?${params}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tTit-body');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center">Nu exista date.</td></tr>'; return; }
-            let html = '';
-            data.forEach(item => {
-                html += `<tr>
-            <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
-            <td>${item.departament || ''}</td><td>${item.facultate || ''}</td><td>${item.grad || ''}</td></tr>`;
-            });
-            tb.innerHTML = html;
-        }
-
-        // =====================================================================
-        // R7: COLABORATORI
-        // =====================================================================
-        async function loadCol() {
-            buildBox('box-col', 'tCol');
-            document.getElementById('tCol-head').innerHTML = `<tr>
-            <th>Nr.</th><th>Profesor</th>
-            <th>Departament</th><th>Facultate</th><th>Grad</th></tr>`;
-            const p = getP();
-            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
-            const data = await fetch(`/api/colaboratori?${params}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tCol-body');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center">Nu exista date.</td></tr>'; return; }
-            let html = '';
-            data.forEach(item => {
-                html += `<tr>
-            <td>${item.nrCrt}</td><td class="fw-bold">${item.profesor || ''}</td>
-            <td>${item.departament || ''}</td><td>${item.facultate || ''}</td><td>${item.grad || ''}</td></tr>`;
-            });
-            tb.innerHTML = html;
-        }
-
-        // =====================================================================
-        // R8: ANS - coloane dinamice
-        // =====================================================================
-        async function loadANS() {
-            buildBox('box-ans', 'tANS', 'etbl-ans');
-            const p = getP();
-            const params = new URLSearchParams({ idAnUniv: p.idAnUniv, facultate: p.facultate, departament: p.departament });
-            const data = await fetch(`/api/ansreport/date?${params}`).then(r => r.json()).catch(() => []);
-            const tb = document.getElementById('tANS-body');
-            const th = document.getElementById('tANS-head');
-            if (!data.length) { tb.innerHTML = '<tr><td colspan="10" class="text-center">Nu exista date.</td></tr>'; return; }
-
-            // Coloane dinamice din ID-urile ANS prezente in date
-            const idAnsSet = new Set();
-            data.forEach(prof => { if (prof.fractiuniPerDomeniu) Object.keys(prof.fractiuniPerDomeniu).forEach(k => idAnsSet.add(parseInt(k))); });
-            const ids = Array.from(idAnsSet).sort((a, b) => a - b);
-
-            th.innerHTML = '<tr><th>Nr.</th><th>Profesor</th><th>Facultate</th><th>Departament</th><th>Grad</th><th>Norma(h)</th><th>Total Ore</th>'
-                + ids.map(id => `<th title="ID_ANS=${id}">D.${id}</th>`).join('') + '<th>Σ Frac.</th></tr>';
-
-            tb.innerHTML = '';
-            data.forEach((prof, idx) => {
-                let tf = 0;
-                let cells = `<td>${idx + 1}</td><td>${prof.numeIntreg || ''}</td>
-                <td>${prof.facultate || '-'}</td><td>${prof.departament || '-'}</td>
-                <td>${prof.grad || '-'}</td>
-                <td class="text-center">${prof.normaLegalaOre || ''}</td>
-                <td class="text-center">${(+prof.totalOreConv || 0).toFixed(2)}</td>`;
-                ids.forEach(id => {
-                    const frac = prof.fractiuniPerDomeniu ? (+prof.fractiuniPerDomeniu[id] || 0) : 0;
-                    if (frac > 0) { cells += `<td class="frac-poz">${frac.toFixed(2)}</td>`; tf += frac; }
-                    else cells += '<td></td>';
+        function loadSpec() {
+            const $s = $('#sSpec').empty().append(new Option('Toate', 'Toti')).trigger('change');
+            fetch(`/api/Rapoarte/liste/specializari?idAnUniv=${S.idAn}&idFacultate=${S.idFac}&idCatedra=${S.idCatedra}`)
+                .then(r => r.json()).then(data => {
+                    $s.empty();
+                    data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
+                    $s.val('Toti').trigger('change');
                 });
-                cells += `<td class="fw-bold text-center">${tf.toFixed(2)}</td>`;
-                const tr = document.createElement('tr'); tr.innerHTML = cells; tb.appendChild(tr);
-            });
+        }
+        function loadProf() {
+            const $p = $('#sProf').empty().append(new Option('', 'Toti')).trigger('change');
+            fetch(`/api/Rapoarte/liste/profesori?${ap()}`)
+                .then(r => r.json()).then(data => {
+                    $p.empty().append(new Option('', 'Toti'));
+                    data.forEach(p => { if (p.id !== 'Toti') $p.append(new Option(p.nume, p.id)); });
+                    $p.val('Toti').trigger('change');
+                });
         }
 
-        // =====================================================================
-        // DOWNLOAD ROUTER
-        // =====================================================================
+        // Download router
         function dl(tip) {
-            const p = getP();
-            const id = p.idAnUniv;
-            const fac = encodeURIComponent(p.facultate);
-            const dept = encodeURIComponent(p.departament);
-            const prof = encodeURIComponent(p.profesor);
-            const params = new URLSearchParams({
-                idAnUniv: id, facultate: p.facultate,
-                departament: p.departament, profesor: p.profesor, formaInvatamant: p.formaInvatamant,
-                semestru: p.semestru, tipPost: p.tipPost
-            });
+            const p = ap();
+            if (tip === 'discipline-zip') {
+                // ZIP nu are filtru forma, trimite ceilalti parametri
+                const pz = new URLSearchParams();
+                if (S.idAn > 0) pz.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) pz.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) pz.append('idCatedra', S.idCatedra);
+                if (S.prof !== 'Toti') pz.append('profesor', S.prof);
+                location.href = `/api/Rapoarte/export/discipline-zip?${pz}`;
+            } else {
+                location.href = `/api/Rapoarte/export/${tip}?${p}`;
+            }
+        }
 
-            if (tip === 'raport-ans') location.href = `/api/ansreport/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
-            else if (tip === 'limbi-straine') location.href = `/api/foreignlang/export?idAnUniv=${id}`;
-            else if (tip === 'titulari') location.href = `/api/titulari/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
-            else if (tip === 'colaboratori') location.href = `/api/colaboratori/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
-            else if (tip === 'discipline-predate') location.href = `/api/discipline/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}`;
-            else if (tip === 'norma') location.href = `/api/norma/export?${params}`;
-            else if (tip === 'ore-program') location.href = `/api/oreprogram/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}&profesor=${prof}`;
-            else if (tip === 'norma-totaluri') location.href = `/api/normatotaluri/export?idAnUniv=${id}&facultate=${fac}&departament=${dept}&profesor=${prof}`;
+        // ============================================================
+        // R1: NORME
+        // ============================================================
+        async function loadR1() {
+            document.getElementById('b1').innerHTML = spin(13);
+            try {
+                const data = await fetch(`/api/Rapoarte/norma?${ap()}`).then(r => r.json());
+                if (!data?.length) { document.getElementById('b1').innerHTML = empty(13); return; }
+                let html = '', tc = 0, ta = 0, tv = 0;
+                data.forEach(n => {
+                    const c = +n.oreCurs || 0, a = +n.oreAplicatii || 0, v = +n.oreConv || 0;
+                    tc += c; ta += a; tv += v;
+                    html += `<tr>
+                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                    <td class="small">${n.departament}</td>
+                    <td class="small">${n.specializare}</td>
+                    <td class="small">${n.materie}</td>
+                    <td>${bTip(n.tipPost)}</td>
+                    <td class="text-center">${n.semestru || ''}</td>
+                    <td>${bForma(n.formaInv)}</td>
+                    <td class="text-end">${c.toFixed(2)}</td>
+                    <td class="text-end">${a.toFixed(2)}</td>
+                    <td class="text-end fw-bold">${v.toFixed(2)}</td>
+                    <td class="text-end">${(+n.totalOreProf || 0).toFixed(2)}</td>
+                    <td class="text-end">${(+n.procentDinTotal || 0).toFixed(1)}%</td>
+                </tr>`;
+                });
+                html += `<tr class="tfoot-row">
+                <td colspan="8" class="text-end">TOTAL:</td>
+                <td class="text-end">${tc.toFixed(2)}</td>
+                <td class="text-end">${ta.toFixed(2)}</td>
+                <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
+                <td colspan="2"></td></tr>`;
+                document.getElementById('b1').innerHTML = html;
+            } catch (e) { document.getElementById('b1').innerHTML = err(13, e.message); }
+        }
+
+        // ============================================================
+        // R2: TOTALURI
+        // ============================================================
+        async function loadR2() {
+            document.getElementById('b2').innerHTML = spin(10);
+            try {
+                const p = new URLSearchParams();
+                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) p.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+                if (S.prof !== 'Toti') p.append('profesor', S.prof);
+                if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
+                const data = await fetch(`/api/Rapoarte/norma-totaluri?${p}`).then(r => r.json());
+                if (!data?.length) { document.getElementById('b2').innerHTML = empty(10); return; }
+                let html = '', gif = 0, gid = 0, gifr = 0, gc = 0, ga = 0;
+                data.forEach(n => {
+                    const oi = +n.oreIF || 0, od = +n.oreID || 0, oifr = +n.oreIFR || 0,
+                        oc = +n.totalOreConv || 0, oa = +n.totalAnual || 0;
+                    gif += oi; gid += od; gifr += oifr; gc += oc; ga += oa;
+                    html += `<tr>
+                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                    <td class="small">${n.facultate}</td>
+                    <td class="small">${n.departament}</td>
+                    <td>${bTip(n.tipPost)}</td>
+                    <td class="text-end">${oi.toFixed(2)}</td>
+                    <td class="text-end">${od.toFixed(2)}</td>
+                    <td class="text-end">${oifr.toFixed(2)}</td>
+                    <td class="text-end fw-bold">${oc.toFixed(2)}</td>
+                    <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
+                </tr>`;
+                });
+                html += `<tr class="tfoot-row">
+                <td colspan="5" class="text-end">TOTAL GENERAL:</td>
+                <td class="text-end">${gif.toFixed(2)}</td>
+                <td class="text-end">${gid.toFixed(2)}</td>
+                <td class="text-end">${gifr.toFixed(2)}</td>
+                <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
+                <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
+                document.getElementById('b2').innerHTML = html;
+            } catch (e) { document.getElementById('b2').innerHTML = err(10, e.message); }
+        }
+
+        // ============================================================
+        // R3: DISTRIBUTIE ORE cu progress bar colorat
+        // ============================================================
+        async function loadR3() {
+            document.getElementById('b3').innerHTML = spin(7);
+            try {
+                const p = new URLSearchParams();
+                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) p.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+                if (S.prof !== 'Toti') p.append('profesor', S.prof);
+                const data = await fetch(`/api/Rapoarte/distributie-ore?${p}`).then(r => r.json());
+                if (!data?.length) { document.getElementById('b3').innerHTML = empty(7); return; }
+                let html = '';
+                data.forEach(n => {
+                    const op = +n.oreProgram || 0, ot = +n.totalOreUniv || 0, pr = +n.procent || 0;
+                    html += `<tr>
+                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                    <td class="small">${n.departament}</td>
+                    <td class="small">${n.program}</td>
+                    <td class="text-end">${op.toFixed(2)}</td>
+                    <td class="text-end">${ot.toFixed(2)}</td>
+                    <td>${progBar(pr)}</td>
+                </tr>`;
+                });
+                document.getElementById('b3').innerHTML = html;
+            } catch (e) { document.getElementById('b3').innerHTML = err(7, e.message); }
+        }
+
+        // ============================================================
+        // R4: LIMBI
+        // ============================================================
+        async function loadR4() {
+            document.getElementById('b4').innerHTML = spin(6);
+            try {
+                const p = new URLSearchParams();
+                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) p.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+                if (S.prof !== 'Toti') p.append('profesor', S.prof);
+                if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
+                const data = await fetch(`/api/Rapoarte/limbi-straine?${p}`).then(r => r.json());
+                if (!data?.length) { document.getElementById('b4').innerHTML = empty(6); return; }
+                let html = '', s1 = 0, s2 = 0, st = 0;
+                data.forEach(n => {
+                    const a = +n.sem1 || 0, b = +n.sem2 || 0, t = +n.total || 0;
+                    s1 += a; s2 += b; st += t;
+                    html += `<tr>
+                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                    <td class="text-end">${a.toFixed(2)}</td>
+                    <td class="text-end">${b.toFixed(2)}</td>
+                    <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
+                    <td class="small">${n.limbiPredate || ''}</td>
+                </tr>`;
+                });
+                html += `<tr class="tfoot-row">
+                <td colspan="2" class="text-end">TOTAL:</td>
+                <td class="text-end">${s1.toFixed(2)}</td>
+                <td class="text-end">${s2.toFixed(2)}</td>
+                <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
+                <td></td></tr>`;
+                document.getElementById('b4').innerHTML = html;
+            } catch (e) { document.getElementById('b4').innerHTML = err(6, e.message); }
+        }
+
+        // ============================================================
+        // R5: DISCIPLINE
+        // ============================================================
+        async function loadR5() {
+            document.getElementById('b5').innerHTML = spin(7);
+            try {
+                const p = new URLSearchParams();
+                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) p.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+                if (S.prof !== 'Toti') p.append('profesor', S.prof);
+                const data = await fetch(`/api/Rapoarte/discipline?${p}`).then(r => r.json());
+                if (!data?.length) { document.getElementById('b5').innerHTML = empty(7); return; }
+                let html = '';
+                data.forEach(n => {
+                    html += `<tr>
+                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                    <td class="small">${n.facultate}</td>
+                    <td class="small">${n.departament}</td>
+                    <td class="small">${n.grad}</td>
+                    <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
+                    <td class="small" style="white-space:normal;max-width:380px;">${n.discipline || ''}</td>
+                </tr>`;
+                });
+                document.getElementById('b5').innerHTML = html;
+            } catch (e) { document.getElementById('b5').innerHTML = err(7, e.message); }
+        }
+
+        // ============================================================
+        // R6: TITULARI
+        // ============================================================
+        async function loadR6() {
+            document.getElementById('b6').innerHTML = spin(5);
+            try {
+                const p = new URLSearchParams();
+                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) p.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+                if (S.prof !== 'Toti') p.append('profesor', S.prof);
+                const data = await fetch(`/api/Rapoarte/titulari?${p}`).then(r => r.json());
+                if (!data?.length) { document.getElementById('b6').innerHTML = empty(5); return; }
+                let html = '';
+                data.forEach(n => {
+                    html += `<tr>
+                <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                <td class="small">${n.facultate}</td>
+                <td class="small">${n.departament}</td>
+                <td class="small">${n.grad}</td></tr>`;
+                });
+                html += `<tr class="tfoot-row"><td colspan="5" class="text-end">Total: ${data.length} titulari</td></tr>`;
+                document.getElementById('b6').innerHTML = html;
+            } catch (e) { document.getElementById('b6').innerHTML = err(5, e.message); }
+        }
+
+        // ============================================================
+        // R7: COLABORATORI
+        // ============================================================
+        async function loadR7() {
+            document.getElementById('b7').innerHTML = spin(5);
+            try {
+                const p = new URLSearchParams();
+                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) p.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+                const data = await fetch(`/api/Rapoarte/colaboratori?${p}`).then(r => r.json());
+                if (!data?.length) { document.getElementById('b7').innerHTML = empty(5); return; }
+                let html = '';
+                data.forEach(n => {
+                    html += `<tr>
+                <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                <td class="small">${n.facultate}</td>
+                <td class="small">${n.departament}</td>
+                <td class="small">${n.grad}</td></tr>`;
+                });
+                html += `<tr class="tfoot-row"><td colspan="5" class="text-end">Total: ${data.length} colaboratori</td></tr>`;
+                document.getElementById('b7').innerHTML = html;
+            } catch (e) { document.getElementById('b7').innerHTML = err(5, e.message); }
+        }
+
+        // ============================================================
+        // R8: ANS previzualizare (primii 25)
+        // ============================================================
+        async function loadAns() {
+            document.getElementById('ansWrap').style.display = 'block';
+            document.getElementById('b8').innerHTML = spin(6);
+            document.getElementById('ansHead').innerHTML = '<th colspan="6" class="text-center">Se încarcă...</th>';
+            try {
+                const p = new URLSearchParams();
+                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
+                if (S.idFac > 0) p.append('idFacultate', S.idFac);
+                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
+                const resp = await fetch(`/api/Rapoarte/raport-ans?${p}`).then(r => r.json());
+                const domenii = resp.domenii || [];
+                const profs = (resp.profesori || []).slice(0, 25);
+
+                let hdr = '<th>Nr.</th><th>Profesor</th><th>Facultate</th><th>Dept.</th><th>Funcție</th>';
+                domenii.forEach(d => {
+                    const sh = d.length > 18 ? d.substring(0, 16) + '…' : d;
+                    hdr += `<th class="text-center" title="${d}" style="min-width:65px;font-size:.7rem">${sh}</th>`;
+                });
+                hdr += '<th class="text-center">Total</th>';
+                document.getElementById('ansHead').innerHTML = hdr;
+
+                if (!profs.length) { document.getElementById('b8').innerHTML = empty(domenii.length + 6); return; }
+                let html = '';
+                profs.forEach(p => {
+                    let tf = 0, cols = '';
+                    domenii.forEach(d => {
+                        const f = p.domeniiMapate?.[d] || 0;
+                        tf += f;
+                        cols += f > 0
+                            ? `<td class="frac-cell">${f.toFixed(2)}</td>`
+                            : '<td></td>';
+                    });
+                    html += `<tr>
+                    <td>${p.nrCrt}</td><td><b class="small">${p.numeComplet}</b></td>
+                    <td class="small">${p.facultate}</td>
+                    <td class="small">${p.departament}</td>
+                    <td class="small">${p.gradFunctie}</td>
+                    ${cols}
+                    <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
+                });
+                if ((resp.profesori?.length || 0) > 25)
+                    html += `<tr class="tfoot-row"><td colspan="${domenii.length + 6}" class="text-center">
+                    Primii 25 din ${resp.profesori.length}. Excel pentru lista completă.</td></tr>`;
+                document.getElementById('b8').innerHTML = html;
+                clean('r8');
+            } catch (e) { document.getElementById('b8').innerHTML = err(6, e.message); }
         }
     </script>
 </body>

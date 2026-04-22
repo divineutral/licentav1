@@ -12,6 +12,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Controllers\Ansreportcontroller.cs" />
+    <Compile Remove="Controllers\Colaboratoricontroller.cs" />
+    <Compile Remove="Controllers\Disciplinecontroller.cs" />
+    <Compile Remove="Controllers\Foreignlangcontroller.cs" />
+    <Compile Remove="Controllers\Normacontroller.cs" />
+    <Compile Remove="Controllers\Normatotaluricontroller.cs" />
+    <Compile Remove="Controllers\Oreprogramcontroller.cs" />
+    <Compile Remove="Controllers\TitulariController.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
