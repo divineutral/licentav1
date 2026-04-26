@@ -44,31 +44,31 @@
 
         .main {
             margin-left: var(--sw);
-            padding: 24px;
+            padding: 22px;
         }
 
         .fb {
             background: #fff;
-            padding: 14px 16px;
+            padding: 12px 16px;
             border-radius: 12px;
-            margin-bottom: 18px;
+            margin-bottom: 16px;
             box-shadow: 0 2px 8px rgba(0,0,0,.06);
             border-top: 4px solid var(--a);
         }
 
             .fb label {
-                font-size: .73rem;
+                font-size: .72rem;
                 font-weight: 700;
                 color: #6c757d;
                 display: block;
-                margin-bottom: 3px;
+                margin-bottom: 2px;
             }
 
         .accordion-item {
             border: none;
             border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             box-shadow: 0 3px 10px rgba(0,0,0,.06);
         }
 
@@ -76,7 +76,7 @@
             background: #fff;
             font-weight: 600;
             color: #495057;
-            font-size: .89rem;
+            font-size: .88rem;
         }
 
             .accordion-button:not(.collapsed) {
@@ -90,7 +90,7 @@
             }
 
         .select2-container .select2-selection--single {
-            height: 34px !important;
+            height: 33px !important;
             border: 1px solid #dee2e6 !important;
             display: flex;
             align-items: center;
@@ -99,18 +99,18 @@
         .select2-container--default .select2-selection--single .select2-selection__arrow {
             top: 4px;
         }
-        /* Table */
+
         .etbl {
             width: 100%;
             border-collapse: collapse;
-            font-size: .77rem;
+            font-size: .76rem;
         }
 
             .etbl th {
                 background: var(--a);
                 color: #fff;
                 font-weight: 600;
-                padding: 7px 9px;
+                padding: 6px 9px;
                 position: sticky;
                 top: 0;
                 z-index: 5;
@@ -118,7 +118,7 @@
             }
 
             .etbl td {
-                padding: 6px 9px;
+                padding: 5px 9px;
                 border-bottom: 1px solid #f0f0f0;
                 vertical-align: middle;
             }
@@ -137,21 +137,21 @@
 
         .twrap {
             overflow: auto;
-            max-height: 460px;
+            max-height: 450px;
             border: 1px solid #dee2e6;
             border-radius: 0 0 8px 8px;
         }
 
-        .tfoot-row td {
+        .tfoot td {
             background: #e9ecef !important;
             font-weight: 700;
-            font-size: .77rem;
+            font-size: .76rem;
         }
-        /* Badges */
+
         .bt {
             background: var(--a);
             color: #fff;
-            font-size: .71rem;
+            font-size: .7rem;
             padding: 2px 7px;
             border-radius: 4px;
             font-weight: 600;
@@ -160,7 +160,7 @@
         .bs {
             background: #ffc107;
             color: #212529;
-            font-size: .71rem;
+            font-size: .7rem;
             padding: 2px 7px;
             border-radius: 4px;
             font-weight: 600;
@@ -169,7 +169,7 @@
         .bif {
             background: #0d6efd;
             color: #fff;
-            font-size: .71rem;
+            font-size: .7rem;
             padding: 2px 7px;
             border-radius: 4px;
         }
@@ -177,7 +177,7 @@
         .bifr {
             background: #6f42c1;
             color: #fff;
-            font-size: .71rem;
+            font-size: .7rem;
             padding: 2px 7px;
             border-radius: 4px;
         }
@@ -185,16 +185,16 @@
         .bid {
             background: #20c997;
             color: #212529;
-            font-size: .71rem;
+            font-size: .7rem;
             padding: 2px 7px;
             border-radius: 4px;
         }
-        /* Progress bars for distributie */
+
         .pbar-wrap {
             display: flex;
             align-items: center;
             gap: 6px;
-            min-width: 140px;
+            min-width: 130px;
         }
 
         .pbar-track {
@@ -208,14 +208,20 @@
         .pbar-fill {
             height: 100%;
             border-radius: 4px;
-            transition: width .4s;
         }
-        /* ANS fracție pozitivă */
+
         .frac-cell {
             background: #d4edda;
             color: #155724;
             font-weight: 700;
             text-align: center;
+            font-size: .74rem;
+        }
+
+        .mnt-cell {
+            font-size: .7rem;
+            color: #6c757d;
+            font-style: italic;
         }
     </style>
 </head>
@@ -226,7 +232,9 @@
                  onerror="this.style.display='none';this.parentElement.innerHTML='<h5 class=\'text-white mb-0\'>BI Dashboard</h5>'">
         </div>
         <ul class="nav nav-pills flex-column">
-            <li><a href="#" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+            <li>
+                <a href="#" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+            </li>
         </ul>
         <div class="mt-auto p-2 text-center small text-secondary">Licență 2026</div>
     </div>
@@ -241,15 +249,15 @@
             <div class="row g-2 align-items-end">
                 <div class="col-auto">
                     <label>An Universitar</label>
-                    <select id="sAn" class="form-select form-select-sm" style="min-width:150px;"></select>
+                    <select id="sAn" class="form-select form-select-sm" style="min-width:148px;"></select>
                 </div>
                 <div class="col-auto">
                     <label>Facultate</label>
-                    <select id="sFac" class="form-select form-select-sm" style="min-width:195px;"></select>
+                    <select id="sFac" class="form-select form-select-sm" style="min-width:190px;"></select>
                 </div>
                 <div class="col-auto">
                     <label>Departament</label>
-                    <select id="sDept" class="form-select form-select-sm" style="min-width:195px;"></select>
+                    <select id="sDept" class="form-select form-select-sm" style="min-width:190px;"></select>
                 </div>
                 <div class="col-auto">
                     <label>Tip Post</label>
@@ -261,7 +269,7 @@
                 </div>
                 <div class="col-auto">
                     <label>Forma Inv.</label>
-                    <select id="sForma" class="form-select form-select-sm" style="min-width:110px;">
+                    <select id="sForma" class="form-select form-select-sm" style="min-width:108px;">
                         <option value="Toti">Toate</option>
                         <option value="Cu frecvență">IF</option>
                         <option value="Frecvență redusă">IFR</option>
@@ -269,24 +277,28 @@
                     </select>
                 </div>
                 <div class="col-auto">
+                    <label>Ciclu Studii</label>
+                    <select id="sCiclu" class="form-select form-select-sm" style="min-width:115px;"></select>
+                </div>
+                <div class="col-auto">
                     <label>Semestru</label>
-                    <select id="sSem" class="form-select form-select-sm" style="min-width:88px;">
+                    <select id="sSem" class="form-select form-select-sm" style="min-width:86px;">
                         <option value="0">Toate</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                     </select>
                 </div>
-                <div class="col-auto" style="min-width:175px;">
+                <div class="col-auto" style="min-width:170px;">
                     <label>Specializare</label>
                     <select id="sSpec" class="form-select form-select-sm w-100"></select>
                 </div>
-                <div class="col-auto" style="min-width:175px;">
+                <div class="col-auto" style="min-width:200px;">
                     <label>Profesor</label>
                     <select id="sProf" class="form-select form-select-sm w-100"></select>
                 </div>
                 <div class="col-auto">
                     <label class="invisible">.</label>
-                    <button class="btn btn-sm btn-secondary d-block" onclick="resetAll()">
+                    <button class="btn btn-sm btn-secondary d-block" onclick="resetAll()" title="Resetează filtre">
                         <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
                 </div>
@@ -316,7 +328,7 @@
                                     <tr>
                                         <th>Nr.</th>
                                         <th>Profesor</th>
-                                        <th>Dept.</th>
+                                        <th>Dept. Orei</th>
                                         <th>Specializare</th>
                                         <th>Materie</th>
                                         <th>Tip</th>
@@ -325,13 +337,12 @@
                                         <th class="text-end">Ore C.</th>
                                         <th class="text-end">Ore A.</th>
                                         <th class="text-end">Ore Conv.</th>
-                                        <th class="text-end">Total</th>
-                                        <th class="text-end">%</th>
+                                        <th>Mențiuni cuplaj</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b1">
                                     <tr>
-                                        <td colspan="13" class="text-center py-3 text-muted">
+                                        <td colspan="12" class="text-center py-3 text-muted">
                                             <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
                                         </td>
                                     </tr>
@@ -369,8 +380,8 @@
                                         <th class="text-end">Ore IF</th>
                                         <th class="text-end">Ore ID</th>
                                         <th class="text-end">Ore IFR</th>
-                                        <th class="text-end">Total Ore Conv.</th>
-                                        <th class="text-end">Total Anual (×14)</th>
+                                        <th class="text-end">Total Conv.</th>
+                                        <th class="text-end">Total Anual ×14</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b2">
@@ -386,7 +397,7 @@
                 </div>
             </div>
 
-            <!-- R3: Distributie Ore -->
+            <!-- R3: Distributie -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -397,9 +408,7 @@
                 <div id="r3" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="small text-muted">
-                                Procent = (Ore program / Total ore universitate profesor) × 100
-                            </span>
+                            <span class="small text-muted">% = Ore program / Total ore universitate profesor × 100</span>
                             <button class="btn btn-success btn-sm" onclick="dl('distributie-ore')">
                                 <i class="bi bi-file-earmark-excel"></i> Export Excel
                             </button>
@@ -412,9 +421,9 @@
                                         <th>Profesor</th>
                                         <th>Dept.</th>
                                         <th>Program Studiu</th>
-                                        <th class="text-end">Ore Program</th>
+                                        <th class="text-end">Ore Prog.</th>
                                         <th class="text-end">Total Univ.</th>
-                                        <th style="min-width:180px;">Procent</th>
+                                        <th style="min-width:170px;">Procent</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b3">
@@ -451,15 +460,17 @@
                                     <tr>
                                         <th>Nr.</th>
                                         <th>Profesor</th>
-                                        <th class="text-end">Sem. 1 (h)</th>
-                                        <th class="text-end">Sem. 2 (h)</th>
-                                        <th class="text-end">Total (h)</th>
+                                        <th class="text-center">Sem.</th>
+                                        <th class="text-end">Total Ore (h)</th>
                                         <th>Limbi Predate</th>
+                                        <th>Program Studiu</th>
+                                        <th>Ciclu Studii</th>
+                                        <th>Specializare</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b4">
                                     <tr>
-                                        <td colspan="6" class="text-center py-3 text-muted">
+                                        <td colspan="8" class="text-center py-3 text-muted">
                                             <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
                                         </td>
                                     </tr>
@@ -480,9 +491,9 @@
                 </h2>
                 <div id="r5" class="accordion-collapse collapse">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-2 gap-2">
+                        <div class="d-flex justify-content-end mb-2">
                             <button class="btn btn-outline-success btn-sm" onclick="dl('discipline-zip')">
-                                <i class="bi bi-file-earmark-zip"></i> Export ZIP (IF+IFR+ID)
+                                <i class="bi bi-file-earmark-zip"></i> Export ZIP (IF + IFR + ID)
                             </button>
                         </div>
                         <div class="twrap">
@@ -494,7 +505,7 @@
                                         <th>Facultate</th>
                                         <th>Dept.</th>
                                         <th>Grad</th>
-                                        <th class="text-center">Nr. Disc.</th>
+                                        <th class="text-center">Nr.</th>
                                         <th>Discipline</th>
                                     </tr>
                                 </thead>
@@ -522,7 +533,7 @@
                 <div id="r6" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="badge bg-secondary small">TitularAnUniv = 1</span>
+                            <span class="badge bg-secondary small">Filtru oficial: TitularAnUniv=1 + grad didactic + ore > 0</span>
                             <button class="btn btn-success btn-sm" onclick="dl('titulari')">
                                 <i class="bi bi-file-earmark-excel"></i> Export Excel
                             </button>
@@ -604,7 +615,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="small text-muted">
                                 <i class="bi bi-info-circle me-1"></i>
-                                Titulari oficiali (741) — coloane dinamice din DB
+                                Titulari oficiali — coloane dinamice din DB
                             </span>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-outline-secondary btn-sm" onclick="loadAns()">
@@ -632,419 +643,449 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        const S = {
-            idAn: 0, idFac: 0, idCatedra: 0, spec: 'Toti', prof: 'Toti',
-            tipPost: 'Toti', formaInv: 'Toti', sem: 0
-        };
-        const loaded = {};
+// ============================================================
+// STARE GLOBALA
+// ============================================================
+const S = {
+    idAn:0, idFac:0, idCatedra:0, spec:'Toti', prof:'Toti',
+    tipPost:'Toti', formaInv:'Toti', ciclu:'Toti', sem:0,
+    numeFac:'', numeDept:''
+};
+const loaded = {};
 
-        function key() { return JSON.stringify(S); }
-        function dirty(id) { return loaded[id] !== key(); }
-        function clean(id) { loaded[id] = key(); }
+function key() { return JSON.stringify(S); }
+function dirty(id) { return loaded[id] !== key(); }
+function clean(id) { loaded[id] = key(); }
 
-        function resetAll() {
-            document.querySelectorAll('.accordion-collapse.show').forEach(el =>
-                bootstrap.Collapse.getInstance(el)?.hide());
-            Object.keys(loaded).forEach(k => delete loaded[k]);
-        }
+function resetAll() {
+    document.querySelectorAll('.accordion-collapse.show').forEach(el =>
+        bootstrap.Collapse.getInstance(el)?.hide());
+    Object.keys(loaded).forEach(k => delete loaded[k]);
+}
 
-        function ap() {
-            const p = new URLSearchParams();
-            if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-            if (S.idFac > 0) p.append('idFacultate', S.idFac);
-            if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-            if (S.spec !== 'Toti') p.append('specializare', S.spec);
-            if (S.prof !== 'Toti') p.append('profesor', S.prof);
-            if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
-            if (S.formaInv !== 'Toti') p.append('formaInvatamant', S.formaInv);
-            if (S.sem > 0) p.append('semestru', S.sem);
-            return p;
-        }
+// Params pentru API (trimite ID-uri)
+function ap(extra) {
+    const p = new URLSearchParams();
+    if (S.idAn>0)      p.append('idAnUniv', S.idAn);
+    if (S.idFac>0)     p.append('idFacultate', S.idFac);
+    if (S.idCatedra>0) p.append('idCatedra', S.idCatedra);
+    if (S.spec!=='Toti')    p.append('specializare', S.spec);
+    if (S.prof!=='Toti')    p.append('profesor', S.prof);
+    if (S.tipPost!=='Toti') p.append('tipPost', S.tipPost);
+    if (S.formaInv!=='Toti') p.append('formaInvatamant', S.formaInv);
+    if (S.ciclu!=='Toti')   p.append('cicluStudii', S.ciclu);
+    if (S.sem>0)             p.append('semestru', S.sem);
+    // Trimite si denumirile pentru header Excel
+    if (S.numeFac)  p.append('numeFacultate', S.numeFac);
+    if (S.numeDept) p.append('numeDepartament', S.numeDept);
+    if (extra) Object.entries(extra).forEach(([k,v]) => v && p.append(k,v));
+    return p;
+}
 
-        function bTip(t) {
-            if (!t) return '<span class="badge bg-secondary">-</span>';
-            return t.toLowerCase().includes('tit')
-                ? `<span class="bt">${t}</span>` : `<span class="bs">${t}</span>`;
-        }
-        function bForma(f) {
-            if (!f) return '';
-            if (f.includes('distanță')) return '<span class="bid">ID</span>';
-            if (f.includes('redusă')) return '<span class="bifr">IFR</span>';
-            return '<span class="bif">IF</span>';
-        }
-        function spin(c) { return `<tr><td colspan="${c}" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Se actualizează...</td></tr>`; }
-        function empty(c) { return `<tr><td colspan="${c}" class="text-center py-2 text-muted"><i class="bi bi-inbox me-1"></i>Nu există date.</td></tr>`; }
-        function err(c, m) { return `<tr><td colspan="${c}" class="text-center text-danger small">Eroare: ${m}</td></tr>`; }
+function bTip(t) {
+    if (!t) return '';
+    return t.toLowerCase().includes('tit') ? `<span class="bt">${t}</span>` : `<span class="bs">${t}</span>`;
+}
+function bForma(f) {
+    if (!f) return '';
+    if (f.includes('distanță')) return '<span class="bid">ID</span>';
+    if (f.includes('redusă'))   return '<span class="bifr">IFR</span>';
+    return '<span class="bif">IF</span>';
+}
+function spin(c) { return `<tr><td colspan="${c}" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Se actualizează...</td></tr>`; }
+function empty(c) { return `<tr><td colspan="${c}" class="text-center py-2 text-muted"><i class="bi bi-inbox me-1"></i>Nu există date.</td></tr>`; }
+function errR(c,m) { return `<tr><td colspan="${c}" class="text-center text-danger small">Eroare: ${m}</td></tr>`; }
 
-        function progBar(pct) {
-            const p = +pct || 0;
-            const color = p > 50 ? '#56723e' : p >= 20 ? '#f0ad4e' : '#d9534f';
-            return `<div class="pbar-wrap">
-            <span style="min-width:38px;font-size:.75rem;font-weight:600">${p.toFixed(1)}%</span>
-            <div class="pbar-track">
-                <div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${color};"></div>
-            </div>
-        </div>`;
-        }
+function progBar(pct) {
+    const p = +pct||0;
+    const col = p>50 ? '#56723e' : p>=20 ? '#f0ad4e' : '#d9534f';
+    return `<div class="pbar-wrap">
+        <span style="min-width:36px;font-size:.74rem;font-weight:600">${p.toFixed(1)}%</span>
+        <div class="pbar-track"><div class="pbar-fill" style="width:${Math.min(p,100)}%;background:${col};"></div></div>
+    </div>`;
+}
 
-        $(function () {
-            $('#sSpec').select2({ placeholder: 'Toate', allowClear: true, width: 'resolve' });
-            $('#sProf').select2({ placeholder: 'Cauta...', allowClear: true, width: 'resolve' });
+// ============================================================
+// INIT
+// ============================================================
+$(function() {
+    $('#sSpec').select2({ placeholder:'Toate specializarile', allowClear:true, width:'resolve' });
+    $('#sProf').select2({ placeholder:'Cauta profesor...', allowClear:true, width:'resolve' });
 
-            fetch('/api/Rapoarte/liste/ani-universitari').then(r => r.json()).then(data => {
-                const s = document.getElementById('sAn');
-                data.forEach(a => s.appendChild(new Option(a.nume, a.id)));
-                if (data.length) { S.idAn = data[0].id; s.value = data[0].id; }
-                loadFacultati();
-            });
+    fetch('/api/Rapoarte/liste/ani-universitari').then(r=>r.json()).then(data => {
+        const s = document.getElementById('sAn');
+        data.forEach(a => s.appendChild(new Option(a.nume, a.id)));
+        if (data.length) { S.idAn = data[0].id; s.value = data[0].id; }
+        loadFacultati();
+        loadCicluri();
+    });
 
-            $('#sAn').on('change', function () { S.idAn = +this.value || 0; resetAll(); loadFacultati(); });
-            $('#sFac').on('change', function () { S.idFac = +this.value || 0; resetAll(); loadDept(); loadSpec(); });
-            $('#sDept').on('change', function () { S.idCatedra = +this.value || 0; resetAll(); loadSpec(); });
-            $('#sSpec').on('change', function () { S.spec = $(this).val() || 'Toti'; resetAll(); loadProf(); });
-            $('#sProf').on('change', function () { S.prof = $(this).val() || 'Toti'; resetAll(); });
-            $('#sTip').on('change', function () { S.tipPost = this.value || 'Toti'; resetAll(); });
-            $('#sForma').on('change', function () { S.formaInv = this.value || 'Toti'; resetAll(); });
-            $('#sSem').on('change', function () { S.sem = +this.value || 0; resetAll(); });
+    $('#sAn').on('change',  function() { S.idAn = +this.value||0; resetAll(); loadFacultati(); loadCicluri(); });
+    $('#sFac').on('change', function() {
+        S.idFac = +this.value||0;
+        S.numeFac = this.options[this.selectedIndex]?.text || '';
+        if (S.numeFac === 'Toate') S.numeFac = '';
+        resetAll(); loadDept(); loadSpec(); loadProf();
+    });
+    $('#sDept').on('change', function() {
+        S.idCatedra = +this.value||0;
+        S.numeDept = this.options[this.selectedIndex]?.text || '';
+        if (S.numeDept === 'Toate') S.numeDept = '';
+        resetAll(); loadSpec(); loadProf();
+    });
+    $('#sSpec').on('change', function() { S.spec = $(this).val()||'Toti'; resetAll(); loadProf(); });
+    $('#sProf').on('change', function() { S.prof = $(this).val()||'Toti'; resetAll(); });
+    $('#sTip').on('change',  function() { S.tipPost = this.value||'Toti'; resetAll(); loadProf(); });
+    $('#sForma').on('change',function() { S.formaInv = this.value||'Toti'; resetAll(); });
+    $('#sCiclu').on('change',function() { S.ciclu = $(this).val()||'Toti'; resetAll(); });
+    $('#sSem').on('change',  function() { S.sem = +this.value||0; resetAll(); });
 
-            bindR('r1', loadR1); bindR('r2', loadR2); bindR('r3', loadR3);
-            bindR('r4', loadR4); bindR('r5', loadR5);
-            bindR('r6', loadR6); bindR('r7', loadR7);
+    bindR('r1', loadR1); bindR('r2', loadR2); bindR('r3', loadR3);
+    bindR('r4', loadR4); bindR('r5', loadR5);
+    bindR('r6', loadR6); bindR('r7', loadR7);
+});
+
+function bindR(id, fn) {
+    document.getElementById(id)?.addEventListener('show.bs.collapse', () => {
+        if (dirty(id)) { fn(); clean(id); }
+    });
+}
+
+// ============================================================
+// DROPDOWNURI
+// ============================================================
+function loadFacultati() {
+    fetch('/api/Rapoarte/liste/facultati').then(r=>r.json()).then(data => {
+        const s = document.getElementById('sFac');
+        s.innerHTML = '';
+        data.forEach(f => s.appendChild(new Option(f.nume, f.id)));
+        s.value = 0; S.idFac = 0; S.numeFac = '';
+        loadDept(); loadSpec(); loadProf();
+    });
+}
+function loadDept() {
+    const s = document.getElementById('sDept');
+    s.innerHTML = '<option value="0">Se încarcă...</option>';
+    fetch(`/api/Rapoarte/liste/departamente?idAnUniv=${S.idAn}&idFacultate=${S.idFac}`)
+        .then(r=>r.json()).then(data => {
+            s.innerHTML = '';
+            data.forEach(d => s.appendChild(new Option(d.nume, d.id)));
+            s.value = 0; S.idCatedra = 0; S.numeDept = '';
+        }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
+}
+function loadSpec() {
+    const $s = $('#sSpec').empty().append(new Option('Toate','Toti')).trigger('change');
+    fetch(`/api/Rapoarte/liste/specializari?idAnUniv=${S.idAn}&idFacultate=${S.idFac}&idCatedra=${S.idCatedra}`)
+        .then(r=>r.json()).then(data => {
+            $s.empty();
+            data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
+            $s.val('Toti').trigger('change');
         });
+}
+function loadProf() {
+    // Se incarca intotdeauna, chiar si cand toate filtrele sunt "Toate"
+    const $p = $('#sProf');
+    const params = new URLSearchParams();
+    if (S.idAn>0) params.append('idAnUniv', S.idAn);
+    if (S.idFac>0) params.append('idFacultate', S.idFac);
+    if (S.idCatedra>0) params.append('idCatedra', S.idCatedra);
+    if (S.spec!=='Toti') params.append('specializare', S.spec);
+    if (S.tipPost!=='Toti') params.append('tipPost', S.tipPost);
+    fetch(`/api/Rapoarte/liste/profesori?${params}`)
+        .then(r=>r.json()).then(data => {
+            $p.empty();
+            data.forEach(p => $p.append(new Option(p.nume, p.id)));
+            $p.val('Toti').trigger('change');
+        });
+}
+function loadCicluri() {
+    const $c = $('#sCiclu').empty().append(new Option('Toate','Toti'));
+    fetch(`/api/Rapoarte/liste/cicluri-studii?idAnUniv=${S.idAn}`)
+        .then(r=>r.json()).then(data => {
+            $c.empty();
+            data.forEach(c => $c.append(new Option(c.nume, c.id)));
+            $c.val('Toti');
+        });
+}
 
-        function bindR(id, fn) {
-            document.getElementById(id)?.addEventListener('show.bs.collapse', () => {
-                if (dirty(id)) { fn(); clean(id); }
-            });
-        }
+// ============================================================
+// DOWNLOAD - trimite si denumirile pentru header Excel
+// ============================================================
+function dl(tip) {
+    if (tip === 'discipline-zip') {
+        const p = new URLSearchParams();
+        if (S.idAn>0) p.append('idAnUniv',S.idAn);
+        if (S.idFac>0) p.append('idFacultate',S.idFac);
+        if (S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        if (S.prof!=='Toti') p.append('profesor',S.prof);
+        location.href = `/api/Rapoarte/export/discipline-zip?${p}`;
+    } else {
+        location.href = `/api/Rapoarte/export/${tip}?${ap()}`;
+    }
+}
 
-        function loadFacultati() {
-            fetch('/api/Rapoarte/liste/facultati').then(r => r.json()).then(data => {
-                const s = document.getElementById('sFac');
-                s.innerHTML = '';
-                data.forEach(f => s.appendChild(new Option(f.nume, f.id)));
-                s.value = 0; S.idFac = 0;
-                loadDept(); loadSpec();
-            });
-        }
-        function loadDept() {
-            const s = document.getElementById('sDept');
-            s.innerHTML = '<option value="0">Se încarcă...</option>';
-            fetch(`/api/Rapoarte/liste/departamente?idAnUniv=${S.idAn}&idFacultate=${S.idFac}`)
-                .then(r => r.json()).then(data => {
-                    s.innerHTML = '';
-                    data.forEach(d => s.appendChild(new Option(d.nume, d.id)));
-                    s.value = 0; S.idCatedra = 0;
-                }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
-        }
-        function loadSpec() {
-            const $s = $('#sSpec').empty().append(new Option('Toate', 'Toti')).trigger('change');
-            fetch(`/api/Rapoarte/liste/specializari?idAnUniv=${S.idAn}&idFacultate=${S.idFac}&idCatedra=${S.idCatedra}`)
-                .then(r => r.json()).then(data => {
-                    $s.empty();
-                    data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
-                    $s.val('Toti').trigger('change');
-                });
-        }
-        function loadProf() {
-            const $p = $('#sProf').empty().append(new Option('', 'Toti')).trigger('change');
-            fetch(`/api/Rapoarte/liste/profesori?${ap()}`)
-                .then(r => r.json()).then(data => {
-                    $p.empty().append(new Option('', 'Toti'));
-                    data.forEach(p => { if (p.id !== 'Toti') $p.append(new Option(p.nume, p.id)); });
-                    $p.val('Toti').trigger('change');
-                });
-        }
+// ============================================================
+// R1: NORME (cu Departament Orei si Mențiuni cuplaje)
+// ============================================================
+async function loadR1() {
+    document.getElementById('b1').innerHTML = spin(12);
+    try {
+        const data = await fetch(`/api/Rapoarte/norma?${ap()}`).then(r=>r.json());
+        if (!data?.length) { document.getElementById('b1').innerHTML = empty(12); return; }
+        let html='', tc=0, ta=0, tv=0;
+        data.forEach(n => {
+            const c=+n.oreCurs||0, a=+n.oreAplicatii||0, v=+n.oreConv||0;
+            tc+=c; ta+=a; tv+=v;
+            const mnt = n.mentiuni
+                ? `<span class="mnt-cell">${n.mentiuni}</span>` : '';
+            html+=`<tr>
+                <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                <td class="small">${n.departament}</td>
+                <td class="small">${n.specializare}</td>
+                <td class="small">${n.materie}</td>
+                <td>${bTip(n.tipPost)}</td>
+                <td class="text-center">${n.semestru||''}</td>
+                <td>${bForma(n.formaInv)}</td>
+                <td class="text-end">${c.toFixed(2)}</td>
+                <td class="text-end">${a.toFixed(2)}</td>
+                <td class="text-end fw-bold">${v.toFixed(2)}</td>
+                <td>${mnt}</td>
+            </tr>`;
+        });
+        html+=`<tr class="tfoot">
+            <td colspan="8" class="text-end">TOTAL:</td>
+            <td class="text-end">${tc.toFixed(2)}</td>
+            <td class="text-end">${ta.toFixed(2)}</td>
+            <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
+            <td></td></tr>`;
+        document.getElementById('b1').innerHTML = html;
+    } catch(e) { document.getElementById('b1').innerHTML = errR(12, e.message); }
+}
 
-        // Download router
-        function dl(tip) {
-            const p = ap();
-            if (tip === 'discipline-zip') {
-                // ZIP nu are filtru forma, trimite ceilalti parametri
-                const pz = new URLSearchParams();
-                if (S.idAn > 0) pz.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) pz.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) pz.append('idCatedra', S.idCatedra);
-                if (S.prof !== 'Toti') pz.append('profesor', S.prof);
-                location.href = `/api/Rapoarte/export/discipline-zip?${pz}`;
-            } else {
-                location.href = `/api/Rapoarte/export/${tip}?${p}`;
-            }
-        }
-
-        // ============================================================
-        // R1: NORME
-        // ============================================================
-        async function loadR1() {
-            document.getElementById('b1').innerHTML = spin(13);
-            try {
-                const data = await fetch(`/api/Rapoarte/norma?${ap()}`).then(r => r.json());
-                if (!data?.length) { document.getElementById('b1').innerHTML = empty(13); return; }
-                let html = '', tc = 0, ta = 0, tv = 0;
-                data.forEach(n => {
-                    const c = +n.oreCurs || 0, a = +n.oreAplicatii || 0, v = +n.oreConv || 0;
-                    tc += c; ta += a; tv += v;
-                    html += `<tr>
-                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                    <td class="small">${n.departament}</td>
-                    <td class="small">${n.specializare}</td>
-                    <td class="small">${n.materie}</td>
-                    <td>${bTip(n.tipPost)}</td>
-                    <td class="text-center">${n.semestru || ''}</td>
-                    <td>${bForma(n.formaInv)}</td>
-                    <td class="text-end">${c.toFixed(2)}</td>
-                    <td class="text-end">${a.toFixed(2)}</td>
-                    <td class="text-end fw-bold">${v.toFixed(2)}</td>
-                    <td class="text-end">${(+n.totalOreProf || 0).toFixed(2)}</td>
-                    <td class="text-end">${(+n.procentDinTotal || 0).toFixed(1)}%</td>
-                </tr>`;
-                });
-                html += `<tr class="tfoot-row">
-                <td colspan="8" class="text-end">TOTAL:</td>
-                <td class="text-end">${tc.toFixed(2)}</td>
-                <td class="text-end">${ta.toFixed(2)}</td>
-                <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
-                <td colspan="2"></td></tr>`;
-                document.getElementById('b1').innerHTML = html;
-            } catch (e) { document.getElementById('b1').innerHTML = err(13, e.message); }
-        }
-
-        // ============================================================
-        // R2: TOTALURI
-        // ============================================================
-        async function loadR2() {
-            document.getElementById('b2').innerHTML = spin(10);
-            try {
-                const p = new URLSearchParams();
-                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) p.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-                if (S.prof !== 'Toti') p.append('profesor', S.prof);
-                if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
-                const data = await fetch(`/api/Rapoarte/norma-totaluri?${p}`).then(r => r.json());
-                if (!data?.length) { document.getElementById('b2').innerHTML = empty(10); return; }
-                let html = '', gif = 0, gid = 0, gifr = 0, gc = 0, ga = 0;
-                data.forEach(n => {
-                    const oi = +n.oreIF || 0, od = +n.oreID || 0, oifr = +n.oreIFR || 0,
-                        oc = +n.totalOreConv || 0, oa = +n.totalAnual || 0;
-                    gif += oi; gid += od; gifr += oifr; gc += oc; ga += oa;
-                    html += `<tr>
-                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                    <td class="small">${n.facultate}</td>
-                    <td class="small">${n.departament}</td>
-                    <td>${bTip(n.tipPost)}</td>
-                    <td class="text-end">${oi.toFixed(2)}</td>
-                    <td class="text-end">${od.toFixed(2)}</td>
-                    <td class="text-end">${oifr.toFixed(2)}</td>
-                    <td class="text-end fw-bold">${oc.toFixed(2)}</td>
-                    <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
-                </tr>`;
-                });
-                html += `<tr class="tfoot-row">
-                <td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                <td class="text-end">${gif.toFixed(2)}</td>
-                <td class="text-end">${gid.toFixed(2)}</td>
-                <td class="text-end">${gifr.toFixed(2)}</td>
-                <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
-                <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
-                document.getElementById('b2').innerHTML = html;
-            } catch (e) { document.getElementById('b2').innerHTML = err(10, e.message); }
-        }
-
-        // ============================================================
-        // R3: DISTRIBUTIE ORE cu progress bar colorat
-        // ============================================================
-        async function loadR3() {
-            document.getElementById('b3').innerHTML = spin(7);
-            try {
-                const p = new URLSearchParams();
-                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) p.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-                if (S.prof !== 'Toti') p.append('profesor', S.prof);
-                const data = await fetch(`/api/Rapoarte/distributie-ore?${p}`).then(r => r.json());
-                if (!data?.length) { document.getElementById('b3').innerHTML = empty(7); return; }
-                let html = '';
-                data.forEach(n => {
-                    const op = +n.oreProgram || 0, ot = +n.totalOreUniv || 0, pr = +n.procent || 0;
-                    html += `<tr>
-                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                    <td class="small">${n.departament}</td>
-                    <td class="small">${n.program}</td>
-                    <td class="text-end">${op.toFixed(2)}</td>
-                    <td class="text-end">${ot.toFixed(2)}</td>
-                    <td>${progBar(pr)}</td>
-                </tr>`;
-                });
-                document.getElementById('b3').innerHTML = html;
-            } catch (e) { document.getElementById('b3').innerHTML = err(7, e.message); }
-        }
-
-        // ============================================================
-        // R4: LIMBI
-        // ============================================================
-        async function loadR4() {
-            document.getElementById('b4').innerHTML = spin(6);
-            try {
-                const p = new URLSearchParams();
-                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) p.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-                if (S.prof !== 'Toti') p.append('profesor', S.prof);
-                if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
-                const data = await fetch(`/api/Rapoarte/limbi-straine?${p}`).then(r => r.json());
-                if (!data?.length) { document.getElementById('b4').innerHTML = empty(6); return; }
-                let html = '', s1 = 0, s2 = 0, st = 0;
-                data.forEach(n => {
-                    const a = +n.sem1 || 0, b = +n.sem2 || 0, t = +n.total || 0;
-                    s1 += a; s2 += b; st += t;
-                    html += `<tr>
-                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                    <td class="text-end">${a.toFixed(2)}</td>
-                    <td class="text-end">${b.toFixed(2)}</td>
-                    <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
-                    <td class="small">${n.limbiPredate || ''}</td>
-                </tr>`;
-                });
-                html += `<tr class="tfoot-row">
-                <td colspan="2" class="text-end">TOTAL:</td>
-                <td class="text-end">${s1.toFixed(2)}</td>
-                <td class="text-end">${s2.toFixed(2)}</td>
-                <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
-                <td></td></tr>`;
-                document.getElementById('b4').innerHTML = html;
-            } catch (e) { document.getElementById('b4').innerHTML = err(6, e.message); }
-        }
-
-        // ============================================================
-        // R5: DISCIPLINE
-        // ============================================================
-        async function loadR5() {
-            document.getElementById('b5').innerHTML = spin(7);
-            try {
-                const p = new URLSearchParams();
-                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) p.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-                if (S.prof !== 'Toti') p.append('profesor', S.prof);
-                const data = await fetch(`/api/Rapoarte/discipline?${p}`).then(r => r.json());
-                if (!data?.length) { document.getElementById('b5').innerHTML = empty(7); return; }
-                let html = '';
-                data.forEach(n => {
-                    html += `<tr>
-                    <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                    <td class="small">${n.facultate}</td>
-                    <td class="small">${n.departament}</td>
-                    <td class="small">${n.grad}</td>
-                    <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
-                    <td class="small" style="white-space:normal;max-width:380px;">${n.discipline || ''}</td>
-                </tr>`;
-                });
-                document.getElementById('b5').innerHTML = html;
-            } catch (e) { document.getElementById('b5').innerHTML = err(7, e.message); }
-        }
-
-        // ============================================================
-        // R6: TITULARI
-        // ============================================================
-        async function loadR6() {
-            document.getElementById('b6').innerHTML = spin(5);
-            try {
-                const p = new URLSearchParams();
-                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) p.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-                if (S.prof !== 'Toti') p.append('profesor', S.prof);
-                const data = await fetch(`/api/Rapoarte/titulari?${p}`).then(r => r.json());
-                if (!data?.length) { document.getElementById('b6').innerHTML = empty(5); return; }
-                let html = '';
-                data.forEach(n => {
-                    html += `<tr>
+// ============================================================
+// R2: TOTALURI
+// ============================================================
+async function loadR2() {
+    document.getElementById('b2').innerHTML = spin(10);
+    try {
+        const p = new URLSearchParams();
+        if(S.idAn>0) p.append('idAnUniv',S.idAn);
+        if(S.idFac>0) p.append('idFacultate',S.idFac);
+        if(S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        if(S.prof!=='Toti') p.append('profesor',S.prof);
+        if(S.tipPost!=='Toti') p.append('tipPost',S.tipPost);
+        const data = await fetch(`/api/Rapoarte/norma-totaluri?${p}`).then(r=>r.json());
+        if (!data?.length) { document.getElementById('b2').innerHTML = empty(10); return; }
+        let html='', gif=0, gid=0, gifr=0, gc=0, ga=0;
+        data.forEach(n => {
+            const oi=+n.oreIF||0, od=+n.oreID||0, oifr=+n.oreIFR||0,
+                  oc=+n.totalOreConv||0, oa=+n.totalAnual||0;
+            gif+=oi; gid+=od; gifr+=oifr; gc+=oc; ga+=oa;
+            html+=`<tr>
                 <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
                 <td class="small">${n.facultate}</td>
                 <td class="small">${n.departament}</td>
-                <td class="small">${n.grad}</td></tr>`;
-                });
-                html += `<tr class="tfoot-row"><td colspan="5" class="text-end">Total: ${data.length} titulari</td></tr>`;
-                document.getElementById('b6').innerHTML = html;
-            } catch (e) { document.getElementById('b6').innerHTML = err(5, e.message); }
-        }
+                <td>${bTip(n.tipPost)}</td>
+                <td class="text-end">${oi.toFixed(2)}</td>
+                <td class="text-end">${od.toFixed(2)}</td>
+                <td class="text-end">${oifr.toFixed(2)}</td>
+                <td class="text-end fw-bold">${oc.toFixed(2)}</td>
+                <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
+            </tr>`;
+        });
+        html+=`<tr class="tfoot"><td colspan="5" class="text-end">TOTAL GENERAL:</td>
+            <td class="text-end">${gif.toFixed(2)}</td><td class="text-end">${gid.toFixed(2)}</td>
+            <td class="text-end">${gifr.toFixed(2)}</td>
+            <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
+            <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
+        document.getElementById('b2').innerHTML = html;
+    } catch(e) { document.getElementById('b2').innerHTML = errR(10, e.message); }
+}
 
-        // ============================================================
-        // R7: COLABORATORI
-        // ============================================================
-        async function loadR7() {
-            document.getElementById('b7').innerHTML = spin(5);
-            try {
-                const p = new URLSearchParams();
-                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) p.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-                const data = await fetch(`/api/Rapoarte/colaboratori?${p}`).then(r => r.json());
-                if (!data?.length) { document.getElementById('b7').innerHTML = empty(5); return; }
-                let html = '';
-                data.forEach(n => {
-                    html += `<tr>
+// ============================================================
+// R3: DISTRIBUTIE ORE
+// ============================================================
+async function loadR3() {
+    document.getElementById('b3').innerHTML = spin(7);
+    try {
+        const p = new URLSearchParams();
+        if(S.idAn>0) p.append('idAnUniv',S.idAn);
+        if(S.idFac>0) p.append('idFacultate',S.idFac);
+        if(S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        if(S.prof!=='Toti') p.append('profesor',S.prof);
+        const data = await fetch(`/api/Rapoarte/distributie-ore?${p}`).then(r=>r.json());
+        if (!data?.length) { document.getElementById('b3').innerHTML = empty(7); return; }
+        let html='';
+        data.forEach(n => {
+            const op=+n.oreProgram||0, ot=+n.totalOreUniv||0, pr=+n.procent||0;
+            html+=`<tr>
                 <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                <td class="small">${n.facultate}</td>
                 <td class="small">${n.departament}</td>
-                <td class="small">${n.grad}</td></tr>`;
-                });
-                html += `<tr class="tfoot-row"><td colspan="5" class="text-end">Total: ${data.length} colaboratori</td></tr>`;
-                document.getElementById('b7').innerHTML = html;
-            } catch (e) { document.getElementById('b7').innerHTML = err(5, e.message); }
-        }
+                <td class="small">${n.program}</td>
+                <td class="text-end">${op.toFixed(2)}</td>
+                <td class="text-end">${ot.toFixed(2)}</td>
+                <td>${progBar(pr)}</td>
+            </tr>`;
+        });
+        document.getElementById('b3').innerHTML = html;
+    } catch(e) { document.getElementById('b3').innerHTML = errR(7, e.message); }
+}
 
-        // ============================================================
-        // R8: ANS previzualizare (primii 25)
-        // ============================================================
-        async function loadAns() {
-            document.getElementById('ansWrap').style.display = 'block';
-            document.getElementById('b8').innerHTML = spin(6);
-            document.getElementById('ansHead').innerHTML = '<th colspan="6" class="text-center">Se încarcă...</th>';
-            try {
-                const p = new URLSearchParams();
-                if (S.idAn > 0) p.append('idAnUniv', S.idAn);
-                if (S.idFac > 0) p.append('idFacultate', S.idFac);
-                if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
-                const resp = await fetch(`/api/Rapoarte/raport-ans?${p}`).then(r => r.json());
-                const domenii = resp.domenii || [];
-                const profs = (resp.profesori || []).slice(0, 25);
+// ============================================================
+// R4: LIMBI STRAINE (structura noua)
+// ============================================================
+async function loadR4() {
+    document.getElementById('b4').innerHTML = spin(8);
+    try {
+        const p = new URLSearchParams();
+        if(S.idAn>0) p.append('idAnUniv',S.idAn);
+        if(S.idFac>0) p.append('idFacultate',S.idFac);
+        if(S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        if(S.prof!=='Toti') p.append('profesor',S.prof);
+        if(S.tipPost!=='Toti') p.append('tipPost',S.tipPost);
+        if(S.ciclu!=='Toti') p.append('cicluStudii',S.ciclu);
+        const data = await fetch(`/api/Rapoarte/limbi-straine?${p}`).then(r=>r.json());
+        if (!data?.length) { document.getElementById('b4').innerHTML = empty(8); return; }
+        let html='', st=0;
+        data.forEach(n => {
+            const t=+n.totalOre||0; st+=t;
+            html+=`<tr>
+                <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                <td class="text-center">${n.semestru||''}</td>
+                <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
+                <td class="small">${n.limbiPredate||''}</td>
+                <td class="small">${n.programStudiu||''}</td>
+                <td class="small"><span class="badge bg-secondary" style="font-size:.68rem">${n.cicluStudii||''}</span></td>
+                <td class="small">${n.specializare||''}</td>
+            </tr>`;
+        });
+        html+=`<tr class="tfoot"><td colspan="3" class="text-end">TOTAL:</td>
+            <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
+            <td colspan="4"></td></tr>`;
+        document.getElementById('b4').innerHTML = html;
+    } catch(e) { document.getElementById('b4').innerHTML = errR(8, e.message); }
+}
 
-                let hdr = '<th>Nr.</th><th>Profesor</th><th>Facultate</th><th>Dept.</th><th>Funcție</th>';
-                domenii.forEach(d => {
-                    const sh = d.length > 18 ? d.substring(0, 16) + '…' : d;
-                    hdr += `<th class="text-center" title="${d}" style="min-width:65px;font-size:.7rem">${sh}</th>`;
-                });
-                hdr += '<th class="text-center">Total</th>';
-                document.getElementById('ansHead').innerHTML = hdr;
+// ============================================================
+// R5: DISCIPLINE
+// ============================================================
+async function loadR5() {
+    document.getElementById('b5').innerHTML = spin(7);
+    try {
+        const p = new URLSearchParams();
+        if(S.idAn>0) p.append('idAnUniv',S.idAn);
+        if(S.idFac>0) p.append('idFacultate',S.idFac);
+        if(S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        if(S.prof!=='Toti') p.append('profesor',S.prof);
+        const data = await fetch(`/api/Rapoarte/discipline?${p}`).then(r=>r.json());
+        if (!data?.length) { document.getElementById('b5').innerHTML = empty(7); return; }
+        let html='';
+        data.forEach(n => { html+=`<tr>
+            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+            <td class="small">${n.facultate}</td><td class="small">${n.departament}</td>
+            <td class="small">${n.grad}</td>
+            <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline||0}</span></td>
+            <td class="small" style="white-space:normal;max-width:370px;">${n.discipline||''}</td>
+        </tr>`; });
+        document.getElementById('b5').innerHTML = html;
+    } catch(e) { document.getElementById('b5').innerHTML = errR(7, e.message); }
+}
 
-                if (!profs.length) { document.getElementById('b8').innerHTML = empty(domenii.length + 6); return; }
-                let html = '';
-                profs.forEach(p => {
-                    let tf = 0, cols = '';
-                    domenii.forEach(d => {
-                        const f = p.domeniiMapate?.[d] || 0;
-                        tf += f;
-                        cols += f > 0
-                            ? `<td class="frac-cell">${f.toFixed(2)}</td>`
-                            : '<td></td>';
-                    });
-                    html += `<tr>
-                    <td>${p.nrCrt}</td><td><b class="small">${p.numeComplet}</b></td>
-                    <td class="small">${p.facultate}</td>
-                    <td class="small">${p.departament}</td>
-                    <td class="small">${p.gradFunctie}</td>
-                    ${cols}
-                    <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
-                });
-                if ((resp.profesori?.length || 0) > 25)
-                    html += `<tr class="tfoot-row"><td colspan="${domenii.length + 6}" class="text-center">
-                    Primii 25 din ${resp.profesori.length}. Excel pentru lista completă.</td></tr>`;
-                document.getElementById('b8').innerHTML = html;
-                clean('r8');
-            } catch (e) { document.getElementById('b8').innerHTML = err(6, e.message); }
-        }
+// ============================================================
+// R6: TITULARI
+// ============================================================
+async function loadR6() {
+    document.getElementById('b6').innerHTML = spin(5);
+    try {
+        const p = new URLSearchParams();
+        if(S.idAn>0) p.append('idAnUniv',S.idAn);
+        if(S.idFac>0) p.append('idFacultate',S.idFac);
+        if(S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        if(S.prof!=='Toti') p.append('profesor',S.prof);
+        const data = await fetch(`/api/Rapoarte/titulari?${p}`).then(r=>r.json());
+        if (!data?.length) { document.getElementById('b6').innerHTML = empty(5); return; }
+        let html='';
+        data.forEach(n => { html+=`<tr>
+            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+            <td class="small">${n.facultate}</td>
+            <td class="small">${n.departament}</td>
+            <td class="small">${n.grad}</td></tr>`; });
+        html+=`<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} titulari oficiali</td></tr>`;
+        document.getElementById('b6').innerHTML = html;
+    } catch(e) { document.getElementById('b6').innerHTML = errR(5, e.message); }
+}
+
+// ============================================================
+// R7: COLABORATORI
+// ============================================================
+async function loadR7() {
+    document.getElementById('b7').innerHTML = spin(5);
+    try {
+        const p = new URLSearchParams();
+        if(S.idAn>0) p.append('idAnUniv',S.idAn);
+        if(S.idFac>0) p.append('idFacultate',S.idFac);
+        if(S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        const data = await fetch(`/api/Rapoarte/colaboratori?${p}`).then(r=>r.json());
+        if (!data?.length) { document.getElementById('b7').innerHTML = empty(5); return; }
+        let html='';
+        data.forEach(n => { html+=`<tr>
+            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+            <td class="small">${n.facultate}</td>
+            <td class="small">${n.departament}</td>
+            <td class="small">${n.grad}</td></tr>`; });
+        html+=`<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} colaboratori</td></tr>`;
+        document.getElementById('b7').innerHTML = html;
+    } catch(e) { document.getElementById('b7').innerHTML = errR(5, e.message); }
+}
+
+// ============================================================
+// R8: ANS
+// ============================================================
+async function loadAns() {
+    document.getElementById('ansWrap').style.display='block';
+    document.getElementById('b8').innerHTML = spin(6);
+    document.getElementById('ansHead').innerHTML = '<th colspan="6" class="text-center">Se încarcă...</th>';
+    try {
+        const p = new URLSearchParams();
+        if(S.idAn>0) p.append('idAnUniv',S.idAn);
+        if(S.idFac>0) p.append('idFacultate',S.idFac);
+        if(S.idCatedra>0) p.append('idCatedra',S.idCatedra);
+        const resp = await fetch(`/api/Rapoarte/raport-ans?${p}`).then(r=>r.json());
+        const dom = resp.domenii || [];
+        const prs = (resp.profesori || []).slice(0, 25);
+
+        let hdr = '<th>Nr.</th><th>Profesor</th><th>Facultate</th><th>Dept.</th><th>Funcție</th>';
+        dom.forEach(d => {
+            const sh = d.length>18 ? d.substring(0,16)+'…' : d;
+            hdr += `<th class="text-center" title="${d}" style="min-width:64px;font-size:.69rem">${sh}</th>`;
+        });
+        hdr += '<th class="text-center">Total</th>';
+        document.getElementById('ansHead').innerHTML = hdr;
+
+        if (!prs.length) { document.getElementById('b8').innerHTML = empty(dom.length+6); return; }
+        let html='';
+        prs.forEach(p => {
+            let tf=0, cols='';
+            dom.forEach(d => {
+                const f = p.domeniiMapate?.[d]||0;
+                tf += f;
+                cols += f>0 ? `<td class="frac-cell">${f.toFixed(2)}</td>` : '<td></td>';
+            });
+            html+=`<tr>
+                <td>${p.nrCrt}</td><td><b class="small">${p.numeComplet}</b></td>
+                <td class="small">${p.facultate}</td>
+                <td class="small">${p.departament}</td>
+                <td class="small">${p.gradFunctie}</td>
+                ${cols}
+                <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
+        });
+        if ((resp.profesori?.length||0) > 25)
+            html+=`<tr class="tfoot"><td colspan="${dom.length+6}" class="text-center">
+                Primii 25 din ${resp.profesori.length}. Folosiți Export pentru lista completă.</td></tr>`;
+        document.getElementById('b8').innerHTML = html;
+        clean('r8');
+    } catch(e) { document.getElementById('b8').innerHTML = errR(6, e.message); }
+}
     </script>
 </body>
 </html>
