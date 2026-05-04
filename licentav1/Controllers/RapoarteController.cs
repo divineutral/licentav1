@@ -467,7 +467,7 @@ namespace LicentaV1.Controllers
         [HttpGet("norma-totaluri")]
         public async Task<IActionResult> GetTotaluri(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
-            [FromQuery] string? profesor, [FromQuery] string? tipPost)
+            [FromQuery] string? profesor, [FromQuery] string? tipPost, [FromQuery] int? semestru)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var result = new List<object>();
@@ -479,6 +479,7 @@ namespace LicentaV1.Controllers
             cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(profesor) ? "Toti" : profesor.Trim());
             cmd.Parameters.AddWithValue("@tipPost", string.IsNullOrWhiteSpace(tipPost) ? "Toti" : tipPost.Trim());
             cmd.Parameters.AddWithValue("@sapt", SaptamaniPerAn);
+            cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 result.Add(new
@@ -501,7 +502,7 @@ namespace LicentaV1.Controllers
         [HttpGet("export/norma-totaluri")]
         public async Task<IActionResult> ExportTotaluri(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
-            [FromQuery] string? profesor, [FromQuery] string? tipPost)
+            [FromQuery] string? profesor, [FromQuery] string? tipPost, [FromQuery] int? semestru)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var dt = new DataTable();
@@ -522,6 +523,7 @@ namespace LicentaV1.Controllers
             cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
             cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(profesor) ? "Toti" : profesor!.Trim());
             cmd.Parameters.AddWithValue("@tipPost", string.IsNullOrWhiteSpace(tipPost) ? "Toti" : tipPost!.Trim());
+            cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
             cmd.Parameters.AddWithValue("@sapt", SaptamaniPerAn);
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
@@ -1179,6 +1181,9 @@ namespace LicentaV1.Controllers
 
             -- Pas 4: fractia per profesor x ramura, cu norma individuala
             -- (ExceptiiNormaOreConventionale > NormaOreConventionale standard)
+            -- Folosim denumirea OFICIALA din N_RAMURA_STIINTA_ANS (cu paranteze
+            -- complete: 'Stiinte economice (fara Cibernetica...)' nu varianta scurta
+            -- 'Stiinte economice' din N_DOMENIU_STUDIUL_ANS_List).
             SELECT
                 v.ID_Profesor,
                 v.NumeIntreg                            AS NumeIntreg,
@@ -1186,7 +1191,7 @@ namespace LicentaV1.Controllers
                 v.DenumireCatedra                       AS Departament,
                 v.DenumireGradDidactic                  AS Grad,
                 s.ID_RamuraDeStiinta_ANS                AS IdRamura,
-                s.RamuraDeStiinta_ANS                   AS RamuraNume,
+                ISNULL(rsa.Denumire, s.RamuraDeStiinta_ANS) AS RamuraNume,
                 CAST(SUM(
                     s.NrOreConventionale / s.cnt /
                     ISNULL(enoc.NrOreTitular, ISNULL(noc.NrOreConventionaleTitular, @normaFallback))
@@ -1196,6 +1201,8 @@ namespace LicentaV1.Controllers
                 ON s.ID_Profesor = v.ID_Profesor
                 AND v.ID_AnUnivCatedra = @idAn
                 AND v.TitularAnUniv = 1
+            LEFT JOIN [dbo].[N_RAMURA_STIINTA_ANS] rsa
+                ON rsa.ID_Element = s.ID_RamuraDeStiinta_ANS
             LEFT JOIN [pi].[NormaOreConventionale] noc
                 ON noc.ID_TipGradDidactic = s.ID_TipGradDidactic
                 AND noc.ID_AnUniv = @idAn
@@ -1217,19 +1224,35 @@ namespace LicentaV1.Controllers
               )
             GROUP BY v.ID_Profesor, v.NumeIntreg,
                      v.DenumireFacultate, v.DenumireCatedra, v.DenumireGradDidactic,
-                     s.ID_RamuraDeStiinta_ANS, s.RamuraDeStiinta_ANS
+                     s.ID_RamuraDeStiinta_ANS, s.RamuraDeStiinta_ANS, rsa.Denumire
             HAVING SUM(s.NrOreConventionale / s.cnt /
                        ISNULL(enoc.NrOreTitular, ISNULL(noc.NrOreConventionaleTitular, @normaFallback))) > 0
             ORDER BY v.NumeIntreg COLLATE Romanian_CI_AS, s.ID_RamuraDeStiinta_ANS;";
 
-        // Maparea ramuri ANS (1-40) — citita o data, cache-uita
+        // Maparea ramuri ANS — citita o data, cache-uita.
+        // ATENTIE: N_RAMURA_STIINTA_ANS are doar 35 ramuri (1-34, 40).
+        // Lipsesc 35-39 (Teatru, Cinematografie, Muzica x2, Sport).
+        // N_DOMENIU_STUDIUL_ANS_List le acopera. Combinam cele doua surse:
+        // denumirea oficiala din rsa daca exista, altfel din procedura.
         private List<(int Id, string Den)> GetRamuriAns(SqlConnection conn)
         {
-            // Folosim cache static — ramurile ANS sunt fixe la nivel national
-            return _cache.GetOrCreate("RamuriANS_v1", e =>
+            return _cache.GetOrCreate("RamuriANS_v3", e =>
             {
                 e.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
-                using var cmdT = new SqlCommand(@"
+
+                // 1. Tabelul oficial cu denumiri complete (35 ramuri, gap 35-39)
+                var rsa = new Dictionary<int, string>();
+                using (var cmd = new SqlCommand(
+                    "SELECT ID_Element, Denumire FROM [dbo].[N_RAMURA_STIINTA_ANS]", conn))
+                {
+                    cmd.CommandTimeout = TimeoutShort;
+                    using var r = cmd.ExecuteReader();
+                    while (r.Read())
+                        rsa[Convert.ToInt32(r[0])] = r[1]?.ToString() ?? "";
+                }
+
+                // 2. Procedura cu lista completa (40 ramuri) - umple golurile
+                using var cmd2 = new SqlCommand(@"
                     IF OBJECT_ID('tempdb..#DM_ramuri') IS NOT NULL DROP TABLE #DM_ramuri;
                     CREATE TABLE #DM_ramuri (
                         ID_ELEMENT INT, COD_DS_CNATDCU NVARCHAR(20), cod_DS NVARCHAR(20),
@@ -1239,12 +1262,18 @@ namespace LicentaV1.Controllers
                     INSERT INTO #DM_ramuri EXEC [dbo].[N_DOMENIU_STUDIUL_ANS_List];
                     SELECT DISTINCT ID_RamuraDeStiinta_ANS, RamuraDeStiinta_ANS
                     FROM #DM_ramuri
+                    WHERE ID_RamuraDeStiinta_ANS IS NOT NULL
                     ORDER BY ID_RamuraDeStiinta_ANS;", conn);
-                cmdT.CommandTimeout = TimeoutShort;
+                cmd2.CommandTimeout = TimeoutShort;
                 var lst = new List<(int, string)>();
-                using var r = cmdT.ExecuteReader();
-                while (r.Read())
-                    lst.Add((Convert.ToInt32(r[0]), r[1]?.ToString() ?? ""));
+                using var rd = cmd2.ExecuteReader();
+                while (rd.Read())
+                {
+                    int id = Convert.ToInt32(rd[0]);
+                    // Prioritate: denumirea oficiala din N_RAMURA_STIINTA_ANS
+                    string den = rsa.TryGetValue(id, out var d) ? d : (rd[1]?.ToString() ?? "");
+                    lst.Add((id, den));
+                }
                 return lst;
             })!;
         }
