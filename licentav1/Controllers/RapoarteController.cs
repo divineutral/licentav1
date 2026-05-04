@@ -262,6 +262,8 @@ namespace LicentaV1.Controllers
                     vppm.ID_PlanMaterie_Prestator,
                     vppm.ID_Facultate,
                     vppm.ID_Catedra,
+                    vppm.ID_TipFormaInv,
+                    vppm.ID_StatDeFunctii,
                     vppm.TitularSauSuplinitor,
                     ROW_NUMBER() OVER (
                         PARTITION BY vppm.ID_Profesor, vppm.ID_PlanMaterie_Prestator, vppm.NrSemestruDinAn
@@ -298,6 +300,8 @@ namespace LicentaV1.Controllers
             FROM OreUnice ou
             INNER JOIN [dbo].[View_Profesori_CF_AnUniv] p
                 ON ou.ID_Profesor = p.ID_Profesor AND p.ID_AnUnivCatedra = @idAn
+            LEFT JOIN [pi].[StatDeFunctii] sf
+                ON ou.ID_StatDeFunctii = sf.ID_StatDeFunctii
             WHERE ou.Rn = 1
               AND (@idFac     = 0 OR ou.ID_Facultate = @idFac)
               AND (@idCatedra = 0 OR ou.ID_Catedra   = @idCatedra)
@@ -310,10 +314,14 @@ namespace LicentaV1.Controllers
               AND (@prof      = N'Toti' OR p.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
               AND (@tipPost   = N'Toti' OR CASE ou.TitularSauSuplinitor WHEN 1 THEN N'Titular' ELSE N'Suplinitor' END = @tipPost)
               AND (@sem       = 0       OR ou.NrSemestruDinAn = @sem)
+              -- Forma de invatamant: 1=IF, 2=ID, 3=IFR (conventie AGSIS)
+              AND (@formaInv  = 0       OR ou.ID_TipFormaInv = @formaInv)
+              -- Ciclu studii din StatDeFunctii (1=Licenta, 2=Master, 3=Doctorat etc)
+              AND (@ciclu     = 0       OR sf.ID_TipCicluInv = @ciclu)
             ORDER BY p.NumeIntreg COLLATE Romanian_CI_AS, ou.NrSemestruDinAn";
 
         private void AddNormaParams(SqlCommand cmd, int idAn, int idFac, int idCat,
-            string prof, string spec, string tipPost, int sem)
+            string prof, string spec, string tipPost, int sem, int formaInv, int ciclu)
         {
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFac);
@@ -322,20 +330,43 @@ namespace LicentaV1.Controllers
             cmd.Parameters.AddWithValue("@spec", string.IsNullOrWhiteSpace(spec) ? "Toti" : spec.Trim());
             cmd.Parameters.AddWithValue("@tipPost", string.IsNullOrWhiteSpace(tipPost) ? "Toti" : tipPost.Trim());
             cmd.Parameters.AddWithValue("@sem", sem);
+            cmd.Parameters.AddWithValue("@formaInv", formaInv);
+            cmd.Parameters.AddWithValue("@ciclu", ciclu);
         }
+
+        // Conversie string forma invatamant → ID conform conventiei AGSIS
+        // (1=IF zi, 2=ID, 3=IFR). Frontend trimite stringul pentru lizibilitate.
+        private static int FormaInvToId(string? s) => (s ?? "").Trim().ToUpperInvariant() switch
+        {
+            "IF" => 1,
+            "ID" => 2,
+            "IFR" => 3,
+            _ => 0
+        };
+
+        // Conversie string ciclu studii → ID. AGSIS foloseste:
+        // 1=Licenta, 2=Master, 3=Doctorat (verificat in StatDeFunctii.ID_TipCicluInv)
+        private static int CicluToId(string? s) => (s ?? "").Trim().ToUpperInvariant() switch
+        {
+            "LICENTA" or "LICENȚĂ" or "L" => 1,
+            "MASTER" or "M" => 2,
+            "DOCTORAT" or "D" => 3,
+            _ => 0
+        };
 
         [HttpGet("norma")]
         public async Task<IActionResult> GetNorma(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
             [FromQuery] string? profesor, [FromQuery] string? specializare, [FromQuery] string? tipPost,
-            [FromQuery] int? semestru)
+            [FromQuery] int? semestru, [FromQuery] string? formaInvatamant, [FromQuery] string? cicluStudii)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var result = new List<object>();
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlNorma, conn); cmd.CommandTimeout = 180;
+            using var cmd = new SqlCommand(SqlNorma, conn); cmd.CommandTimeout = TimeoutLong;
             AddNormaParams(cmd, idAn, idFacultate ?? 0, idCatedra ?? 0,
-                profesor ?? "", specializare ?? "", tipPost ?? "Toti", semestru ?? 0);
+                profesor ?? "", specializare ?? "", tipPost ?? "Toti", semestru ?? 0,
+                FormaInvToId(formaInvatamant), CicluToId(cicluStudii));
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 result.Add(new
@@ -352,9 +383,7 @@ namespace LicentaV1.Controllers
                     OreCurs = r["OreCurs"] == DBNull.Value ? 0m : Convert.ToDecimal(r["OreCurs"]),
                     OreAplic = r["OreAplic"] == DBNull.Value ? 0m : Convert.ToDecimal(r["OreAplic"]),
                     OreConv = r["OreConv"] == DBNull.Value ? 0m : Convert.ToDecimal(r["OreConv"]),
-                    Mentiuni = r["Mentiuni"]?.ToString() ?? "",
-                    CicluInv = "",
-                    FormaInv = ""
+                    Mentiuni = r["Mentiuni"]?.ToString() ?? ""
                 });
             return Ok(result);
         }
@@ -363,7 +392,7 @@ namespace LicentaV1.Controllers
         public async Task<IActionResult> ExportNorma(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
             [FromQuery] string? profesor, [FromQuery] string? specializare, [FromQuery] string? tipPost,
-            [FromQuery] int? semestru)
+            [FromQuery] int? semestru, [FromQuery] string? formaInvatamant, [FromQuery] string? cicluStudii)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var dt = new DataTable();
@@ -377,9 +406,10 @@ namespace LicentaV1.Controllers
                 new DataColumn("Mentiuni")
             });
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlNorma, conn); cmd.CommandTimeout = 180;
+            using var cmd = new SqlCommand(SqlNorma, conn); cmd.CommandTimeout = TimeoutLong;
             AddNormaParams(cmd, idAn, idFacultate ?? 0, idCatedra ?? 0,
-                profesor ?? "", specializare ?? "", tipPost ?? "Toti", semestru ?? 0);
+                profesor ?? "", specializare ?? "", tipPost ?? "Toti", semestru ?? 0,
+                FormaInvToId(formaInvatamant), CicluToId(cicluStudii));
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 dt.Rows.Add(nr++, r["Profesor"]?.ToString(), r["Facultate"]?.ToString(),
@@ -460,6 +490,7 @@ namespace LicentaV1.Controllers
               AND (@idCatedra = 0 OR ou.ID_Catedra   = @idCatedra)
               AND (@prof      = N'Toti' OR p.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
               AND (@tipPost   = N'Toti' OR CASE ou.TitularSauSuplinitor WHEN 1 THEN N'Titular' ELSE N'Suplinitor' END = @tipPost)
+              AND (@sem       = 0       OR ou.NrSemestruDinAn = @sem)
             GROUP BY p.NumeIntreg, ou.TitularSauSuplinitor
             HAVING SUM(ou.NrOreConventionale) > 0
             ORDER BY p.NumeIntreg COLLATE Romanian_CI_AS";
@@ -472,7 +503,7 @@ namespace LicentaV1.Controllers
             int idAn = idAnUniv ?? GetAnCurent();
             var result = new List<object>();
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlTotaluri, conn); cmd.CommandTimeout = 120;
+            using var cmd = new SqlCommand(SqlTotaluri, conn); cmd.CommandTimeout = TimeoutMedium;
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
             cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
@@ -517,14 +548,14 @@ namespace LicentaV1.Controllers
                 new DataColumn("Total Anual (x14)", typeof(decimal))
             });
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlTotaluri, conn); cmd.CommandTimeout = 120;
+            using var cmd = new SqlCommand(SqlTotaluri, conn); cmd.CommandTimeout = TimeoutMedium;
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
             cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
             cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(profesor) ? "Toti" : profesor!.Trim());
             cmd.Parameters.AddWithValue("@tipPost", string.IsNullOrWhiteSpace(tipPost) ? "Toti" : tipPost!.Trim());
-            cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
             cmd.Parameters.AddWithValue("@sapt", SaptamaniPerAn);
+            cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 dt.Rows.Add(nr++, r["Profesor"], r["Facultate"], r["Departament"], r["Grad"], r["TipPost"],
@@ -556,13 +587,33 @@ namespace LicentaV1.Controllers
             WITH OreUnice AS (
                 SELECT
                     vppm.ID_Profesor,
+                    -- SpecCurata: denumirea pastrata pentru afisare (cu diacritice, dar
+                    -- fara partea dupa '+').
                     LTRIM(RTRIM(
                         CASE WHEN CHARINDEX(N'+', vppm.DenumireSpecializare) > 0
                              THEN LEFT(vppm.DenumireSpecializare, CHARINDEX(N'+', vppm.DenumireSpecializare)-1)
                              ELSE vppm.DenumireSpecializare END
                     )) AS SpecCurata,
+                    -- SpecKey: cheie de deduplicare. Aplicam:
+                    --   1. UPPER → case-insensitive
+                    --   2. COLLATE Latin1_General_CI_AI → ignora diacriticele
+                    --      (ex: 'în' = 'in', 'ă' = 'a', 'ș' = 's')
+                    --   3. REPLACE paranteze cu spatiu → 'X (Y)' = 'X Y'
+                    --   4. REPLACE spatii multiple → unul singur
+                    -- Asta uneste 'Informatica aplicata in limba germana' cu
+                    -- 'Informatica aplicata (in limba germana)' si cu varianta cu diacritice.
+                    LTRIM(RTRIM(
+                        REPLACE(REPLACE(REPLACE(REPLACE(
+                            UPPER(
+                                CASE WHEN CHARINDEX(N'+', vppm.DenumireSpecializare) > 0
+                                     THEN LEFT(vppm.DenumireSpecializare, CHARINDEX(N'+', vppm.DenumireSpecializare)-1)
+                                     ELSE vppm.DenumireSpecializare END
+                            ) COLLATE Latin1_General_CI_AI,
+                            N'(', N' '), N')', N' '), N'  ', N' '), N'  ', N' ')
+                    )) AS SpecKey,
                     vppm.ID_Facultate, vppm.ID_Catedra,
                     vppm.NrSemestruDinAn, vppm.NrOreConventionale,
+                    vppm.TitularSauSuplinitor,
                     ROW_NUMBER() OVER (
                         PARTITION BY vppm.ID_Profesor, vppm.ID_PlanMaterie_Prestator, vppm.NrSemestruDinAn
                         ORDER BY vppm.DenumireSpecializare
@@ -572,7 +623,9 @@ namespace LicentaV1.Controllers
             ),
             OrePerProg AS (
                 SELECT p.NumeIntreg, p.DenumireFacultate, p.DenumireCatedra,
-                       ou.SpecCurata AS Program, SUM(ou.NrOreConventionale) AS OreProgram
+                       ou.SpecKey,
+                       MIN(ou.SpecCurata) AS Program,  -- alegem o reprezentare consistenta
+                       SUM(ou.NrOreConventionale) AS OreProgram
                 FROM OreUnice ou
                 INNER JOIN [dbo].[View_Profesori_CF_AnUniv] p
                     ON ou.ID_Profesor = p.ID_Profesor AND p.ID_AnUnivCatedra = @idAn
@@ -581,7 +634,9 @@ namespace LicentaV1.Controllers
                   AND (@idCatedra = 0 OR ou.ID_Catedra   = @idCatedra)
                   AND (@prof      = N'Toti' OR p.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
                   AND (@spec      = N'Toti' OR ou.SpecCurata COLLATE DATABASE_DEFAULT = @spec COLLATE DATABASE_DEFAULT)
-                GROUP BY p.NumeIntreg, p.DenumireFacultate, p.DenumireCatedra, ou.SpecCurata
+                  AND (@tipPost   = N'Toti' OR CASE ou.TitularSauSuplinitor WHEN 1 THEN N'Titular' ELSE N'Suplinitor' END = @tipPost)
+                  AND (@sem       = 0       OR ou.NrSemestruDinAn = @sem)
+                GROUP BY p.NumeIntreg, p.DenumireFacultate, p.DenumireCatedra, ou.SpecKey
             ),
             TotProf AS (
                 SELECT NumeIntreg, SUM(OreProgram) AS TotalProf FROM OrePerProg GROUP BY NumeIntreg
@@ -599,17 +654,20 @@ namespace LicentaV1.Controllers
         [HttpGet("distributie-ore")]
         public async Task<IActionResult> GetDistrib(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
-            [FromQuery] string? profesor, [FromQuery] string? specializare)
+            [FromQuery] string? profesor, [FromQuery] string? specializare,
+            [FromQuery] string? tipPost, [FromQuery] int? semestru)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var result = new List<object>();
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlDistrib, conn); cmd.CommandTimeout = 120;
+            using var cmd = new SqlCommand(SqlDistrib, conn); cmd.CommandTimeout = TimeoutMedium;
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
             cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
             cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(profesor) ? "Toti" : profesor.Trim());
             cmd.Parameters.AddWithValue("@spec", string.IsNullOrWhiteSpace(specializare) ? "Toti" : specializare.Trim());
+            cmd.Parameters.AddWithValue("@tipPost", string.IsNullOrWhiteSpace(tipPost) ? "Toti" : tipPost.Trim());
+            cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 result.Add(new
@@ -629,7 +687,8 @@ namespace LicentaV1.Controllers
         [HttpGet("export/distributie-ore")]
         public async Task<IActionResult> ExportDistrib(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
-            [FromQuery] string? profesor, [FromQuery] string? specializare)
+            [FromQuery] string? profesor, [FromQuery] string? specializare,
+            [FromQuery] string? tipPost, [FromQuery] int? semestru)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var dt = new DataTable();
@@ -641,12 +700,14 @@ namespace LicentaV1.Controllers
                 new DataColumn("Procent %", typeof(decimal))
             });
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlDistrib, conn); cmd.CommandTimeout = 120;
+            using var cmd = new SqlCommand(SqlDistrib, conn); cmd.CommandTimeout = TimeoutMedium;
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
             cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
             cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(profesor) ? "Toti" : profesor.Trim());
             cmd.Parameters.AddWithValue("@spec", string.IsNullOrWhiteSpace(specializare) ? "Toti" : specializare.Trim());
+            cmd.Parameters.AddWithValue("@tipPost", string.IsNullOrWhiteSpace(tipPost) ? "Toti" : tipPost.Trim());
+            cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 dt.Rows.Add(nr++, r["Profesor"]?.ToString(), r["Facultate"]?.ToString(),

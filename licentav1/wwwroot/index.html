@@ -326,23 +326,24 @@
                             <table class="etbl">
                                 <thead>
                                     <tr>
-                                        <th>Nr.</th>
+                                        <th>Nr.Crt.</th>
                                         <th>Profesor</th>
-                                        <th>Dept. Orei</th>
+                                        <th>Facultate</th>
+                                        <th>Departament</th>
+                                        <th>Grad</th>
+                                        <th>Tip Post</th>
                                         <th>Specializare</th>
                                         <th>Materie</th>
-                                        <th>Tip</th>
                                         <th>Sem.</th>
-                                        <th>Forma</th>
-                                        <th class="text-end">Ore C.</th>
-                                        <th class="text-end">Ore A.</th>
+                                        <th class="text-end">Ore Curs</th>
+                                        <th class="text-end">Ore Aplic.</th>
                                         <th class="text-end">Ore Conv.</th>
-                                        <th>Mențiuni cuplaj</th>
+                                        <th>Mențiuni</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b1">
                                     <tr>
-                                        <td colspan="12" class="text-center py-3 text-muted">
+                                        <td colspan="13" class="text-center py-3 text-muted">
                                             <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
                                         </td>
                                     </tr>
@@ -702,9 +703,9 @@
             const p = +pct || 0;
             const col = p > 50 ? '#56723e' : p >= 20 ? '#f0ad4e' : '#d9534f';
             return `<div class="pbar-wrap">
-                    <span style="min-width:36px;font-size:.74rem;font-weight:600">${p.toFixed(1)}%</span>
-                    <div class="pbar-track"><div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${col};"></div></div>
-                </div>`;
+                <span style="min-width:36px;font-size:.74rem;font-weight:600">${p.toFixed(1)}%</span>
+                <div class="pbar-track"><div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${col};"></div></div>
+            </div>`;
         }
 
         // ============================================================
@@ -791,18 +792,18 @@
             const s = document.getElementById('sDept');
             s.innerHTML = '<option value="0">Se încarcă...</option>';
             apiGet(`/api/Rapoarte/liste/departamente?idAnUniv=${S.idAn}&idFacultate=${S.idFac}`).then(data => {
-                s.innerHTML = '';
-                data.forEach(d => s.appendChild(new Option(d.nume, d.id)));
-                s.value = 0; S.idCatedra = 0; S.numeDept = '';
-            }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
+                    s.innerHTML = '';
+                    data.forEach(d => s.appendChild(new Option(d.nume, d.id)));
+                    s.value = 0; S.idCatedra = 0; S.numeDept = '';
+                }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
         }
         function loadSpec() {
             const $s = $('#sSpec').empty().append(new Option('Toate', 'Toti')).trigger('change');
             apiGet(`/api/Rapoarte/liste/specializari?idAnUniv=${S.idAn}&idFacultate=${S.idFac}&idCatedra=${S.idCatedra}`).then(data => {
-                $s.empty();
-                data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
-                $s.val('Toti').trigger('change');
-            });
+                    $s.empty();
+                    data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
+                    $s.val('Toti').trigger('change');
+                });
         }
         function loadProf() {
             const $p = $('#sProf');
@@ -813,18 +814,18 @@
             if (S.spec !== 'Toti') params.append('specializare', S.spec);
             if (S.tipPost !== 'Toti') params.append('tipPost', S.tipPost);
             apiGet(`/api/Rapoarte/liste/profesori?${params}`).then(data => {
-                $p.empty();
-                data.forEach(p => $p.append(new Option(p.nume, p.id)));
-                $p.val('Toti').trigger('change');
-            });
+                    $p.empty();
+                    data.forEach(p => $p.append(new Option(p.nume, p.id)));
+                    $p.val('Toti').trigger('change');
+                });
         }
         function loadCicluri() {
             const $c = $('#sCiclu').empty().append(new Option('Toate', 'Toti'));
             apiGet(`/api/Rapoarte/liste/cicluri-studii?idAnUniv=${S.idAn}`).then(data => {
-                $c.empty();
-                data.forEach(c => $c.append(new Option(c.nume, c.id)));
-                $c.val('Toti');
-            });
+                    $c.empty();
+                    data.forEach(c => $c.append(new Option(c.nume, c.id)));
+                    $c.val('Toti');
+                });
         }
 
         // ============================================================
@@ -852,14 +853,13 @@
         //              formaInv, oreCurs, oreAplic, oreConv, mentiuni
         // ============================================================
         // R1: campuri JSON (camelCase din controller):
-        // nrCrt, profesor, facultate, departament, grad, tipPost,
-        // specializare, cicluInv, materie, semestru, formaInv,
-        // oreCurs, oreAplic, oreConv, mentiuni
+        // R1: NORMA DETALIATA - coloane: profesor, facultate, departament, grad,
+        // tipPost, specializare, materie, semestru, oreCurs, oreAplic, oreConv, mentiuni
         async function loadR1() {
-            document.getElementById('b1').innerHTML = spin(12);
+            document.getElementById('b1').innerHTML = spin(13);
             try {
                 const data = await apiGet(`/api/Rapoarte/norma?${ap()}`);
-                if (!data?.length) { document.getElementById('b1').innerHTML = empty(12); return; }
+                if (!data?.length) { document.getElementById('b1').innerHTML = empty(13); return; }
                 let html = '', tc = 0, ta = 0, tv = 0;
                 data.forEach(n => {
                     const c = +n.oreCurs || 0, a = +n.oreAplic || 0, v = +n.oreConv || 0;
@@ -867,28 +867,29 @@
                     const mnt = n.mentiuni && n.mentiuni !== ''
                         ? `<span class="mnt-cell">${n.mentiuni}</span>` : '';
                     html += `<tr>
-                            <td>${n.nrCrt}</td>
-                            <td><b>${n.profesor || ''}</b></td>
-                            <td class="small">${n.departament || ''}</td>
-                            <td class="small">${n.specializare || ''}</td>
-                            <td class="small">${n.materie || ''}</td>
-                            <td>${bTip(n.tipPost)}</td>
-                            <td class="text-center">${n.semestru || ''}</td>
-                            <td>${bForma(n.formaInv)}</td>
-                            <td class="text-end">${c.toFixed(2)}</td>
-                            <td class="text-end">${a.toFixed(2)}</td>
-                            <td class="text-end fw-bold">${v.toFixed(2)}</td>
-                            <td>${mnt}</td>
-                        </tr>`;
+                        <td>${n.nrCrt}</td>
+                        <td><b>${n.profesor || ''}</b></td>
+                        <td class="small">${n.facultate || ''}</td>
+                        <td class="small">${n.departament || ''}</td>
+                        <td class="small">${n.grad || ''}</td>
+                        <td>${bTip(n.tipPost)}</td>
+                        <td class="small">${n.specializare || ''}</td>
+                        <td class="small">${n.materie || ''}</td>
+                        <td class="text-center">${n.semestru || ''}</td>
+                        <td class="text-end">${c.toFixed(2)}</td>
+                        <td class="text-end">${a.toFixed(2)}</td>
+                        <td class="text-end fw-bold">${v.toFixed(2)}</td>
+                        <td>${mnt}</td>
+                    </tr>`;
                 });
                 html += `<tr class="tfoot">
-                        <td colspan="8" class="text-end">TOTAL:</td>
-                        <td class="text-end">${tc.toFixed(2)}</td>
-                        <td class="text-end">${ta.toFixed(2)}</td>
-                        <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
-                        <td></td></tr>`;
+                    <td colspan="9" class="text-end">TOTAL:</td>
+                    <td class="text-end">${tc.toFixed(2)}</td>
+                    <td class="text-end">${ta.toFixed(2)}</td>
+                    <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
+                    <td></td></tr>`;
                 document.getElementById('b1').innerHTML = html;
-            } catch (e) { document.getElementById('b1').innerHTML = errR(12, e.message); }
+            } catch (e) { document.getElementById('b1').innerHTML = errR(13, e.message); }
         }
 
         // ============================================================
@@ -905,6 +906,7 @@
                 if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
                 if (S.prof !== 'Toti') p.append('profesor', S.prof);
                 if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
+                if (S.sem > 0) p.append('semestru', S.sem);
                 const data = await apiGet(`/api/Rapoarte/norma-totaluri?${p}`);
                 if (!data?.length) { document.getElementById('b2').innerHTML = empty(10); return; }
                 let html = '', gif = 0, gid = 0, gifr = 0, gc = 0, ga = 0;
@@ -913,23 +915,23 @@
                         oc = +n.totalOreConv || 0, oa = +n.totalAnual || 0;
                     gif += oi; gid += od; gifr += oifr; gc += oc; ga += oa;
                     html += `<tr>
-                            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                            <td class="small">${n.facultate || ''}</td>
-                            <td class="small">${n.departament || ''}</td>
-                            <td>${bTip(n.tipPost)}</td>
-                            <td class="text-end">${oi.toFixed(2)}</td>
-                            <td class="text-end">${od.toFixed(2)}</td>
-                            <td class="text-end">${oifr.toFixed(2)}</td>
-                            <td class="text-end fw-bold">${oc.toFixed(2)}</td>
-                            <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
-                        </tr>`;
+                        <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                        <td class="small">${n.facultate || ''}</td>
+                        <td class="small">${n.departament || ''}</td>
+                        <td>${bTip(n.tipPost)}</td>
+                        <td class="text-end">${oi.toFixed(2)}</td>
+                        <td class="text-end">${od.toFixed(2)}</td>
+                        <td class="text-end">${oifr.toFixed(2)}</td>
+                        <td class="text-end fw-bold">${oc.toFixed(2)}</td>
+                        <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
+                    </tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                        <td class="text-end">${gif.toFixed(2)}</td>
-                        <td class="text-end">${gid.toFixed(2)}</td>
-                        <td class="text-end">${gifr.toFixed(2)}</td>
-                        <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
-                        <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
+                    <td class="text-end">${gif.toFixed(2)}</td>
+                    <td class="text-end">${gid.toFixed(2)}</td>
+                    <td class="text-end">${gifr.toFixed(2)}</td>
+                    <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
+                    <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
                 document.getElementById('b2').innerHTML = html;
             } catch (e) { document.getElementById('b2').innerHTML = errR(10, e.message); }
         }
@@ -948,19 +950,21 @@
                 if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
                 if (S.prof !== 'Toti') p.append('profesor', S.prof);
                 if (S.spec !== 'Toti') p.append('specializare', S.spec);
+                if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
+                if (S.sem > 0) p.append('semestru', S.sem);
                 const data = await apiGet(`/api/Rapoarte/distributie-ore?${p}`);
                 if (!data?.length) { document.getElementById('b3').innerHTML = empty(7); return; }
                 let html = '';
                 data.forEach(n => {
                     const op = +n.oreProgram || 0, ot = +n.totalOreUniv || 0, pr = +n.procent || 0;
                     html += `<tr>
-                            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                            <td class="small">${n.departament || ''}</td>
-                            <td class="small">${n.program || ''}</td>
-                            <td class="text-end">${op.toFixed(2)}</td>
-                            <td class="text-end">${ot.toFixed(2)}</td>
-                            <td>${progBar(pr)}</td>
-                        </tr>`;
+                        <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                        <td class="small">${n.departament || ''}</td>
+                        <td class="small">${n.program || ''}</td>
+                        <td class="text-end">${op.toFixed(2)}</td>
+                        <td class="text-end">${ot.toFixed(2)}</td>
+                        <td>${progBar(pr)}</td>
+                    </tr>`;
                 });
                 document.getElementById('b3').innerHTML = html;
             } catch (e) { document.getElementById('b3').innerHTML = errR(7, e.message); }
@@ -988,18 +992,18 @@
                 data.forEach(n => {
                     const t = +n.totalOre || 0; st += t;
                     html += `<tr>
-                            <td>${n.nrCrt}</td>
-                            <td><b>${n.profesor}</b></td>
-                            <td class="text-center">${n.semestru || ''}</td>
-                            <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
-                            <td class="small">${n.limbaProgram || ''}</td>
-                            <td class="small">${n.programStudiu || ''}</td>
-                            <td class="small"><span class="badge bg-secondary" style="font-size:.68rem">${n.cicluStudii || ''}</span></td>
-                        </tr>`;
+                        <td>${n.nrCrt}</td>
+                        <td><b>${n.profesor}</b></td>
+                        <td class="text-center">${n.semestru || ''}</td>
+                        <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
+                        <td class="small">${n.limbaProgram || ''}</td>
+                        <td class="small">${n.programStudiu || ''}</td>
+                        <td class="small"><span class="badge bg-secondary" style="font-size:.68rem">${n.cicluStudii || ''}</span></td>
+                    </tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="3" class="text-end">TOTAL:</td>
-                        <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
-                        <td colspan="3"></td></tr>`;
+                    <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
+                    <td colspan="3"></td></tr>`;
                 document.getElementById('b4').innerHTML = html;
             } catch (e) { document.getElementById('b4').innerHTML = errR(7, e.message); }
         }
@@ -1023,14 +1027,14 @@
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.grad || ''}</td>
-                        <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
-                        <td class="small" style="white-space:normal;max-width:370px;">${n.discipline || ''}</td>
-                    </tr>`;
+                    <td>${n.nrCrt}</td>
+                    <td><b>${n.profesor}</b></td>
+                    <td class="small">${n.facultate || ''}</td>
+                    <td class="small">${n.departament || ''}</td>
+                    <td class="small">${n.grad || ''}</td>
+                    <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
+                    <td class="small" style="white-space:normal;max-width:370px;">${n.discipline || ''}</td>
+                </tr>`;
                 });
                 document.getElementById('b5').innerHTML = html;
             } catch (e) { document.getElementById('b5').innerHTML = errR(7, e.message); }
@@ -1052,11 +1056,11 @@
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.grad || ''}</td></tr>`;
+                    <td>${n.nrCrt}</td>
+                    <td><b>${n.profesor}</b></td>
+                    <td class="small">${n.facultate || ''}</td>
+                    <td class="small">${n.departament || ''}</td>
+                    <td class="small">${n.grad || ''}</td></tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} titulari oficiali</td></tr>`;
                 document.getElementById('b6').innerHTML = html;
@@ -1079,11 +1083,11 @@
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.grad || ''}</td></tr>`;
+                    <td>${n.nrCrt}</td>
+                    <td><b>${n.profesor}</b></td>
+                    <td class="small">${n.facultate || ''}</td>
+                    <td class="small">${n.departament || ''}</td>
+                    <td class="small">${n.grad || ''}</td></tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} colaboratori</td></tr>`;
                 document.getElementById('b7').innerHTML = html;
@@ -1128,17 +1132,17 @@
                         cols += f > 0 ? `<td class="frac-cell">${(+f).toFixed(2)}</td>` : '<td></td>';
                     });
                     html += `<tr>
-                            <td>${p.nrCrt}</td>
-                            <td><b class="small">${p.numeComplet}</b></td>
-                            <td class="small">${p.facultate || ''}</td>
-                            <td class="small">${p.departament || ''}</td>
-                            <td class="small">${p.gradFunctie || ''}</td>
-                            ${cols}
-                            <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
+                        <td>${p.nrCrt}</td>
+                        <td><b class="small">${p.numeComplet}</b></td>
+                        <td class="small">${p.facultate || ''}</td>
+                        <td class="small">${p.departament || ''}</td>
+                        <td class="small">${p.gradFunctie || ''}</td>
+                        ${cols}
+                        <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
                 });
                 if ((resp.profesori?.length || 0) > 25)
                     html += `<tr class="tfoot"><td colspan="${dom.length + 6}" class="text-center">
-                            Primii 25 din ${resp.profesori.length}. Folosiți Export pentru lista completă.</td></tr>`;
+                        Primii 25 din ${resp.profesori.length}. Folosiți Export pentru lista completă.</td></tr>`;
                 document.getElementById('b8').innerHTML = html;
                 clean('r8');
             } catch (e) { document.getElementById('b8').innerHTML = errR(6, e.message); }
