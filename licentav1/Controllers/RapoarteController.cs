@@ -1086,11 +1086,169 @@ namespace LicentaV1.Controllers
                 "Colaboratori.xlsx");
         }
 
+
         // =================================================================
-        // RAPORT 8: ANS — query master EXACT din notite
-        // Fractia per ramura ANS = OreRamura / MAX(TotalRealizat, NormaLegala)
-        // Coloanele Excel sunt indexate prin ID_Ramura_ANS (1-40)
+        // RAPORT 8: ANS — REPLICA EXACTA a logicii oficiale a profei
+        // -----------------------------------------------------------------
+        // Adaptari fata de query-ul ei (acces restrictionat la Domeniu,
+        // N_DOMENIU_STUDIU_ANS, Profesor, Catedra, SetariUniversitate):
+        //   1. Sursa fractii: pi.StatDeFunctiiPeSpecializare (sfs)
+        //   2. Mapare specializare→domeniu: prin dbo.View_FDS (are coloana
+        //      ID_N_Domeniu_Studiu_ANS direct, fara JOIN cu Domeniu)
+        //   3. Mapare domeniu→ramura ANS: temp #DM populat cu
+        //      EXEC [dbo].[N_DOMENIU_STUDIUL_ANS_List] (procedura accesibila)
+        //   4. Norma individuala: pi.NormaOreConventionale + pi.ExceptiiNormaOreConventionale
+        //   5. Lista profesori titulari: dbo.View_Profesori_CF_AnUniv (TitularAnUniv=1)
+        //
+        // FORMULA OFICIALA (din SQL-ul profei):
+        //   - Sterge cuplajele defecte (CuplajeCareNuMaiExista, AplicDinCuplajCurs,
+        //     AplicDinCuplajApp) prin SET ApartineDeCuplaj=NULL
+        //   - cnt = COUNT(*) OVER PARTITION BY (ID_Profesor, ID_TipGradDidactic,
+        //                                       ApartineDeCuplaj, NrCrtPost)
+        //   - Fractie = SUM(NrOreConventionale / cnt / NormaIndividuala)
+        //   - Filtru: TitularSauSuplinitor=1 AND DenTitularSauSuplinitor != 'SupTit'
         // =================================================================
+        private const string SqlAnsMaster = @"
+            -- Pas 1: snapshot StatDeFunctiiPeSpecializare cu maparea ramura ANS
+            IF OBJECT_ID('tempdb..#DM') IS NOT NULL DROP TABLE #DM;
+            CREATE TABLE #DM (
+                ID_ELEMENT INT,
+                COD_DS_CNATDCU NVARCHAR(20),
+                cod_DS NVARCHAR(20),
+                ID_RamuraDeStiinta_ANS INT,
+                DomeniulDeStudiu_ANS NVARCHAR(200),
+                RamuraDeStiinta_ANS NVARCHAR(200),
+                DomeniuFundamental NVARCHAR(200)
+            );
+            INSERT INTO #DM EXEC [dbo].[N_DOMENIU_STUDIUL_ANS_List];
+
+            -- Pas 2: SFS curatat de cuplaje defecte si imbogatit cu ramura ANS
+            IF OBJECT_ID('tempdb..#sfs') IS NOT NULL DROP TABLE #sfs;
+            SELECT
+                sfs.ID_Profesor,
+                sfs.ID_TipGradDidactic,
+                sfs.NrCrtPost,
+                sfs.TitularSauSuplinitor,
+                sfs.DenTitularSauSuplinitor,
+                sfs.NrOreConventionale,
+                sfs.id_specializare,
+                sfs.ID_Facultate,
+                CASE WHEN sfs.xTipCuplaj IN (
+                        N'CuplajeCareNuMaiExista',
+                        N'AplicDinCuplajCurs',
+                        N'AplicDinCuplajApp')
+                     THEN NULL
+                     ELSE sfs.ApartineDeCuplaj
+                END AS ApartineDeCuplaj,
+                fds.ID_N_Domeniu_Studiu_ANS,
+                dm.ID_RamuraDeStiinta_ANS,
+                dm.RamuraDeStiinta_ANS
+            INTO #sfs
+            FROM [pi].[StatDeFunctiiPeSpecializare] sfs
+            INNER JOIN (
+                -- Maparea specializare → domeniu ANS este stabila in timp
+                -- (e nomenclator national). Specializari continuate din ani vechi
+                -- (ex. Autovehicule rutiere ID_AnUniv=43) NU apar in View_FDS pentru
+                -- anul curent dar APAR in StatDeFunctii. Luam maparea din orice an
+                -- in care exista, nu doar din anul curent, ca sa nu pierdem ore.
+                SELECT ID_Specializare,
+                       MAX(ID_N_Domeniu_Studiu_ANS) AS ID_N_Domeniu_Studiu_ANS
+                FROM [dbo].[View_FDS]
+                WHERE ID_N_Domeniu_Studiu_ANS IS NOT NULL
+                GROUP BY ID_Specializare
+            ) fds
+                ON sfs.id_specializare = fds.ID_Specializare
+            INNER JOIN #DM dm
+                ON dm.ID_ELEMENT = fds.ID_N_Domeniu_Studiu_ANS
+            WHERE sfs.ID_AnUniv = @idAn
+              AND sfs.TitularSauSuplinitor = 1
+              AND sfs.DenTitularSauSuplinitor <> N'SupTit'
+              AND (@idFac     = 0 OR sfs.ID_Facultate = @idFac);
+
+            -- Pas 3: cnt pentru deduplicarea cuplajelor (formula profei)
+            IF OBJECT_ID('tempdb..#sfs_cnt') IS NOT NULL DROP TABLE #sfs_cnt;
+            SELECT
+                s.*,
+                CASE WHEN ISNULL(s.ApartineDeCuplaj, -1) = -1 THEN 1
+                     ELSE COUNT(*) OVER (
+                            PARTITION BY s.ID_Profesor, s.ID_TipGradDidactic,
+                                         ISNULL(s.ApartineDeCuplaj, -1), s.NrCrtPost)
+                END AS cnt
+            INTO #sfs_cnt
+            FROM #sfs s;
+
+            -- Pas 4: fractia per profesor x ramura, cu norma individuala
+            -- (ExceptiiNormaOreConventionale > NormaOreConventionale standard)
+            SELECT
+                v.ID_Profesor,
+                v.NumeIntreg                            AS NumeIntreg,
+                v.DenumireFacultate                     AS Facultate,
+                v.DenumireCatedra                       AS Departament,
+                v.DenumireGradDidactic                  AS Grad,
+                s.ID_RamuraDeStiinta_ANS                AS IdRamura,
+                s.RamuraDeStiinta_ANS                   AS RamuraNume,
+                CAST(SUM(
+                    s.NrOreConventionale / s.cnt /
+                    ISNULL(enoc.NrOreTitular, ISNULL(noc.NrOreConventionaleTitular, @normaFallback))
+                ) AS DECIMAL(10,4))                     AS Fractie
+            FROM #sfs_cnt s
+            INNER JOIN [dbo].[View_Profesori_CF_AnUniv] v
+                ON s.ID_Profesor = v.ID_Profesor
+                AND v.ID_AnUnivCatedra = @idAn
+                AND v.TitularAnUniv = 1
+            LEFT JOIN [pi].[NormaOreConventionale] noc
+                ON noc.ID_TipGradDidactic = s.ID_TipGradDidactic
+                AND noc.ID_AnUniv = @idAn
+            LEFT JOIN [pi].[ExceptiiNormaOreConventionale] enoc
+                ON enoc.ID_Profesor = s.ID_Profesor
+                AND enoc.ID_AnUniv = @idAn
+            WHERE (@idFac     = 0 OR v.ID_Facultate = @idFac)
+              AND (@idCatedra = 0 OR v.ID_Catedra   = @idCatedra)
+              AND EXISTS (
+                  SELECT 1
+                  FROM [pi].[Post] AS P
+                  INNER JOIN [pi].[Post_Profesor] AS PP ON P.ID_Post = PP.ID_Post
+                  INNER JOIN [pi].[StatDeFunctii] AS SF ON P.ID_StatDeFunctii = SF.ID_StatDeFunctii
+                  WHERE PP.ID_Profesor = v.ID_Profesor
+                    AND SF.ID_AnUniv   = @idAn
+                    AND P.TitularSauSuplinitor = 1
+                    AND P.Deleted = 0
+                    AND PP.Deleted = 0
+              )
+            GROUP BY v.ID_Profesor, v.NumeIntreg,
+                     v.DenumireFacultate, v.DenumireCatedra, v.DenumireGradDidactic,
+                     s.ID_RamuraDeStiinta_ANS, s.RamuraDeStiinta_ANS
+            HAVING SUM(s.NrOreConventionale / s.cnt /
+                       ISNULL(enoc.NrOreTitular, ISNULL(noc.NrOreConventionaleTitular, @normaFallback))) > 0
+            ORDER BY v.NumeIntreg COLLATE Romanian_CI_AS, s.ID_RamuraDeStiinta_ANS;";
+
+        // Maparea ramuri ANS (1-40) — citita o data, cache-uita
+        private List<(int Id, string Den)> GetRamuriAns(SqlConnection conn)
+        {
+            // Folosim cache static — ramurile ANS sunt fixe la nivel national
+            return _cache.GetOrCreate("RamuriANS_v1", e =>
+            {
+                e.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
+                using var cmdT = new SqlCommand(@"
+                    IF OBJECT_ID('tempdb..#DM_ramuri') IS NOT NULL DROP TABLE #DM_ramuri;
+                    CREATE TABLE #DM_ramuri (
+                        ID_ELEMENT INT, COD_DS_CNATDCU NVARCHAR(20), cod_DS NVARCHAR(20),
+                        ID_RamuraDeStiinta_ANS INT, DomeniulDeStudiu_ANS NVARCHAR(200),
+                        RamuraDeStiinta_ANS NVARCHAR(200), DomeniuFundamental NVARCHAR(200)
+                    );
+                    INSERT INTO #DM_ramuri EXEC [dbo].[N_DOMENIU_STUDIUL_ANS_List];
+                    SELECT DISTINCT ID_RamuraDeStiinta_ANS, RamuraDeStiinta_ANS
+                    FROM #DM_ramuri
+                    ORDER BY ID_RamuraDeStiinta_ANS;", conn);
+                cmdT.CommandTimeout = TimeoutShort;
+                var lst = new List<(int, string)>();
+                using var r = cmdT.ExecuteReader();
+                while (r.Read())
+                    lst.Add((Convert.ToInt32(r[0]), r[1]?.ToString() ?? ""));
+                return lst;
+            })!;
+        }
+
         [HttpGet("raport-ans")]
         public async Task<IActionResult> GetAns(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra)
@@ -1098,94 +1256,15 @@ namespace LicentaV1.Controllers
             int idAn = idAnUniv ?? GetAnCurent();
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
 
-            // 1. Maparea oficiala N_DOMENIU_STUDIUL_ANS_List intr-un temp table
-            using (var cmdT = new SqlCommand(@"
-                IF OBJECT_ID('tempdb..#DM') IS NOT NULL DROP TABLE #DM;
-                CREATE TABLE #DM (
-                    ID_ELEMENT INT, COD_DS_CNATDCU NVARCHAR(20), cod_DS NVARCHAR(20),
-                    ID_Ramura_ANS INT, DomeniulDeStudiu_ANS NVARCHAR(200),
-                    RamuraDeStiinta_ANS NVARCHAR(200), DomeniuFundamental NVARCHAR(200)
-                );
-                INSERT INTO #DM EXEC [dbo].[N_DOMENIU_STUDIUL_ANS_List];", conn))
-            {
-                cmdT.CommandTimeout = 60;
-                await cmdT.ExecuteNonQueryAsync();
-            }
+            var ramuri = GetRamuriAns(conn);
 
-            // Domenii (lista pentru header)
-            var domenii = new List<(int Id, string Den)>();
-            using (var cmdD = new SqlCommand(
-                "SELECT DISTINCT ID_Ramura_ANS, RamuraDeStiinta_ANS FROM #DM ORDER BY ID_Ramura_ANS", conn))
-            using (var rd = await cmdD.ExecuteReaderAsync())
-                while (await rd.ReadAsync())
-                    domenii.Add((Convert.ToInt32(rd[0]), rd[1]?.ToString() ?? ""));
-
-            // 2. Query master ANS: profesori titulari + fractie per ramura
-            const string sqlAns = @"
-                WITH TitulariActivi AS (
-                    SELECT DISTINCT V.ID_Profesor, V.NumeIntreg,
-                           V.DenumireFacultate, V.DenumireCatedra,
-                           V.DenumireGradDidactic, V.ID_TipGradDidacticAnUniv
-                    FROM [dbo].[View_Profesori_CF_AnUniv] AS V
-                    WHERE V.ID_AnUnivCatedra = @idAn
-                      AND V.TitularAnUniv = 1
-                      AND (@idFac     = 0 OR V.ID_Facultate = @idFac)
-                      AND (@idCatedra = 0 OR V.ID_Catedra   = @idCatedra)
-                      AND EXISTS (
-                          SELECT 1 FROM [pi].[Post] AS P
-                          INNER JOIN [pi].[Post_Profesor] AS PP ON P.ID_Post = PP.ID_Post
-                          INNER JOIN [pi].[StatDeFunctii] AS SF ON P.ID_StatDeFunctii = SF.ID_StatDeFunctii
-                          WHERE PP.ID_Profesor = V.ID_Profesor AND SF.ID_AnUniv = @idAn
-                            AND P.TitularSauSuplinitor = 1
-                            AND P.Deleted = 0 AND PP.Deleted = 0
-                      )
-                ),
-                OreRaw AS (
-                    SELECT T.ID_Profesor, T.NumeIntreg,
-                           T.DenumireFacultate, T.DenumireCatedra, T.DenumireGradDidactic,
-                           T.ID_TipGradDidacticAnUniv,
-                           M.ID_Ramura_ANS AS IdRamura,
-                           SUM(vc.NrOreConventionale) AS OreRamura
-                    FROM TitulariActivi T
-                    INNER JOIN [pi].[View_CentralizareMateriiProfesor] vc
-                        ON T.ID_Profesor = vc.ID_Profesor
-                    INNER JOIN [dbo].[View_FDS] fds
-                        ON fds.DenumireSpecializare COLLATE DATABASE_DEFAULT
-                           = vc.DenumireSpecializare COLLATE DATABASE_DEFAULT
-                    INNER JOIN #DM M ON M.ID_ELEMENT = fds.ID_N_Domeniu_Studiu_ANS
-                    WHERE vc.ID_AnUniv = @idAn AND fds.ID_AnUniv = @idAn
-                      AND vc.NrCrtPostProfesor = 1
-                    GROUP BY T.ID_Profesor, T.NumeIntreg,
-                             T.DenumireFacultate, T.DenumireCatedra, T.DenumireGradDidactic,
-                             T.ID_TipGradDidacticAnUniv, M.ID_Ramura_ANS
-                ),
-                BazaCalcul AS (
-                    SELECT o.*,
-                           SUM(o.OreRamura) OVER(PARTITION BY o.ID_Profesor) AS TotalRealizat,
-                           ISNULL(n.NrOreConventionaleTitular, @normaFallback) AS NormaLegala
-                    FROM OreRaw o
-                    LEFT JOIN [pi].[NormaOreConventionale] n
-                        ON o.ID_TipGradDidacticAnUniv = n.ID_TipGradDidactic
-                       AND n.ID_AnUniv = @idAn
-                )
-                SELECT bc.ID_Profesor, bc.NumeIntreg,
-                       bc.DenumireFacultate, bc.DenumireCatedra, bc.DenumireGradDidactic,
-                       bc.IdRamura,
-                       CAST(bc.OreRamura AS DECIMAL(18,4)) AS OreRamura,
-                       CAST(ROUND(bc.OreRamura /
-                            CASE WHEN bc.TotalRealizat > bc.NormaLegala
-                                 THEN bc.TotalRealizat ELSE bc.NormaLegala END, 2)
-                            AS DECIMAL(10,4)) AS Fractie
-                FROM BazaCalcul bc
-                WHERE bc.OreRamura > 0
-                ORDER BY bc.NumeIntreg COLLATE Romanian_CI_AS";
-
-            // Profesor -> {idRamura -> fractie}
+            // Profesor → {idRamura → fractie}
             var profMap = new Dictionary<int, (string Nume, string Fac, string Dept, string Grad,
                 Dictionary<int, decimal> Frac)>();
-            using (var cmd = new SqlCommand(sqlAns, conn))
+
+            using (var cmd = new SqlCommand(SqlAnsMaster, conn))
             {
-                cmd.CommandTimeout = 180;
+                cmd.CommandTimeout = TimeoutLong;
                 cmd.Parameters.AddWithValue("@idAn", idAn);
                 cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
                 cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
@@ -1201,27 +1280,27 @@ namespace LicentaV1.Controllers
                     {
                         entry = (
                             rr["NumeIntreg"]?.ToString() ?? "",
-                            rr["DenumireFacultate"]?.ToString() ?? "",
-                            rr["DenumireCatedra"]?.ToString() ?? "",
-                            rr["DenumireGradDidactic"]?.ToString() ?? "",
+                            rr["Facultate"]?.ToString() ?? "",
+                            rr["Departament"]?.ToString() ?? "",
+                            rr["Grad"]?.ToString() ?? "",
                             new Dictionary<int, decimal>()
                         );
                         profMap[idP] = entry;
                     }
-                    entry.Frac[idR] = fr;
+                    entry.Frac[idR] = Math.Round(fr, 2);
                 }
             }
 
             int nrCrt = 1;
             var profesori = profMap
-                .OrderBy(kv => kv.Value.Nume, StringComparer.Create(
-                    new System.Globalization.CultureInfo("ro-RO"), true))
+                .OrderBy(kv => kv.Value.Nume,
+                    StringComparer.Create(new System.Globalization.CultureInfo("ro-RO"), true))
                 .Select(kv =>
                 {
                     var domeniiMapate = new Dictionary<string, decimal>();
-                    foreach (var dr in domenii)
-                        if (kv.Value.Frac.TryGetValue(dr.Id, out var f) && f > 0)
-                            domeniiMapate[dr.Den] = f;
+                    foreach (var (id, den) in ramuri)
+                        if (kv.Value.Frac.TryGetValue(id, out var f) && f > 0)
+                            domeniiMapate[den] = f;
                     return (object)new
                     {
                         NrCrt = nrCrt++,
@@ -1236,7 +1315,7 @@ namespace LicentaV1.Controllers
 
             return Ok(new
             {
-                Domenii = domenii.Select(d => d.Den).ToList(),
+                Domenii = ramuri.Select(r => r.Den).ToList(),
                 Profesori = profesori
             });
         }
@@ -1245,93 +1324,16 @@ namespace LicentaV1.Controllers
         public async Task<IActionResult> ExportAns(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra)
         {
-            // Refolosim GetAns ca sursa de date
-            var raw = await GetAns(idAnUniv, idFacultate, idCatedra) as ObjectResult;
-            if (raw?.Value == null) return StatusCode(500, "ANS data missing");
-
-            // Re-query datele in format simplu (mai eficient sa interogam direct)
             int idAn = idAnUniv ?? GetAnCurent();
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using (var cmdT = new SqlCommand(@"
-                IF OBJECT_ID('tempdb..#DM') IS NOT NULL DROP TABLE #DM;
-                CREATE TABLE #DM (
-                    ID_ELEMENT INT, COD_DS_CNATDCU NVARCHAR(20), cod_DS NVARCHAR(20),
-                    ID_Ramura_ANS INT, DomeniulDeStudiu_ANS NVARCHAR(200),
-                    RamuraDeStiinta_ANS NVARCHAR(200), DomeniuFundamental NVARCHAR(200)
-                );
-                INSERT INTO #DM EXEC [dbo].[N_DOMENIU_STUDIUL_ANS_List];", conn))
-            {
-                cmdT.CommandTimeout = 60;
-                await cmdT.ExecuteNonQueryAsync();
-            }
 
-            var domenii = new List<(int Id, string Den)>();
-            using (var cmdD = new SqlCommand(
-                "SELECT DISTINCT ID_Ramura_ANS, RamuraDeStiinta_ANS FROM #DM ORDER BY ID_Ramura_ANS", conn))
-            using (var rd = await cmdD.ExecuteReaderAsync())
-                while (await rd.ReadAsync())
-                    domenii.Add((Convert.ToInt32(rd[0]), rd[1]?.ToString() ?? ""));
-
-            const string sqlAns = @"
-                WITH TitulariActivi AS (
-                    SELECT DISTINCT V.ID_Profesor, V.NumeIntreg,
-                           V.DenumireFacultate, V.DenumireCatedra, V.DenumireGradDidactic,
-                           V.ID_TipGradDidacticAnUniv
-                    FROM [dbo].[View_Profesori_CF_AnUniv] AS V
-                    WHERE V.ID_AnUnivCatedra = @idAn AND V.TitularAnUniv = 1
-                      AND (@idFac     = 0 OR V.ID_Facultate = @idFac)
-                      AND (@idCatedra = 0 OR V.ID_Catedra   = @idCatedra)
-                      AND EXISTS (
-                          SELECT 1 FROM [pi].[Post] AS P
-                          INNER JOIN [pi].[Post_Profesor] AS PP ON P.ID_Post = PP.ID_Post
-                          INNER JOIN [pi].[StatDeFunctii] AS SF ON P.ID_StatDeFunctii = SF.ID_StatDeFunctii
-                          WHERE PP.ID_Profesor = V.ID_Profesor AND SF.ID_AnUniv = @idAn
-                            AND P.TitularSauSuplinitor = 1 AND P.Deleted = 0 AND PP.Deleted = 0
-                      )
-                ),
-                OreRaw AS (
-                    SELECT T.ID_Profesor, T.NumeIntreg,
-                           T.DenumireFacultate, T.DenumireCatedra, T.DenumireGradDidactic,
-                           T.ID_TipGradDidacticAnUniv,
-                           M.ID_Ramura_ANS AS IdRamura,
-                           SUM(vc.NrOreConventionale) AS OreRamura
-                    FROM TitulariActivi T
-                    INNER JOIN [pi].[View_CentralizareMateriiProfesor] vc
-                        ON T.ID_Profesor = vc.ID_Profesor
-                    INNER JOIN [dbo].[View_FDS] fds
-                        ON fds.DenumireSpecializare COLLATE DATABASE_DEFAULT
-                           = vc.DenumireSpecializare COLLATE DATABASE_DEFAULT
-                    INNER JOIN #DM M ON M.ID_ELEMENT = fds.ID_N_Domeniu_Studiu_ANS
-                    WHERE vc.ID_AnUniv = @idAn AND fds.ID_AnUniv = @idAn
-                      AND vc.NrCrtPostProfesor = 1
-                    GROUP BY T.ID_Profesor, T.NumeIntreg,
-                             T.DenumireFacultate, T.DenumireCatedra, T.DenumireGradDidactic,
-                             T.ID_TipGradDidacticAnUniv, M.ID_Ramura_ANS
-                ),
-                BazaCalcul AS (
-                    SELECT o.*,
-                           SUM(o.OreRamura) OVER(PARTITION BY o.ID_Profesor) AS TotalRealizat,
-                           ISNULL(n.NrOreConventionaleTitular, @normaFallback) AS NormaLegala
-                    FROM OreRaw o
-                    LEFT JOIN [pi].[NormaOreConventionale] n
-                        ON o.ID_TipGradDidacticAnUniv = n.ID_TipGradDidactic AND n.ID_AnUniv = @idAn
-                )
-                SELECT bc.ID_Profesor, bc.NumeIntreg,
-                       bc.DenumireFacultate, bc.DenumireCatedra, bc.DenumireGradDidactic,
-                       bc.IdRamura,
-                       CAST(ROUND(bc.OreRamura /
-                            CASE WHEN bc.TotalRealizat > bc.NormaLegala
-                                 THEN bc.TotalRealizat ELSE bc.NormaLegala END, 2)
-                            AS DECIMAL(10,4)) AS Fractie
-                FROM BazaCalcul bc
-                WHERE bc.OreRamura > 0
-                ORDER BY bc.NumeIntreg COLLATE Romanian_CI_AS";
+            var ramuri = GetRamuriAns(conn);
 
             var profMap = new Dictionary<int, (string Nume, string Fac, string Dept, string Grad,
                 Dictionary<int, decimal> Frac)>();
-            using (var cmd = new SqlCommand(sqlAns, conn))
+            using (var cmd = new SqlCommand(SqlAnsMaster, conn))
             {
-                cmd.CommandTimeout = 180;
+                cmd.CommandTimeout = TimeoutLong;
                 cmd.Parameters.AddWithValue("@idAn", idAn);
                 cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
                 cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
@@ -1347,18 +1349,18 @@ namespace LicentaV1.Controllers
                     {
                         entry = (
                             rr["NumeIntreg"]?.ToString() ?? "",
-                            rr["DenumireFacultate"]?.ToString() ?? "",
-                            rr["DenumireCatedra"]?.ToString() ?? "",
-                            rr["DenumireGradDidactic"]?.ToString() ?? "",
+                            rr["Facultate"]?.ToString() ?? "",
+                            rr["Departament"]?.ToString() ?? "",
+                            rr["Grad"]?.ToString() ?? "",
                             new Dictionary<int, decimal>()
                         );
                         profMap[idP] = entry;
                     }
-                    entry.Frac[idR] = fr;
+                    entry.Frac[idR] = Math.Round(fr, 2);
                 }
             }
 
-            int nrD = domenii.Count, colTot = 6 + nrD + 1;
+            int nrR = ramuri.Count, colTot = 6 + nrR + 1;
             var wb = new XLWorkbook(); var ws = wb.Worksheets.Add("Raport ANS");
             var gC = XLColor.FromHtml(Green);
 
@@ -1379,9 +1381,9 @@ namespace LicentaV1.Controllers
                 ws.Cell(4, c).Style.Alignment.WrapText = true;
                 ws.Cell(4, c).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             }
-            for (int i = 0; i < nrD; i++)
+            for (int i = 0; i < nrR; i++)
             {
-                ws.Cell(4, 7 + i).Value = domenii[i].Den;
+                ws.Cell(4, 7 + i).Value = ramuri[i].Den;
                 ws.Cell(4, 7 + i).Style.Font.Bold = true;
                 ws.Cell(4, 7 + i).Style.Alignment.WrapText = true;
                 ws.Cell(4, 7 + i).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -1408,9 +1410,9 @@ namespace LicentaV1.Controllers
                 ws.Cell(row, 4).Value = kv.Value.Fac;
                 ws.Cell(row, 5).Value = kv.Value.Dept;
                 decimal totFrac = 0m;
-                for (int i = 0; i < nrD; i++)
+                for (int i = 0; i < nrR; i++)
                 {
-                    if (kv.Value.Frac.TryGetValue(domenii[i].Id, out decimal f) && f > 0)
+                    if (kv.Value.Frac.TryGetValue(ramuri[i].Id, out decimal f) && f > 0)
                     {
                         ws.Cell(row, 7 + i).Value = (double)f;
                         ws.Cell(row, 7 + i).Style.NumberFormat.Format = "0.00";
