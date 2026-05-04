@@ -533,7 +533,7 @@
                 <div id="r6" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="badge bg-secondary small">Filtru oficial: TitularAnUniv=1 + EXISTS în pi.Post (TitularSauSuplinitor=1)</span>
+                            <span class="badge bg-secondary small">Filtru oficial: TitularAnUniv=1 + grad didactic + ore > 0</span>
                             <button class="btn btn-success btn-sm" onclick="dl('titulari')">
                                 <i class="bi bi-file-earmark-excel"></i> Export Excel
                             </button>
@@ -573,7 +573,7 @@
                 <div id="r7" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="badge bg-secondary small">TitularAnUniv=0 + EXISTS în pi.Post (TitularSauSuplinitor=0)</span>
+                            <span class="badge bg-secondary small">TitularAnUniv = 0</span>
                             <button class="btn btn-success btn-sm" onclick="dl('colaboratori')">
                                 <i class="bi bi-file-earmark-excel"></i> Export Excel
                             </button>
@@ -753,9 +753,9 @@
             });
         }
 
+
         // ============================================================
-        // HELPER FETCH SIGUR — parseaza ca JSON daca e JSON, altfel
-        // arunca eroare cu textul brut (evita "Unexpected token 'M'")
+        // HELPER FETCH SIGUR - parseaza JSON sau ridica eroare cu mesaj clar
         // ============================================================
         async function apiGet(url) {
             const resp = await fetch(url);
@@ -764,7 +764,7 @@
             try { data = txt ? JSON.parse(txt) : null; }
             catch {
                 const preview = txt.length > 250 ? txt.substring(0, 250) + '…' : txt;
-                throw new Error(`Răspuns non-JSON (HTTP ${resp.status}): ${preview}`);
+                throw new Error(`Raspuns non-JSON (HTTP ${resp.status}): ${preview}`);
             }
             if (!resp.ok) {
                 const m = data && (data.message || data.error)
