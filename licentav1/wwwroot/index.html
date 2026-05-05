@@ -244,7 +244,7 @@
             Dashboard Cadre Didactice
         </h2>
 
-        <!-- FILTRE -->
+        
         <div class="fb">
             <div class="row g-2 align-items-end">
                 <div class="col-auto">
@@ -269,12 +269,7 @@
                 </div>
                 <div class="col-auto">
                     <label>Forma Inv.</label>
-                    <select id="sForma" class="form-select form-select-sm" style="min-width:108px;">
-                        <option value="Toti">Toate</option>
-                        <option value="Cu frecvență">IF</option>
-                        <option value="Frecvență redusă">IFR</option>
-                        <option value="Învățământ la distanță">ID</option>
-                    </select>
+                    <select id="sForma" class="form-select form-select-sm" style="min-width:108px;"></select>
                 </div>
                 <div class="col-auto">
                     <label>Ciclu Studii</label>
@@ -307,7 +302,7 @@
 
         <div class="accordion" id="acc">
 
-            <!-- R1: Norme -->
+            <!-- R1 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -354,7 +349,7 @@
                 </div>
             </div>
 
-            <!-- R2: Totaluri -->
+            <!-- R2 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -398,7 +393,7 @@
                 </div>
             </div>
 
-            <!-- R3: Distributie -->
+            <!-- R3 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -440,8 +435,7 @@
                 </div>
             </div>
 
-            <!-- R4: Limbi -->
-            <!-- Coloane corespund exact JSON: nrCrt, profesor, semestru, totalOre, limbaProgram, programStudiu, cicluStudii -->
+            <!-- R4 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -482,7 +476,7 @@
                 </div>
             </div>
 
-            <!-- R5: Discipline -->
+            <!-- R5 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -523,7 +517,7 @@
                 </div>
             </div>
 
-            <!-- R6: Titulari -->
+            <!-- R6 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -563,7 +557,7 @@
                 </div>
             </div>
 
-            <!-- R7: Colaboratori -->
+            <!-- R7 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -603,7 +597,7 @@
                 </div>
             </div>
 
-            <!-- R8: ANS -->
+            <!-- R8 -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -644,9 +638,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        // ============================================================
-        // STARE GLOBALA
-        // ============================================================
+
         const S = {
             idAn: 0, idFac: 0, idCatedra: 0, spec: 'Toti', prof: 'Toti',
             tipPost: 'Toti', formaInv: 'Toti', ciclu: 'Toti', sem: 0,
@@ -663,8 +655,6 @@
                 bootstrap.Collapse.getInstance(el)?.hide());
             Object.keys(loaded).forEach(k => delete loaded[k]);
         }
-
-        // Params pentru API (trimite ID-uri numerice + filtre text)
         function ap(extra) {
             const p = new URLSearchParams();
             if (S.idAn > 0) p.append('idAnUniv', S.idAn);
@@ -676,7 +666,7 @@
             if (S.formaInv !== 'Toti') p.append('formaInvatamant', S.formaInv);
             if (S.ciclu !== 'Toti') p.append('cicluStudii', S.ciclu);
             if (S.sem > 0) p.append('semestru', S.sem);
-            // Denumiri pentru header Excel
+
             if (S.numeFac) p.append('numeFacultate', S.numeFac);
             if (S.numeDept) p.append('numeDepartament', S.numeDept);
             if (extra) Object.entries(extra).forEach(([k, v]) => v && p.append(k, v));
@@ -703,14 +693,12 @@
             const p = +pct || 0;
             const col = p > 50 ? '#56723e' : p >= 20 ? '#f0ad4e' : '#d9534f';
             return `<div class="pbar-wrap">
-                <span style="min-width:36px;font-size:.74rem;font-weight:600">${p.toFixed(1)}%</span>
-                <div class="pbar-track"><div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${col};"></div></div>
-            </div>`;
+                    <span style="min-width:36px;font-size:.74rem;font-weight:600">${p.toFixed(1)}%</span>
+                    <div class="pbar-track"><div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${col};"></div></div>
+                </div>`;
         }
 
-        // ============================================================
-        // INIT
-        // ============================================================
+
         $(function () {
             $('#sSpec').select2({ placeholder: 'Toate specializarile', allowClear: true, width: 'resolve' });
             $('#sProf').select2({ placeholder: 'Cauta profesor...', allowClear: true, width: 'resolve' });
@@ -721,9 +709,10 @@
                 if (data.length) { S.idAn = data[0].id; s.value = data[0].id; }
                 loadFacultati();
                 loadCicluri();
+                loadFormeInv();
             });
 
-            $('#sAn').on('change', function () { S.idAn = +this.value || 0; resetAll(); loadFacultati(); loadCicluri(); });
+            $('#sAn').on('change', function () { S.idAn = +this.value || 0; resetAll(); loadFacultati(); loadCicluri(); loadFormeInv(); });
             $('#sFac').on('change', function () {
                 S.idFac = +this.value || 0;
                 S.numeFac = this.options[this.selectedIndex]?.text || '';
@@ -755,9 +744,7 @@
         }
 
 
-        // ============================================================
-        // HELPER FETCH SIGUR - parseaza JSON sau ridica eroare cu mesaj clar
-        // ============================================================
+ 
         async function apiGet(url) {
             const resp = await fetch(url);
             const txt = await resp.text();
@@ -776,9 +763,7 @@
             return data;
         }
 
-        // ============================================================
-        // DROPDOWNURI
-        // ============================================================
+
         function loadFacultati() {
             apiGet(`/api/Rapoarte/liste/facultati?idAnUniv=${S.idAn}`).then(data => {
                 const s = document.getElementById('sFac');
@@ -792,18 +777,18 @@
             const s = document.getElementById('sDept');
             s.innerHTML = '<option value="0">Se încarcă...</option>';
             apiGet(`/api/Rapoarte/liste/departamente?idAnUniv=${S.idAn}&idFacultate=${S.idFac}`).then(data => {
-                    s.innerHTML = '';
-                    data.forEach(d => s.appendChild(new Option(d.nume, d.id)));
-                    s.value = 0; S.idCatedra = 0; S.numeDept = '';
-                }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
+                s.innerHTML = '';
+                data.forEach(d => s.appendChild(new Option(d.nume, d.id)));
+                s.value = 0; S.idCatedra = 0; S.numeDept = '';
+            }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
         }
         function loadSpec() {
             const $s = $('#sSpec').empty().append(new Option('Toate', 'Toti')).trigger('change');
             apiGet(`/api/Rapoarte/liste/specializari?idAnUniv=${S.idAn}&idFacultate=${S.idFac}&idCatedra=${S.idCatedra}`).then(data => {
-                    $s.empty();
-                    data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
-                    $s.val('Toti').trigger('change');
-                });
+                $s.empty();
+                data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
+                $s.val('Toti').trigger('change');
+            });
         }
         function loadProf() {
             const $p = $('#sProf');
@@ -814,23 +799,29 @@
             if (S.spec !== 'Toti') params.append('specializare', S.spec);
             if (S.tipPost !== 'Toti') params.append('tipPost', S.tipPost);
             apiGet(`/api/Rapoarte/liste/profesori?${params}`).then(data => {
-                    $p.empty();
-                    data.forEach(p => $p.append(new Option(p.nume, p.id)));
-                    $p.val('Toti').trigger('change');
-                });
+                $p.empty();
+                data.forEach(p => $p.append(new Option(p.nume, p.id)));
+                $p.val('Toti').trigger('change');
+            });
         }
         function loadCicluri() {
             const $c = $('#sCiclu').empty().append(new Option('Toate', 'Toti'));
             apiGet(`/api/Rapoarte/liste/cicluri-studii?idAnUniv=${S.idAn}`).then(data => {
-                    $c.empty();
-                    data.forEach(c => $c.append(new Option(c.nume, c.id)));
-                    $c.val('Toti');
-                });
+                $c.empty();
+                data.forEach(c => $c.append(new Option(c.nume, c.id)));
+                $c.val('Toti');
+            });
+        }
+        function loadFormeInv() {
+            const $f = $('#sForma').empty().append(new Option('Toate', 'Toti'));
+            apiGet(`/api/Rapoarte/liste/forme-invatamant?idAnUniv=${S.idAn}`).then(data => {
+                $f.empty();
+                data.forEach(c => $f.append(new Option(c.nume, c.id)));
+                $f.val('Toti');
+            });
         }
 
-        // ============================================================
-        // DOWNLOAD
-        // ============================================================
+
         function dl(tip) {
             if (tip === 'discipline' || tip === 'discipline-zip') {
                 const p = new URLSearchParams();
@@ -838,6 +829,8 @@
                 if (S.idFac > 0) p.append('idFacultate', S.idFac);
                 if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
                 if (S.prof !== 'Toti') p.append('profesor', S.prof);
+                if (S.spec !== 'Toti') p.append('specializare', S.spec);
+                if (S.sem > 0) p.append('semestru', S.sem);
                 if (S.numeFac) p.append('numeFacultate', S.numeFac);
                 if (S.numeDept) p.append('numeDepartament', S.numeDept);
                 location.href = `/api/Rapoarte/export/discipline-zip?${p}`;
@@ -846,15 +839,9 @@
             }
         }
 
-        // ============================================================
-        // R1: NORME DETALIATE
-        // JSON fields: nrCrt, profesor, facultate, departament, grad,
-        //              tipPost, specializare, cicluInv, materie, semestru,
-        //              formaInv, oreCurs, oreAplic, oreConv, mentiuni
-        // ============================================================
-        // R1: campuri JSON (camelCase din controller):
-        // R1: NORMA DETALIATA - coloane: profesor, facultate, departament, grad,
-        // tipPost, specializare, materie, semestru, oreCurs, oreAplic, oreConv, mentiuni
+
+        // R1
+
         async function loadR1() {
             document.getElementById('b1').innerHTML = spin(13);
             try {
@@ -867,36 +854,33 @@
                     const mnt = n.mentiuni && n.mentiuni !== ''
                         ? `<span class="mnt-cell">${n.mentiuni}</span>` : '';
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor || ''}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.grad || ''}</td>
-                        <td>${bTip(n.tipPost)}</td>
-                        <td class="small">${n.specializare || ''}</td>
-                        <td class="small">${n.materie || ''}</td>
-                        <td class="text-center">${n.semestru || ''}</td>
-                        <td class="text-end">${c.toFixed(2)}</td>
-                        <td class="text-end">${a.toFixed(2)}</td>
-                        <td class="text-end fw-bold">${v.toFixed(2)}</td>
-                        <td>${mnt}</td>
-                    </tr>`;
+                            <td>${n.nrCrt}</td>
+                            <td><b>${n.profesor || ''}</b></td>
+                            <td class="small">${n.facultate || ''}</td>
+                            <td class="small">${n.departament || ''}</td>
+                            <td class="small">${n.grad || ''}</td>
+                            <td>${bTip(n.tipPost)}</td>
+                            <td class="small">${n.specializare || ''}</td>
+                            <td class="small">${n.materie || ''}</td>
+                            <td class="text-center">${n.semestru || ''}</td>
+                            <td class="text-end">${c.toFixed(2)}</td>
+                            <td class="text-end">${a.toFixed(2)}</td>
+                            <td class="text-end fw-bold">${v.toFixed(2)}</td>
+                            <td>${mnt}</td>
+                        </tr>`;
                 });
                 html += `<tr class="tfoot">
-                    <td colspan="9" class="text-end">TOTAL:</td>
-                    <td class="text-end">${tc.toFixed(2)}</td>
-                    <td class="text-end">${ta.toFixed(2)}</td>
-                    <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
-                    <td></td></tr>`;
+                        <td colspan="9" class="text-end">TOTAL:</td>
+                        <td class="text-end">${tc.toFixed(2)}</td>
+                        <td class="text-end">${ta.toFixed(2)}</td>
+                        <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
+                        <td></td></tr>`;
                 document.getElementById('b1').innerHTML = html;
             } catch (e) { document.getElementById('b1').innerHTML = errR(13, e.message); }
         }
 
-        // ============================================================
-        // R2: TOTALURI NORME
-        // JSON fields: nrCrt, profesor, facultate, departament, tipPost,
-        //              oreIF, oreID, oreIFR, totalOreConv, totalAnual
-        // ============================================================
+        // R2
+   
         async function loadR2() {
             document.getElementById('b2').innerHTML = spin(10);
             try {
@@ -915,32 +899,28 @@
                         oc = +n.totalOreConv || 0, oa = +n.totalAnual || 0;
                     gif += oi; gid += od; gifr += oifr; gc += oc; ga += oa;
                     html += `<tr>
-                        <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td>${bTip(n.tipPost)}</td>
-                        <td class="text-end">${oi.toFixed(2)}</td>
-                        <td class="text-end">${od.toFixed(2)}</td>
-                        <td class="text-end">${oifr.toFixed(2)}</td>
-                        <td class="text-end fw-bold">${oc.toFixed(2)}</td>
-                        <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
-                    </tr>`;
+                            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                            <td class="small">${n.facultate || ''}</td>
+                            <td class="small">${n.departament || ''}</td>
+                            <td>${bTip(n.tipPost)}</td>
+                            <td class="text-end">${oi.toFixed(2)}</td>
+                            <td class="text-end">${od.toFixed(2)}</td>
+                            <td class="text-end">${oifr.toFixed(2)}</td>
+                            <td class="text-end fw-bold">${oc.toFixed(2)}</td>
+                            <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
+                        </tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                    <td class="text-end">${gif.toFixed(2)}</td>
-                    <td class="text-end">${gid.toFixed(2)}</td>
-                    <td class="text-end">${gifr.toFixed(2)}</td>
-                    <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
-                    <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
+                        <td class="text-end">${gif.toFixed(2)}</td>
+                        <td class="text-end">${gid.toFixed(2)}</td>
+                        <td class="text-end">${gifr.toFixed(2)}</td>
+                        <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
+                        <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
                 document.getElementById('b2').innerHTML = html;
             } catch (e) { document.getElementById('b2').innerHTML = errR(10, e.message); }
         }
 
-        // ============================================================
-        // R3: DISTRIBUTIE ORE PE PROGRAME
-        // JSON fields: nrCrt, profesor, facultate, departament, program,
-        //              oreProgram, totalOreUniv, procent
-        // ============================================================
+        // R3
         async function loadR3() {
             document.getElementById('b3').innerHTML = spin(7);
             try {
@@ -958,24 +938,19 @@
                 data.forEach(n => {
                     const op = +n.oreProgram || 0, ot = +n.totalOreUniv || 0, pr = +n.procent || 0;
                     html += `<tr>
-                        <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.program || ''}</td>
-                        <td class="text-end">${op.toFixed(2)}</td>
-                        <td class="text-end">${ot.toFixed(2)}</td>
-                        <td>${progBar(pr)}</td>
-                    </tr>`;
+                            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                            <td class="small">${n.departament || ''}</td>
+                            <td class="small">${n.program || ''}</td>
+                            <td class="text-end">${op.toFixed(2)}</td>
+                            <td class="text-end">${ot.toFixed(2)}</td>
+                            <td>${progBar(pr)}</td>
+                        </tr>`;
                 });
                 document.getElementById('b3').innerHTML = html;
             } catch (e) { document.getElementById('b3').innerHTML = errR(7, e.message); }
         }
 
-        // ============================================================
-        // R4: LIMBI STRAINE
-        // JSON fields: nrCrt, profesor, semestru, totalOre,
-        //              limbaProgram, programStudiu, cicluStudii
-        // CORECTIE: limbaProgram (nu limbiPredate), 7 coloane (nu 8)
-        // ============================================================
+        // R4
         async function loadR4() {
             document.getElementById('b4').innerHTML = spin(7);
             try {
@@ -992,27 +967,23 @@
                 data.forEach(n => {
                     const t = +n.totalOre || 0; st += t;
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor}</b></td>
-                        <td class="text-center">${n.semestru || ''}</td>
-                        <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
-                        <td class="small">${n.limbaProgram || ''}</td>
-                        <td class="small">${n.programStudiu || ''}</td>
-                        <td class="small"><span class="badge bg-secondary" style="font-size:.68rem">${n.cicluStudii || ''}</span></td>
-                    </tr>`;
+                            <td>${n.nrCrt}</td>
+                            <td><b>${n.profesor}</b></td>
+                            <td class="text-center">${n.semestru || ''}</td>
+                            <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
+                            <td class="small">${n.limbaProgram || ''}</td>
+                            <td class="small">${n.programStudiu || ''}</td>
+                            <td class="small"><span class="badge bg-secondary" style="font-size:.68rem">${n.cicluStudii || ''}</span></td>
+                        </tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="3" class="text-end">TOTAL:</td>
-                    <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
-                    <td colspan="3"></td></tr>`;
+                        <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
+                        <td colspan="3"></td></tr>`;
                 document.getElementById('b4').innerHTML = html;
             } catch (e) { document.getElementById('b4').innerHTML = errR(7, e.message); }
         }
 
-        // ============================================================
-        // R5: DISCIPLINE PER PROFESOR
-        // JSON fields: nrCrt, profesor, facultate, departament, grad,
-        //              discipline, nrDiscipline
-        // ============================================================
+        // R5
         async function loadR5() {
             document.getElementById('b5').innerHTML = spin(7);
             try {
@@ -1022,28 +993,25 @@
                 if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
                 if (S.prof !== 'Toti') p.append('profesor', S.prof);
                 if (S.sem > 0) p.append('semestru', S.sem);
+                if (S.spec !== 'Toti') p.append('specializare', S.spec);
                 const data = await apiGet(`/api/Rapoarte/discipline?${p}`);
                 if (!data?.length) { document.getElementById('b5').innerHTML = empty(7); return; }
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                    <td>${n.nrCrt}</td>
-                    <td><b>${n.profesor}</b></td>
-                    <td class="small">${n.facultate || ''}</td>
-                    <td class="small">${n.departament || ''}</td>
-                    <td class="small">${n.grad || ''}</td>
-                    <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
-                    <td class="small" style="white-space:normal;max-width:370px;">${n.discipline || ''}</td>
-                </tr>`;
+                        <td>${n.nrCrt}</td>
+                        <td><b>${n.profesor}</b></td>
+                        <td class="small">${n.facultate || ''}</td>
+                        <td class="small">${n.departament || ''}</td>
+                        <td class="small">${n.grad || ''}</td>
+                        <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
+                        <td class="small" style="white-space:normal;max-width:370px;">${n.discipline || ''}</td>
+                    </tr>`;
                 });
                 document.getElementById('b5').innerHTML = html;
             } catch (e) { document.getElementById('b5').innerHTML = errR(7, e.message); }
         }
-
-        // ============================================================
-        // R6: TITULARI
-        // JSON fields: nrCrt, profesor, facultate, departament, grad
-        // ============================================================
+        // R6
         async function loadR6() {
             document.getElementById('b6').innerHTML = spin(5);
             try {
@@ -1056,21 +1024,17 @@
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                    <td>${n.nrCrt}</td>
-                    <td><b>${n.profesor}</b></td>
-                    <td class="small">${n.facultate || ''}</td>
-                    <td class="small">${n.departament || ''}</td>
-                    <td class="small">${n.grad || ''}</td></tr>`;
+                        <td>${n.nrCrt}</td>
+                        <td><b>${n.profesor}</b></td>
+                        <td class="small">${n.facultate || ''}</td>
+                        <td class="small">${n.departament || ''}</td>
+                        <td class="small">${n.grad || ''}</td></tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} titulari oficiali</td></tr>`;
                 document.getElementById('b6').innerHTML = html;
             } catch (e) { document.getElementById('b6').innerHTML = errR(5, e.message); }
         }
-
-        // ============================================================
-        // R7: COLABORATORI
-        // JSON fields: nrCrt, profesor, facultate, departament, grad
-        // ============================================================
+        // R7
         async function loadR7() {
             document.getElementById('b7').innerHTML = spin(5);
             try {
@@ -1083,24 +1047,17 @@
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                    <td>${n.nrCrt}</td>
-                    <td><b>${n.profesor}</b></td>
-                    <td class="small">${n.facultate || ''}</td>
-                    <td class="small">${n.departament || ''}</td>
-                    <td class="small">${n.grad || ''}</td></tr>`;
+                        <td>${n.nrCrt}</td>
+                        <td><b>${n.profesor}</b></td>
+                        <td class="small">${n.facultate || ''}</td>
+                        <td class="small">${n.departament || ''}</td>
+                        <td class="small">${n.grad || ''}</td></tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} colaboratori</td></tr>`;
                 document.getElementById('b7').innerHTML = html;
             } catch (e) { document.getElementById('b7').innerHTML = errR(5, e.message); }
         }
-
-        // ============================================================
-        // R8: ANS
-        // JSON: { Domenii: [...], Profesori: [{nrCrt, numeComplet, cnp, varsta,
-        //          formaAngajare, gradFunctie, facultate, departament,
-        //          normaEfectiva, domeniiMapate: {domeniu: fractie}}] }
-        // Previzualizare limitata la primii 25; export complet via dl()
-        // ============================================================
+        // R8
         async function loadAns() {
             document.getElementById('ansWrap').style.display = 'block';
             document.getElementById('b8').innerHTML = spin(6);
@@ -1132,17 +1089,17 @@
                         cols += f > 0 ? `<td class="frac-cell">${(+f).toFixed(2)}</td>` : '<td></td>';
                     });
                     html += `<tr>
-                        <td>${p.nrCrt}</td>
-                        <td><b class="small">${p.numeComplet}</b></td>
-                        <td class="small">${p.facultate || ''}</td>
-                        <td class="small">${p.departament || ''}</td>
-                        <td class="small">${p.gradFunctie || ''}</td>
-                        ${cols}
-                        <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
+                            <td>${p.nrCrt}</td>
+                            <td><b class="small">${p.numeComplet}</b></td>
+                            <td class="small">${p.facultate || ''}</td>
+                            <td class="small">${p.departament || ''}</td>
+                            <td class="small">${p.gradFunctie || ''}</td>
+                            ${cols}
+                            <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
                 });
                 if ((resp.profesori?.length || 0) > 25)
                     html += `<tr class="tfoot"><td colspan="${dom.length + 6}" class="text-center">
-                        Primii 25 din ${resp.profesori.length}. Folosiți Export pentru lista completă.</td></tr>`;
+                            Primii 25 din ${resp.profesori.length}. Folosiți Export pentru lista completă.</td></tr>`;
                 document.getElementById('b8').innerHTML = html;
                 clean('r8');
             } catch (e) { document.getElementById('b8').innerHTML = errR(6, e.message); }

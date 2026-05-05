@@ -8,10 +8,6 @@ using ClosedXML.Excel;
 
 namespace LicentaV1.Controllers
 {
-    // ====================================================================
-    // FILTRU DE EXCEPTII: orice eroare devine JSON, ca frontend-ul sa nu
-    // mai primeasca HTML cu stack trace ("Microsoft.Data.SqlClient...")
-    // ====================================================================
     public class JsonExceptionFilter : IExceptionFilter
     {
         public void OnException(ExceptionContext ctx)
@@ -39,12 +35,10 @@ namespace LicentaV1.Controllers
         private readonly string _cs;
         private readonly IMemoryCache _cache;
 
-        // ================================================================
-        // CONSTANTE CONFIGURABILE (centralizate, fara magic numbers in cod)
-        // ================================================================
+
         private const string Green = "#56723e";
-        private const int SaptamaniPerAn = 14;     // multiplicator total anual
-        private const decimal NormaLegalaFallback = 15.0m;  // norma cand gradul e necunoscut (Asistent)
+        private const int SaptamaniPerAn = 14;     
+        private const decimal NormaLegalaFallback = 15.0m;  
         private const int TimeoutShort = 60;
         private const int TimeoutMedium = 120;
         private const int TimeoutLong = 180;
@@ -55,9 +49,6 @@ namespace LicentaV1.Controllers
             _cache = cache;
         }
 
-        // ================================================================
-        // AN CURENT — calculat dinamic din BD, fara hardcodare
-        // ================================================================
         private int GetAnCurent() => _cache.GetOrCreate("AnCurent_v9", e =>
         {
             e.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(4);
@@ -90,9 +81,6 @@ namespace LicentaV1.Controllers
             return $"{safe}_{raport}.xlsx";
         }
 
-        // =================================================================
-        // DROPDOWN-URI
-        // =================================================================
         [HttpGet("liste/ani-universitari")]
         public IActionResult GetAni() => Ok(_cache.GetOrCreate("AniUniv_v8", e =>
         {
@@ -202,6 +190,26 @@ namespace LicentaV1.Controllers
             return Ok(lst);
         }
 
+        [HttpGet("liste/forme-invatamant")]
+        public IActionResult GetFormeInv([FromQuery] int? idAnUniv)
+        {
+            int idAn = idAnUniv ?? GetAnCurent();
+            var lst = new List<object> { new { id = "Toti", nume = "Toate" } };
+            using var conn = new SqlConnection(_cs); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT DISTINCT DenumireFormaInv FROM [dbo].[View_FDS]
+                WHERE ID_AnUniv = @idAn AND DenumireFormaInv IS NOT NULL
+                ORDER BY DenumireFormaInv", conn);
+            cmd.Parameters.AddWithValue("@idAn", idAn);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var v = r[0]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(v)) lst.Add(new { id = v, nume = v });
+            }
+            return Ok(lst);
+        }
+
         [HttpGet("liste/profesori")]
         public IActionResult GetProfesori([FromQuery] int? idAnUniv,
             [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
@@ -242,10 +250,7 @@ namespace LicentaV1.Controllers
             return Ok(lst);
         }
 
-        // =================================================================
-        // RAPORT 1: NORMA PROFESORI (detaliat) — query master cu cuplaje
-        // =================================================================
-        private const string SqlNorma = @"
+         private const string SqlNorma = @"
             WITH OreUnice AS (
                 SELECT
                     vppm.ID_Profesor,
@@ -263,7 +268,7 @@ namespace LicentaV1.Controllers
                     vppm.ID_Facultate,
                     vppm.ID_Catedra,
                     vppm.ID_TipFormaInv,
-                    vppm.ID_StatDeFunctii,
+                    vppm.id_specializare,
                     vppm.TitularSauSuplinitor,
                     ROW_NUMBER() OVER (
                         PARTITION BY vppm.ID_Profesor, vppm.ID_PlanMaterie_Prestator, vppm.NrSemestruDinAn
@@ -271,6 +276,15 @@ namespace LicentaV1.Controllers
                     ) AS Rn
                 FROM [pi].[View_PostProfesorMaterie] vppm
                 WHERE vppm.ID_AnUniv = @idAn
+            ),
+            -- Maparea specializare → ciclu+forma. View_FDS poate avea acelasi
+            -- ID_Specializare in mai multi ani; luam cea mai recenta cu MAX().
+            FdsSpec AS (
+                SELECT ID_Specializare,
+                       MAX(DenumireCicluInv) AS DenCiclu,
+                       MAX(ID_TipFormaInv)   AS IdFormaFds
+                FROM [dbo].[View_FDS]
+                GROUP BY ID_Specializare
             )
             SELECT
                 p.NumeIntreg                             AS Profesor,
@@ -300,8 +314,8 @@ namespace LicentaV1.Controllers
             FROM OreUnice ou
             INNER JOIN [dbo].[View_Profesori_CF_AnUniv] p
                 ON ou.ID_Profesor = p.ID_Profesor AND p.ID_AnUnivCatedra = @idAn
-            LEFT JOIN [pi].[StatDeFunctii] sf
-                ON ou.ID_StatDeFunctii = sf.ID_StatDeFunctii
+            LEFT JOIN FdsSpec fs
+                ON fs.ID_Specializare = ou.id_specializare
             WHERE ou.Rn = 1
               AND (@idFac     = 0 OR ou.ID_Facultate = @idFac)
               AND (@idCatedra = 0 OR ou.ID_Catedra   = @idCatedra)
@@ -314,14 +328,21 @@ namespace LicentaV1.Controllers
               AND (@prof      = N'Toti' OR p.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
               AND (@tipPost   = N'Toti' OR CASE ou.TitularSauSuplinitor WHEN 1 THEN N'Titular' ELSE N'Suplinitor' END = @tipPost)
               AND (@sem       = 0       OR ou.NrSemestruDinAn = @sem)
-              -- Forma de invatamant: 1=IF, 2=ID, 3=IFR (conventie AGSIS)
-              AND (@formaInv  = 0       OR ou.ID_TipFormaInv = @formaInv)
-              -- Ciclu studii din StatDeFunctii (1=Licenta, 2=Master, 3=Doctorat etc)
-              AND (@ciclu     = 0       OR sf.ID_TipCicluInv = @ciclu)
+              -- Forma de invatamant: comparare case+accent insensitive cu denumirea
+              -- din BD (vppm.ID_TipFormaInv din pi.View_PostProfesorMaterie e numeric,
+              -- dar acelasi ID intoarce View_FDS la coloana ID_TipFormaInv. Comparam
+              -- prin sub-select din View_FDS unde avem si denumirea).
+              AND (@formaInv  = N'Toti' OR ou.ID_TipFormaInv IN (
+                    SELECT DISTINCT fds2.ID_TipFormaInv FROM [dbo].[View_FDS] fds2
+                    WHERE fds2.DenumireFormaInv COLLATE Latin1_General_CI_AI = @formaInv COLLATE Latin1_General_CI_AI
+                  ))
+              -- Ciclu studii: comparare case+accent insensitive cu DenumireCicluInv din View_FDS
+              AND (@ciclu     = N'Toti' OR
+                   fs.DenCiclu COLLATE Latin1_General_CI_AI = @ciclu COLLATE Latin1_General_CI_AI)
             ORDER BY p.NumeIntreg COLLATE Romanian_CI_AS, ou.NrSemestruDinAn";
 
         private void AddNormaParams(SqlCommand cmd, int idAn, int idFac, int idCat,
-            string prof, string spec, string tipPost, int sem, int formaInv, int ciclu)
+            string prof, string spec, string tipPost, int sem, string formaInv, string ciclu)
         {
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFac);
@@ -330,29 +351,9 @@ namespace LicentaV1.Controllers
             cmd.Parameters.AddWithValue("@spec", string.IsNullOrWhiteSpace(spec) ? "Toti" : spec.Trim());
             cmd.Parameters.AddWithValue("@tipPost", string.IsNullOrWhiteSpace(tipPost) ? "Toti" : tipPost.Trim());
             cmd.Parameters.AddWithValue("@sem", sem);
-            cmd.Parameters.AddWithValue("@formaInv", formaInv);
-            cmd.Parameters.AddWithValue("@ciclu", ciclu);
+            cmd.Parameters.AddWithValue("@formaInv", string.IsNullOrWhiteSpace(formaInv) ? "Toti" : formaInv.Trim());
+            cmd.Parameters.AddWithValue("@ciclu", string.IsNullOrWhiteSpace(ciclu) ? "Toti" : ciclu.Trim());
         }
-
-        // Conversie string forma invatamant → ID conform conventiei AGSIS
-        // (1=IF zi, 2=ID, 3=IFR). Frontend trimite stringul pentru lizibilitate.
-        private static int FormaInvToId(string? s) => (s ?? "").Trim().ToUpperInvariant() switch
-        {
-            "IF" => 1,
-            "ID" => 2,
-            "IFR" => 3,
-            _ => 0
-        };
-
-        // Conversie string ciclu studii → ID. AGSIS foloseste:
-        // 1=Licenta, 2=Master, 3=Doctorat (verificat in StatDeFunctii.ID_TipCicluInv)
-        private static int CicluToId(string? s) => (s ?? "").Trim().ToUpperInvariant() switch
-        {
-            "LICENTA" or "LICENȚĂ" or "L" => 1,
-            "MASTER" or "M" => 2,
-            "DOCTORAT" or "D" => 3,
-            _ => 0
-        };
 
         [HttpGet("norma")]
         public async Task<IActionResult> GetNorma(
@@ -366,7 +367,7 @@ namespace LicentaV1.Controllers
             using var cmd = new SqlCommand(SqlNorma, conn); cmd.CommandTimeout = TimeoutLong;
             AddNormaParams(cmd, idAn, idFacultate ?? 0, idCatedra ?? 0,
                 profesor ?? "", specializare ?? "", tipPost ?? "Toti", semestru ?? 0,
-                FormaInvToId(formaInvatamant), CicluToId(cicluStudii));
+                formaInvatamant ?? "", cicluStudii ?? "");
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 result.Add(new
@@ -409,7 +410,7 @@ namespace LicentaV1.Controllers
             using var cmd = new SqlCommand(SqlNorma, conn); cmd.CommandTimeout = TimeoutLong;
             AddNormaParams(cmd, idAn, idFacultate ?? 0, idCatedra ?? 0,
                 profesor ?? "", specializare ?? "", tipPost ?? "Toti", semestru ?? 0,
-                FormaInvToId(formaInvatamant), CicluToId(cicluStudii));
+                formaInvatamant ?? "", cicluStudii ?? "");
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 dt.Rows.Add(nr++, r["Profesor"]?.ToString(), r["Facultate"]?.ToString(),
@@ -438,11 +439,6 @@ namespace LicentaV1.Controllers
                 SafeFile("Norma_Profesori", profesor));
         }
 
-        // =================================================================
-        // RAPORT 2: TOTALURI NORME (per profesor) — agregare cu split IF/ID/IFR
-        // FormaInv determinata prin matching pe DenumireSpecializare conform
-        // conventiei: '... ID' / '... IFR' / '... id' / sufixe similare.
-        // =================================================================
         private const string SqlTotaluri = @"
             WITH OreUnice AS (
                 SELECT
@@ -580,9 +576,6 @@ namespace LicentaV1.Controllers
                 "Totaluri_Norme.xlsx");
         }
 
-        // =================================================================
-        // RAPORT 3: DISTRIBUTIE PE PROGRAME (procent ore per program studiu)
-        // =================================================================
         private const string SqlDistrib = @"
             WITH OreUnice AS (
                 SELECT
@@ -730,9 +723,6 @@ namespace LicentaV1.Controllers
                 SafeFile("Distributie_Ore", profesor));
         }
 
-        // =================================================================
-        // RAPORT 4: LIMBI STRAINE — query master fidel din notite
-        // =================================================================
         private const string SqlLimbi = @"
             WITH ProgrameStraine AS (
                 SELECT DISTINCT
@@ -741,7 +731,9 @@ namespace LicentaV1.Controllers
                     LTRIM(RTRIM(f.Facultate)) COLLATE DATABASE_DEFAULT AS FacultateCurata,
                     LTRIM(RTRIM(f.DenumireSpecializare)) COLLATE DATABASE_DEFAULT AS NumeSistem,
                     LTRIM(RTRIM(f.LimbaPredare)) AS Limba,
-                    f.CicluDeStudii AS Ciclu
+                    -- Folosim DenumireCicluInv (acelasi camp pe care il populeaza
+                    -- dropdown-ul din UI prin endpointul liste/cicluri-studii)
+                    LTRIM(RTRIM(f.DenumireCicluInv)) AS Ciclu
                 FROM [dbo].[View_FDS] f
                 WHERE f.ID_AnUniv = @idAn
                   AND f.LimbaPredare IS NOT NULL
@@ -765,7 +757,10 @@ namespace LicentaV1.Controllers
               AND (@idFac     = 0 OR p.ID_Facultate = @idFac)
               AND (@idCatedra = 0 OR p.ID_Catedra   = @idCatedra)
               AND (@prof      = N'Toti' OR p.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
-              AND (@ciclu     = N'Toti' OR ps.Ciclu COLLATE DATABASE_DEFAULT = @ciclu COLLATE DATABASE_DEFAULT)
+              -- Compar case+accent insensitive ca sa nu pierdem din cauza variatiilor
+              -- 'MASTER' vs 'Master' vs 'master'
+              AND (@ciclu     = N'Toti' OR
+                   ps.Ciclu COLLATE Latin1_General_CI_AI = @ciclu COLLATE Latin1_General_CI_AI)
             GROUP BY p.NumeIntreg, ps.Limba, ps.ProgramCurat, ps.FacultateCurata, ps.Ciclu, vppm.NrSemestruDinAn
             HAVING SUM(ISNULL(vppm.Nr_Ore_Curs, 0) + ISNULL(vppm.Nr_Ore_Seminar, 0) + ISNULL(vppm.Nr_Ore_Laborator, 0)) > 0
             ORDER BY ps.FacultateCurata, ps.ProgramCurat, p.NumeIntreg";
@@ -842,9 +837,6 @@ namespace LicentaV1.Controllers
                 SafeFile("Limbi_Straine", profesor));
         }
 
-        // =================================================================
-        // RAPORT 5: DISCIPLINE PER PROFESOR — query master din notite
-        // =================================================================
         private const string SqlDisc = @"
             WITH Identitate AS (
                 SELECT ID_Profesor, NumeIntreg, DenumireFacultate, DenumireCatedra, DenumireGradDidactic,
@@ -856,7 +848,18 @@ namespace LicentaV1.Controllers
             PpmDedup AS (
                 SELECT ID_Profesor,
                        ISNULL(Denumire, '') AS MaterieBruta,
-                       NrSemestruDinAn
+                       NrSemestruDinAn,
+                       -- Aplicam aceeasi normalizare specializare ca la R3:
+                       -- scoatem partea dupa '+', UPPER, fara diacritice si paranteze
+                       LTRIM(RTRIM(
+                           REPLACE(REPLACE(REPLACE(REPLACE(
+                               UPPER(
+                                   CASE WHEN CHARINDEX(N'+', DenumireSpecializare) > 0
+                                        THEN LEFT(DenumireSpecializare, CHARINDEX(N'+', DenumireSpecializare)-1)
+                                        ELSE DenumireSpecializare END
+                               ) COLLATE Latin1_General_CI_AI,
+                               N'(', N' '), N')', N' '), N'  ', N' '), N'  ', N' ')
+                       )) AS SpecKey
                 FROM [pi].[View_PostProfesorMaterie]
                 WHERE ID_AnUniv = @idAn
                   AND (Post_Profesor_Materie_Deleted IS NULL OR Post_Profesor_Materie_Deleted = 0)
@@ -872,6 +875,14 @@ namespace LicentaV1.Controllers
                   AND (@sem  = 0       OR ppm.NrSemestruDinAn = @sem)
                   AND (@idFac     = 0 OR i.ID_Facultate = @idFac)
                   AND (@idCatedra = 0 OR i.ID_Catedra   = @idCatedra)
+                  -- Filtru specializare: aplicam aceeasi normalizare pe valoarea
+                  -- primita de la frontend pentru a fi consistent cu SpecKey
+                  AND (@spec = N'Toti' OR ppm.SpecKey =
+                       LTRIM(RTRIM(
+                           REPLACE(REPLACE(REPLACE(REPLACE(
+                               UPPER(@spec) COLLATE Latin1_General_CI_AI,
+                               N'(', N' '), N')', N' '), N'  ', N' '), N'  ', N' ')
+                       )))
                   AND ppm.MaterieBruta != N''
             )
             SELECT dm.NumeIntreg, MAX(dm.DenumireFacultate) AS Facultate,
@@ -888,17 +899,18 @@ namespace LicentaV1.Controllers
         [HttpGet("discipline")]
         public async Task<IActionResult> GetDisc(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
-            [FromQuery] string? profesor, [FromQuery] int? semestru)
+            [FromQuery] string? profesor, [FromQuery] int? semestru, [FromQuery] string? specializare)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var result = new List<object>();
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlDisc, conn); cmd.CommandTimeout = 180;
+            using var cmd = new SqlCommand(SqlDisc, conn); cmd.CommandTimeout = TimeoutLong;
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
             cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
             cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(profesor) ? "Toti" : profesor.Trim());
             cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
+            cmd.Parameters.AddWithValue("@spec", string.IsNullOrWhiteSpace(specializare) ? "Toti" : specializare.Trim());
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 result.Add(new
@@ -917,7 +929,7 @@ namespace LicentaV1.Controllers
         [HttpGet("export/discipline")]
         public async Task<IActionResult> ExportDisc(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
-            [FromQuery] string? profesor, [FromQuery] int? semestru)
+            [FromQuery] string? profesor, [FromQuery] int? semestru, [FromQuery] string? specializare)
         {
             int idAn = idAnUniv ?? GetAnCurent();
             var dt = new DataTable();
@@ -927,12 +939,13 @@ namespace LicentaV1.Controllers
                 new DataColumn("Discipline"), new DataColumn("Nr. Discipline", typeof(int))
             });
             using var conn = new SqlConnection(_cs); await conn.OpenAsync();
-            using var cmd = new SqlCommand(SqlDisc, conn); cmd.CommandTimeout = 180;
+            using var cmd = new SqlCommand(SqlDisc, conn); cmd.CommandTimeout = TimeoutLong;
             cmd.Parameters.AddWithValue("@idAn", idAn);
             cmd.Parameters.AddWithValue("@idFac", idFacultate ?? 0);
             cmd.Parameters.AddWithValue("@idCatedra", idCatedra ?? 0);
             cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(profesor) ? "Toti" : profesor.Trim());
             cmd.Parameters.AddWithValue("@sem", semestru ?? 0);
+            cmd.Parameters.AddWithValue("@spec", string.IsNullOrWhiteSpace(specializare) ? "Toti" : specializare.Trim());
             using var r = await cmd.ExecuteReaderAsync(); int nr = 1;
             while (await r.ReadAsync())
                 dt.Rows.Add(nr++, r["NumeIntreg"]?.ToString(), r["Facultate"]?.ToString(),
@@ -954,16 +967,12 @@ namespace LicentaV1.Controllers
                 SafeFile("Discipline", profesor));
         }
 
-        // alias compat: vechi frontend cere /export/discipline-zip
         [HttpGet("export/discipline-zip")]
         public Task<IActionResult> ExportDiscZip(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
-            [FromQuery] string? profesor, [FromQuery] int? semestru)
-            => ExportDisc(idAnUniv, idFacultate, idCatedra, profesor, semestru);
+            [FromQuery] string? profesor, [FromQuery] int? semestru, [FromQuery] string? specializare)
+            => ExportDisc(idAnUniv, idFacultate, idCatedra, profesor, semestru, specializare);
 
-        // =================================================================
-        // RAPORT 6: TITULARI — query master EXACT din notite
-        // =================================================================
         private const string SqlTitulari = @"
             SELECT DISTINCT
                 V.ID_Profesor,
@@ -1055,9 +1064,6 @@ namespace LicentaV1.Controllers
                 "Titulari.xlsx");
         }
 
-        // =================================================================
-        // RAPORT 7: COLABORATORI — query master EXACT din notite
-        // =================================================================
         private const string SqlColaboratori = @"
             SELECT DISTINCT
                 V.ID_Profesor,
@@ -1149,28 +1155,6 @@ namespace LicentaV1.Controllers
                 "Colaboratori.xlsx");
         }
 
-
-        // =================================================================
-        // RAPORT 8: ANS — REPLICA EXACTA a logicii oficiale a profei
-        // -----------------------------------------------------------------
-        // Adaptari fata de query-ul ei (acces restrictionat la Domeniu,
-        // N_DOMENIU_STUDIU_ANS, Profesor, Catedra, SetariUniversitate):
-        //   1. Sursa fractii: pi.StatDeFunctiiPeSpecializare (sfs)
-        //   2. Mapare specializare→domeniu: prin dbo.View_FDS (are coloana
-        //      ID_N_Domeniu_Studiu_ANS direct, fara JOIN cu Domeniu)
-        //   3. Mapare domeniu→ramura ANS: temp #DM populat cu
-        //      EXEC [dbo].[N_DOMENIU_STUDIUL_ANS_List] (procedura accesibila)
-        //   4. Norma individuala: pi.NormaOreConventionale + pi.ExceptiiNormaOreConventionale
-        //   5. Lista profesori titulari: dbo.View_Profesori_CF_AnUniv (TitularAnUniv=1)
-        //
-        // FORMULA OFICIALA (din SQL-ul profei):
-        //   - Sterge cuplajele defecte (CuplajeCareNuMaiExista, AplicDinCuplajCurs,
-        //     AplicDinCuplajApp) prin SET ApartineDeCuplaj=NULL
-        //   - cnt = COUNT(*) OVER PARTITION BY (ID_Profesor, ID_TipGradDidactic,
-        //                                       ApartineDeCuplaj, NrCrtPost)
-        //   - Fractie = SUM(NrOreConventionale / cnt / NormaIndividuala)
-        //   - Filtru: TitularSauSuplinitor=1 AND DenTitularSauSuplinitor != 'SupTit'
-        // =================================================================
         private const string SqlAnsMaster = @"
             -- Pas 1: snapshot StatDeFunctiiPeSpecializare cu maparea ramura ANS
             IF OBJECT_ID('tempdb..#DM') IS NOT NULL DROP TABLE #DM;
@@ -1290,18 +1274,12 @@ namespace LicentaV1.Controllers
                        ISNULL(enoc.NrOreTitular, ISNULL(noc.NrOreConventionaleTitular, @normaFallback))) > 0
             ORDER BY v.NumeIntreg COLLATE Romanian_CI_AS, s.ID_RamuraDeStiinta_ANS;";
 
-        // Maparea ramuri ANS — citita o data, cache-uita.
-        // ATENTIE: N_RAMURA_STIINTA_ANS are doar 35 ramuri (1-34, 40).
-        // Lipsesc 35-39 (Teatru, Cinematografie, Muzica x2, Sport).
-        // N_DOMENIU_STUDIUL_ANS_List le acopera. Combinam cele doua surse:
-        // denumirea oficiala din rsa daca exista, altfel din procedura.
         private List<(int Id, string Den)> GetRamuriAns(SqlConnection conn)
         {
             return _cache.GetOrCreate("RamuriANS_v3", e =>
             {
                 e.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
 
-                // 1. Tabelul oficial cu denumiri complete (35 ramuri, gap 35-39)
                 var rsa = new Dictionary<int, string>();
                 using (var cmd = new SqlCommand(
                     "SELECT ID_Element, Denumire FROM [dbo].[N_RAMURA_STIINTA_ANS]", conn))
@@ -1312,7 +1290,6 @@ namespace LicentaV1.Controllers
                         rsa[Convert.ToInt32(r[0])] = r[1]?.ToString() ?? "";
                 }
 
-                // 2. Procedura cu lista completa (40 ramuri) - umple golurile
                 using var cmd2 = new SqlCommand(@"
                     IF OBJECT_ID('tempdb..#DM_ramuri') IS NOT NULL DROP TABLE #DM_ramuri;
                     CREATE TABLE #DM_ramuri (
@@ -1331,7 +1308,6 @@ namespace LicentaV1.Controllers
                 while (rd.Read())
                 {
                     int id = Convert.ToInt32(rd[0]);
-                    // Prioritate: denumirea oficiala din N_RAMURA_STIINTA_ANS
                     string den = rsa.TryGetValue(id, out var d) ? d : (rd[1]?.ToString() ?? "");
                     lst.Add((id, den));
                 }
@@ -1348,7 +1324,6 @@ namespace LicentaV1.Controllers
 
             var ramuri = GetRamuriAns(conn);
 
-            // Profesor → {idRamura → fractie}
             var profMap = new Dictionary<int, (string Nume, string Fac, string Dept, string Grad,
                 Dictionary<int, decimal> Frac)>();
 
