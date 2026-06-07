@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BI Dashboard — Transilvania</title>
+    <title>Dashboard Universitatea Transilvania</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
@@ -227,24 +227,24 @@
 </head>
 <body>
     <div class="sidebar d-flex flex-column p-2">
-        <div class="text-center p-3 mb-2" style="background:rgba(255,255,255,.06);border-radius:10px;">
-            <img src="images/logo.png" style="max-width:160px;width:100%;object-fit:contain;"
-                 onerror="this.style.display='none';this.parentElement.innerHTML='<h5 class=\'text-white mb-0\'>BI Dashboard</h5>'">
+        <div class="text-center mb-4 mt-2">
+            <img src="images/logo.png?v=2" style="width:100%; object-fit:contain;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='<h5 class=\'text-white mb-0\'>Dashboard</h5>'">
         </div>
         <ul class="nav nav-pills flex-column">
             <li>
-                <a href="#" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                <a href="#" class="nav-link active">Dashboard</a>
             </li>
         </ul>
-        <div class="mt-auto p-2 text-center small text-secondary">Licență 2026</div>
+        <div class="mt-auto p-2 text-center small text-secondary">Lucrare de licență Ioniță Diana-Andreea, 2026</div>
     </div>
 
     <div class="main">
         <h2 class="mb-3 fw-bold" style="border-left:4px solid var(--a);padding-left:12px;color:#212529;">
-            Dashboard Cadre Didactice
+            Rapoarte Cadre Didactice
         </h2>
 
-        
+
         <div class="fb">
             <div class="row g-2 align-items-end">
                 <div class="col-auto">
@@ -302,7 +302,7 @@
 
         <div class="accordion" id="acc">
 
-            <!-- R1 -->
+            <!-- R1: Norme -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -329,7 +329,7 @@
                                         <th>Tip Post</th>
                                         <th>Specializare</th>
                                         <th>Materie</th>
-                                        <th>Sem.</th>
+                                        <th>Semestru</th>
                                         <th class="text-end">Ore Curs</th>
                                         <th class="text-end">Ore Aplic.</th>
                                         <th class="text-end">Ore Conv.</th>
@@ -349,7 +349,7 @@
                 </div>
             </div>
 
-            <!-- R2 -->
+            <!-- R2: Totaluri -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -368,16 +368,17 @@
                             <table class="etbl">
                                 <thead>
                                     <tr>
-                                        <th>Nr.</th>
+                                        <th>Nr.Crt.</th>
                                         <th>Profesor</th>
                                         <th>Facultate</th>
-                                        <th>Dept.</th>
-                                        <th>Tip</th>
+                                        <th>Departament</th>
+                                        <th>Grad</th>
+                                        <th>Tip Post</th>
                                         <th class="text-end">Ore IF</th>
                                         <th class="text-end">Ore ID</th>
                                         <th class="text-end">Ore IFR</th>
-                                        <th class="text-end">Total Conv.</th>
-                                        <th class="text-end">Total Anual ×14</th>
+                                        <th class="text-end">Total Ore Conv.</th>
+                                        <th class="text-end">Total Anual (x14)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b2">
@@ -393,7 +394,7 @@
                 </div>
             </div>
 
-            <!-- R3 -->
+            <!-- R3: Distributie -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -413,13 +414,14 @@
                             <table class="etbl">
                                 <thead>
                                     <tr>
-                                        <th>Nr.</th>
+                                        <th>Nr.Crt.</th>
                                         <th>Profesor</th>
-                                        <th>Dept.</th>
+                                        <th>Facultate</th>
+                                        <th>Departament</th>
                                         <th>Program Studiu</th>
-                                        <th class="text-end">Ore Prog.</th>
-                                        <th class="text-end">Total Univ.</th>
-                                        <th style="min-width:170px;">Procent</th>
+                                        <th class="text-end">Ore Program</th>
+                                        <th class="text-end">Total Ore Profesor</th>
+                                        <th style="min-width:170px;">Procent %</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b3">
@@ -435,7 +437,8 @@
                 </div>
             </div>
 
-            <!-- R4 -->
+            <!-- R4: Limbi -->
+
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -454,10 +457,10 @@
                             <table class="etbl">
                                 <thead>
                                     <tr>
-                                        <th>Nr.</th>
+                                        <th>Nr.Crt.</th>
                                         <th>Profesor</th>
-                                        <th class="text-center">Sem.</th>
-                                        <th class="text-end">Total Ore (h)</th>
+                                        <th class="text-center">Semestru</th>
+                                        <th class="text-end">Total Ore</th>
                                         <th>Limba Program</th>
                                         <th>Program Studiu</th>
                                         <th>Ciclu Studii</th>
@@ -476,7 +479,7 @@
                 </div>
             </div>
 
-            <!-- R5 -->
+            <!-- R5: Discipline -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -495,13 +498,13 @@
                             <table class="etbl">
                                 <thead>
                                     <tr>
-                                        <th>Nr.</th>
+                                        <th>Nr.Crt.</th>
                                         <th>Profesor</th>
                                         <th>Facultate</th>
-                                        <th>Dept.</th>
+                                        <th>Departament</th>
                                         <th>Grad</th>
-                                        <th class="text-center">Nr.</th>
                                         <th>Discipline</th>
+                                        <th class="text-center">Nr. Discipline</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b5">
@@ -517,7 +520,7 @@
                 </div>
             </div>
 
-            <!-- R6 -->
+            <!-- R6: Titulari -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -537,16 +540,18 @@
                             <table class="etbl">
                                 <thead>
                                     <tr>
-                                        <th>Nr.</th>
-                                        <th>Profesor</th>
+                                        <th>Nr.Crt.</th>
+                                        <th>Nume</th>
+                                        <th>Prenume</th>
+                                        <th>Marca</th>
                                         <th>Facultate</th>
                                         <th>Departament</th>
-                                        <th>Grad Didactic</th>
+                                        <th>Grad</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b6">
                                     <tr>
-                                        <td colspan="5" class="text-center py-3 text-muted">
+                                        <td colspan="7" class="text-center py-3 text-muted">
                                             <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
                                         </td>
                                     </tr>
@@ -557,7 +562,7 @@
                 </div>
             </div>
 
-            <!-- R7 -->
+            <!-- R7: Colaboratori -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -577,16 +582,18 @@
                             <table class="etbl">
                                 <thead>
                                     <tr>
-                                        <th>Nr.</th>
-                                        <th>Profesor</th>
+                                        <th>Nr.Crt.</th>
+                                        <th>Nume</th>
+                                        <th>Prenume</th>
+                                        <th>Marca</th>
                                         <th>Facultate</th>
                                         <th>Departament</th>
-                                        <th>Grad Didactic</th>
+                                        <th>Grad</th>
                                     </tr>
                                 </thead>
                                 <tbody id="b7">
                                     <tr>
-                                        <td colspan="5" class="text-center py-3 text-muted">
+                                        <td colspan="7" class="text-center py-3 text-muted">
                                             <span class="spinner-border spinner-border-sm me-1"></span>Se încarcă...
                                         </td>
                                     </tr>
@@ -597,7 +604,7 @@
                 </div>
             </div>
 
-            <!-- R8 -->
+            <!-- R8: ANS -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button"
@@ -655,6 +662,8 @@
                 bootstrap.Collapse.getInstance(el)?.hide());
             Object.keys(loaded).forEach(k => delete loaded[k]);
         }
+
+
         function ap(extra) {
             const p = new URLSearchParams();
             if (S.idAn > 0) p.append('idAnUniv', S.idAn);
@@ -693,9 +702,9 @@
             const p = +pct || 0;
             const col = p > 50 ? '#56723e' : p >= 20 ? '#f0ad4e' : '#d9534f';
             return `<div class="pbar-wrap">
-                    <span style="min-width:36px;font-size:.74rem;font-weight:600">${p.toFixed(1)}%</span>
-                    <div class="pbar-track"><div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${col};"></div></div>
-                </div>`;
+                        <span style="min-width:36px;font-size:.74rem;font-weight:600">${p.toFixed(1)}%</span>
+                        <div class="pbar-track"><div class="pbar-fill" style="width:${Math.min(p, 100)}%;background:${col};"></div></div>
+                    </div>`;
         }
 
 
@@ -717,15 +726,16 @@
                 S.idFac = +this.value || 0;
                 S.numeFac = this.options[this.selectedIndex]?.text || '';
                 if (S.numeFac === 'Toate') S.numeFac = '';
-                resetAll(); loadDept(); loadSpec(); loadProf();
+
+                resetAll(); loadDept(); loadSpec(true);
             });
             $('#sDept').on('change', function () {
                 S.idCatedra = +this.value || 0;
                 S.numeDept = this.options[this.selectedIndex]?.text || '';
                 if (S.numeDept === 'Toate') S.numeDept = '';
-                resetAll(); loadSpec(); loadProf();
+                resetAll(); loadSpec(true);
             });
-            $('#sSpec').on('change', function () { S.spec = $(this).val() || 'Toti'; resetAll(); loadProf(); });
+
             $('#sProf').on('change', function () { S.prof = $(this).val() || 'Toti'; resetAll(); });
             $('#sTip').on('change', function () { S.tipPost = this.value || 'Toti'; resetAll(); loadProf(); });
             $('#sForma').on('change', function () { S.formaInv = this.value || 'Toti'; resetAll(); });
@@ -744,7 +754,7 @@
         }
 
 
- 
+
         async function apiGet(url) {
             const resp = await fetch(url);
             const txt = await resp.text();
@@ -770,7 +780,9 @@
                 s.innerHTML = '';
                 data.forEach(f => s.appendChild(new Option(f.nume, f.id)));
                 s.value = 0; S.idFac = 0; S.numeFac = '';
-                loadDept(); loadSpec(); loadProf();
+
+                loadDept();
+                loadSpec(/*chainProf=*/true);
             });
         }
         function loadDept() {
@@ -782,12 +794,24 @@
                 s.value = 0; S.idCatedra = 0; S.numeDept = '';
             }).catch(() => { s.innerHTML = '<option value="0">Toate</option>'; });
         }
-        function loadSpec() {
-            const $s = $('#sSpec').empty().append(new Option('Toate', 'Toti')).trigger('change');
+
+        function loadSpec(chainProf) {
+            const $s = $('#sSpec');
+
+            $s.off('change.userSpec');
+            $s.empty().append(new Option('Toate', 'Toti'));
             apiGet(`/api/Rapoarte/liste/specializari?idAnUniv=${S.idAn}&idFacultate=${S.idFac}&idCatedra=${S.idCatedra}`).then(data => {
                 $s.empty();
                 data.forEach(sp => $s.append(new Option(sp.nume, sp.id)));
-                $s.val('Toti').trigger('change');
+                $s.val('Toti');
+                S.spec = 'Toti';
+
+                $s.on('change.userSpec', function () {
+                    S.spec = $(this).val() || 'Toti';
+                    resetAll();
+                    loadProf();
+                });
+                if (chainProf) loadProf();
             });
         }
         function loadProf() {
@@ -840,7 +864,7 @@
         }
 
 
-        // R1
+        // R1: NORME DETALIATE
 
         async function loadR1() {
             document.getElementById('b1').innerHTML = spin(13);
@@ -854,35 +878,36 @@
                     const mnt = n.mentiuni && n.mentiuni !== ''
                         ? `<span class="mnt-cell">${n.mentiuni}</span>` : '';
                     html += `<tr>
-                            <td>${n.nrCrt}</td>
-                            <td><b>${n.profesor || ''}</b></td>
-                            <td class="small">${n.facultate || ''}</td>
-                            <td class="small">${n.departament || ''}</td>
-                            <td class="small">${n.grad || ''}</td>
-                            <td>${bTip(n.tipPost)}</td>
-                            <td class="small">${n.specializare || ''}</td>
-                            <td class="small">${n.materie || ''}</td>
-                            <td class="text-center">${n.semestru || ''}</td>
-                            <td class="text-end">${c.toFixed(2)}</td>
-                            <td class="text-end">${a.toFixed(2)}</td>
-                            <td class="text-end fw-bold">${v.toFixed(2)}</td>
-                            <td>${mnt}</td>
-                        </tr>`;
+                                <td>${n.nrCrt}</td>
+                                <td><b>${n.profesor || ''}</b></td>
+                                <td class="small">${n.facultate || ''}</td>
+                                <td class="small">${n.departament || ''}</td>
+                                <td class="small">${n.grad || ''}</td>
+                                <td>${bTip(n.tipPost)}</td>
+                                <td class="small">${n.specializare || ''}</td>
+                                <td class="small">${n.materie || ''}</td>
+                                <td class="text-center">${n.semestru || ''}</td>
+                                <td class="text-end">${c.toFixed(2)}</td>
+                                <td class="text-end">${a.toFixed(2)}</td>
+                                <td class="text-end fw-bold">${v.toFixed(2)}</td>
+                                <td>${mnt}</td>
+                            </tr>`;
                 });
                 html += `<tr class="tfoot">
-                        <td colspan="9" class="text-end">TOTAL:</td>
-                        <td class="text-end">${tc.toFixed(2)}</td>
-                        <td class="text-end">${ta.toFixed(2)}</td>
-                        <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
-                        <td></td></tr>`;
+                            <td colspan="9" class="text-end">TOTAL:</td>
+                            <td class="text-end">${tc.toFixed(2)}</td>
+                            <td class="text-end">${ta.toFixed(2)}</td>
+                            <td class="text-end" style="color:var(--a)">${tv.toFixed(2)}</td>
+                            <td></td></tr>`;
                 document.getElementById('b1').innerHTML = html;
             } catch (e) { document.getElementById('b1').innerHTML = errR(13, e.message); }
         }
 
-        // R2
-   
+
+        // R2: TOTALURI NORME
+
         async function loadR2() {
-            document.getElementById('b2').innerHTML = spin(10);
+            document.getElementById('b2').innerHTML = spin(11);
             try {
                 const p = new URLSearchParams();
                 if (S.idAn > 0) p.append('idAnUniv', S.idAn);
@@ -892,37 +917,40 @@
                 if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
                 if (S.sem > 0) p.append('semestru', S.sem);
                 const data = await apiGet(`/api/Rapoarte/norma-totaluri?${p}`);
-                if (!data?.length) { document.getElementById('b2').innerHTML = empty(10); return; }
+                if (!data?.length) { document.getElementById('b2').innerHTML = empty(11); return; }
                 let html = '', gif = 0, gid = 0, gifr = 0, gc = 0, ga = 0;
                 data.forEach(n => {
                     const oi = +n.oreIF || 0, od = +n.oreID || 0, oifr = +n.oreIFR || 0,
                         oc = +n.totalOreConv || 0, oa = +n.totalAnual || 0;
                     gif += oi; gid += od; gifr += oifr; gc += oc; ga += oa;
                     html += `<tr>
-                            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                            <td class="small">${n.facultate || ''}</td>
-                            <td class="small">${n.departament || ''}</td>
-                            <td>${bTip(n.tipPost)}</td>
-                            <td class="text-end">${oi.toFixed(2)}</td>
-                            <td class="text-end">${od.toFixed(2)}</td>
-                            <td class="text-end">${oifr.toFixed(2)}</td>
-                            <td class="text-end fw-bold">${oc.toFixed(2)}</td>
-                            <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
-                        </tr>`;
+                                <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                                <td class="small">${n.facultate || ''}</td>
+                                <td class="small">${n.departament || ''}</td>
+                                <td class="small">${n.grad || ''}</td>
+                                <td>${bTip(n.tipPost)}</td>
+                                <td class="text-end">${oi.toFixed(2)}</td>
+                                <td class="text-end">${od.toFixed(2)}</td>
+                                <td class="text-end">${oifr.toFixed(2)}</td>
+                                <td class="text-end fw-bold">${oc.toFixed(2)}</td>
+                                <td class="text-end fw-bold" style="color:#0d6efd">${oa.toFixed(2)}</td>
+                            </tr>`;
                 });
-                html += `<tr class="tfoot"><td colspan="5" class="text-end">TOTAL GENERAL:</td>
-                        <td class="text-end">${gif.toFixed(2)}</td>
-                        <td class="text-end">${gid.toFixed(2)}</td>
-                        <td class="text-end">${gifr.toFixed(2)}</td>
-                        <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
-                        <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
+                html += `<tr class="tfoot"><td colspan="6" class="text-end">TOTAL GENERAL:</td>
+                            <td class="text-end">${gif.toFixed(2)}</td>
+                            <td class="text-end">${gid.toFixed(2)}</td>
+                            <td class="text-end">${gifr.toFixed(2)}</td>
+                            <td class="text-end" style="color:var(--a)">${gc.toFixed(2)}</td>
+                            <td class="text-end" style="color:var(--a)">${ga.toFixed(2)}</td></tr>`;
                 document.getElementById('b2').innerHTML = html;
-            } catch (e) { document.getElementById('b2').innerHTML = errR(10, e.message); }
+            } catch (e) { document.getElementById('b2').innerHTML = errR(11, e.message); }
         }
 
-        // R3
+
+        // R3: DISTRIBUTIE ORE PE PROGRAME
+
         async function loadR3() {
-            document.getElementById('b3').innerHTML = spin(7);
+            document.getElementById('b3').innerHTML = spin(8);
             try {
                 const p = new URLSearchParams();
                 if (S.idAn > 0) p.append('idAnUniv', S.idAn);
@@ -933,24 +961,26 @@
                 if (S.tipPost !== 'Toti') p.append('tipPost', S.tipPost);
                 if (S.sem > 0) p.append('semestru', S.sem);
                 const data = await apiGet(`/api/Rapoarte/distributie-ore?${p}`);
-                if (!data?.length) { document.getElementById('b3').innerHTML = empty(7); return; }
+                if (!data?.length) { document.getElementById('b3').innerHTML = empty(8); return; }
                 let html = '';
                 data.forEach(n => {
                     const op = +n.oreProgram || 0, ot = +n.totalOreUniv || 0, pr = +n.procent || 0;
                     html += `<tr>
-                            <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
-                            <td class="small">${n.departament || ''}</td>
-                            <td class="small">${n.program || ''}</td>
-                            <td class="text-end">${op.toFixed(2)}</td>
-                            <td class="text-end">${ot.toFixed(2)}</td>
-                            <td>${progBar(pr)}</td>
-                        </tr>`;
+                                <td>${n.nrCrt}</td><td><b>${n.profesor}</b></td>
+                                <td class="small">${n.facultate || ''}</td>
+                                <td class="small">${n.departament || ''}</td>
+                                <td class="small">${n.program || ''}</td>
+                                <td class="text-end">${op.toFixed(2)}</td>
+                                <td class="text-end">${ot.toFixed(2)}</td>
+                                <td>${progBar(pr)}</td>
+                            </tr>`;
                 });
                 document.getElementById('b3').innerHTML = html;
-            } catch (e) { document.getElementById('b3').innerHTML = errR(7, e.message); }
+            } catch (e) { document.getElementById('b3').innerHTML = errR(8, e.message); }
         }
 
-        // R4
+        // R4: LIMBI STRAINE
+
         async function loadR4() {
             document.getElementById('b4').innerHTML = spin(7);
             try {
@@ -967,23 +997,25 @@
                 data.forEach(n => {
                     const t = +n.totalOre || 0; st += t;
                     html += `<tr>
-                            <td>${n.nrCrt}</td>
-                            <td><b>${n.profesor}</b></td>
-                            <td class="text-center">${n.semestru || ''}</td>
-                            <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
-                            <td class="small">${n.limbaProgram || ''}</td>
-                            <td class="small">${n.programStudiu || ''}</td>
-                            <td class="small"><span class="badge bg-secondary" style="font-size:.68rem">${n.cicluStudii || ''}</span></td>
-                        </tr>`;
+                                <td>${n.nrCrt}</td>
+                                <td><b>${n.profesor}</b></td>
+                                <td class="text-center">${n.semestru || ''}</td>
+                                <td class="text-end fw-bold" style="color:var(--a)">${t.toFixed(2)}</td>
+                                <td class="small">${n.limbaProgram || ''}</td>
+                                <td class="small">${n.programStudiu || ''}</td>
+                                <td class="small"><span class="badge bg-secondary" style="font-size:.68rem">${n.cicluStudii || ''}</span></td>
+                            </tr>`;
                 });
                 html += `<tr class="tfoot"><td colspan="3" class="text-end">TOTAL:</td>
-                        <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
-                        <td colspan="3"></td></tr>`;
+                            <td class="text-end" style="color:var(--a)">${st.toFixed(2)}</td>
+                            <td colspan="3"></td></tr>`;
                 document.getElementById('b4').innerHTML = html;
             } catch (e) { document.getElementById('b4').innerHTML = errR(7, e.message); }
         }
 
-        // R5
+
+        // R5: DISCIPLINE PER PROFESOR
+
         async function loadR5() {
             document.getElementById('b5').innerHTML = spin(7);
             try {
@@ -999,65 +1031,78 @@
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.grad || ''}</td>
-                        <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
-                        <td class="small" style="white-space:normal;max-width:370px;">${n.discipline || ''}</td>
-                    </tr>`;
+                            <td>${n.nrCrt}</td>
+                            <td><b>${n.profesor}</b></td>
+                            <td class="small">${n.facultate || ''}</td>
+                            <td class="small">${n.departament || ''}</td>
+                            <td class="small">${n.grad || ''}</td>
+                            <td class="small" style="white-space:normal;max-width:370px;">${n.discipline || ''}</td>
+                            <td class="text-center"><span class="badge bg-secondary">${n.nrDiscipline || 0}</span></td>
+                        </tr>`;
                 });
                 document.getElementById('b5').innerHTML = html;
             } catch (e) { document.getElementById('b5').innerHTML = errR(7, e.message); }
         }
-        // R6
+
+
+        // R6: TITULARI
+
         async function loadR6() {
-            document.getElementById('b6').innerHTML = spin(5);
+            document.getElementById('b6').innerHTML = spin(7);
             try {
                 const p = new URLSearchParams();
                 if (S.idAn > 0) p.append('idAnUniv', S.idAn);
                 if (S.idFac > 0) p.append('idFacultate', S.idFac);
                 if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
                 const data = await apiGet(`/api/Rapoarte/titulari?${p}`);
-                if (!data?.length) { document.getElementById('b6').innerHTML = empty(5); return; }
+                if (!data?.length) { document.getElementById('b6').innerHTML = empty(7); return; }
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.grad || ''}</td></tr>`;
+                            <td>${n.nrCrt}</td>
+                            <td><b>${n.nume || ''}</b></td>
+                            <td>${n.prenume || ''}</td>
+                            <td>${n.marca || ''}</td>
+                            <td class="small">${n.facultate || ''}</td>
+                            <td class="small">${n.departament || ''}</td>
+                            <td class="small">${n.grad || ''}</td></tr>`;
                 });
-                html += `<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} titulari oficiali</td></tr>`;
+                html += `<tr class="tfoot"><td colspan="7" class="text-end">Total: ${data.length} titulari oficiali</td></tr>`;
                 document.getElementById('b6').innerHTML = html;
-            } catch (e) { document.getElementById('b6').innerHTML = errR(5, e.message); }
+            } catch (e) { document.getElementById('b6').innerHTML = errR(7, e.message); }
         }
-        // R7
+
+
+        // R7: COLABORATORI
+
         async function loadR7() {
-            document.getElementById('b7').innerHTML = spin(5);
+            document.getElementById('b7').innerHTML = spin(7);
             try {
                 const p = new URLSearchParams();
                 if (S.idAn > 0) p.append('idAnUniv', S.idAn);
                 if (S.idFac > 0) p.append('idFacultate', S.idFac);
                 if (S.idCatedra > 0) p.append('idCatedra', S.idCatedra);
                 const data = await apiGet(`/api/Rapoarte/colaboratori?${p}`);
-                if (!data?.length) { document.getElementById('b7').innerHTML = empty(5); return; }
+                if (!data?.length) { document.getElementById('b7').innerHTML = empty(7); return; }
                 let html = '';
                 data.forEach(n => {
                     html += `<tr>
-                        <td>${n.nrCrt}</td>
-                        <td><b>${n.profesor}</b></td>
-                        <td class="small">${n.facultate || ''}</td>
-                        <td class="small">${n.departament || ''}</td>
-                        <td class="small">${n.grad || ''}</td></tr>`;
+                            <td>${n.nrCrt}</td>
+                            <td><b>${n.nume || ''}</b></td>
+                            <td>${n.prenume || ''}</td>
+                            <td>${n.marca || ''}</td>
+                            <td class="small">${n.facultate || ''}</td>
+                            <td class="small">${n.departament || ''}</td>
+                            <td class="small">${n.grad || ''}</td></tr>`;
                 });
-                html += `<tr class="tfoot"><td colspan="5" class="text-end">Total: ${data.length} colaboratori</td></tr>`;
+                html += `<tr class="tfoot"><td colspan="7" class="text-end">Total: ${data.length} colaboratori</td></tr>`;
                 document.getElementById('b7').innerHTML = html;
-            } catch (e) { document.getElementById('b7').innerHTML = errR(5, e.message); }
+            } catch (e) { document.getElementById('b7').innerHTML = errR(7, e.message); }
         }
-        // R8
+
+
+        // R8: ANS
+
         async function loadAns() {
             document.getElementById('ansWrap').style.display = 'block';
             document.getElementById('b8').innerHTML = spin(6);
@@ -1071,7 +1116,7 @@
                 const dom = resp.domenii || [];
                 const prs = (resp.profesori || []).slice(0, 25);
 
-                let hdr = '<th>Nr.</th><th>Profesor</th><th>Facultate</th><th>Dept.</th><th>Funcție</th>';
+                let hdr = '<th>Nr.Crt.</th><th>Nume si prenume</th><th>Facultate</th><th>Departament</th><th>Functie</th><th>Norma</th>';
                 dom.forEach(d => {
                     const sh = d.length > 18 ? d.substring(0, 16) + '…' : d;
                     hdr += `<th class="text-center" title="${d}" style="min-width:64px;font-size:.69rem">${sh}</th>`;
@@ -1079,7 +1124,7 @@
                 hdr += '<th class="text-center">Total</th>';
                 document.getElementById('ansHead').innerHTML = hdr;
 
-                if (!prs.length) { document.getElementById('b8').innerHTML = empty(dom.length + 6); return; }
+                if (!prs.length) { document.getElementById('b8').innerHTML = empty(dom.length + 7); return; }
                 let html = '';
                 prs.forEach(p => {
                     let tf = 0, cols = '';
@@ -1089,17 +1134,18 @@
                         cols += f > 0 ? `<td class="frac-cell">${(+f).toFixed(2)}</td>` : '<td></td>';
                     });
                     html += `<tr>
-                            <td>${p.nrCrt}</td>
-                            <td><b class="small">${p.numeComplet}</b></td>
-                            <td class="small">${p.facultate || ''}</td>
-                            <td class="small">${p.departament || ''}</td>
-                            <td class="small">${p.gradFunctie || ''}</td>
-                            ${cols}
-                            <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
+                                <td>${p.nrCrt}</td>
+                                <td><b class="small">${p.numeComplet}</b></td>
+                                <td class="small">${p.facultate || ''}</td>
+                                <td class="small">${p.departament || ''}</td>
+                                <td class="small">${p.gradFunctie || ''}</td>
+                                <td class="text-center fw-bold">${tf.toFixed(2)}</td>
+                                ${cols}
+                                <td class="text-center fw-bold">${tf.toFixed(2)}</td></tr>`;
                 });
                 if ((resp.profesori?.length || 0) > 25)
-                    html += `<tr class="tfoot"><td colspan="${dom.length + 6}" class="text-center">
-                            Primii 25 din ${resp.profesori.length}. Folosiți Export pentru lista completă.</td></tr>`;
+                    html += `<tr class="tfoot"><td colspan="${dom.length + 7}" class="text-center">
+                                Primii 25 din ${resp.profesori.length}. Folosiți Export pentru lista completă.</td></tr>`;
                 document.getElementById('b8').innerHTML = html;
                 clean('r8');
             } catch (e) { document.getElementById('b8').innerHTML = errR(6, e.message); }

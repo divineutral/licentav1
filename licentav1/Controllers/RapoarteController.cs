@@ -8,6 +8,8 @@ using ClosedXML.Excel;
 
 namespace LicentaV1.Controllers
 {
+   
+    
     public class JsonExceptionFilter : IExceptionFilter
     {
         public void OnException(ExceptionContext ctx)
@@ -34,8 +36,6 @@ namespace LicentaV1.Controllers
     {
         private readonly string _cs;
         private readonly IMemoryCache _cache;
-
-
         private const string Green = "#56723e";
         private const int SaptamaniPerAn = 14;     
         private const decimal NormaLegalaFallback = 15.0m;  
@@ -49,6 +49,7 @@ namespace LicentaV1.Controllers
             _cache = cache;
         }
 
+        
         private int GetAnCurent() => _cache.GetOrCreate("AnCurent_v9", e =>
         {
             e.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(4);
@@ -81,6 +82,7 @@ namespace LicentaV1.Controllers
             return $"{safe}_{raport}.xlsx";
         }
 
+        
         [HttpGet("liste/ani-universitari")]
         public IActionResult GetAni() => Ok(_cache.GetOrCreate("AniUniv_v8", e =>
         {
@@ -250,7 +252,9 @@ namespace LicentaV1.Controllers
             return Ok(lst);
         }
 
-         private const string SqlNorma = @"
+        
+        // RAPORT 1
+        private const string SqlNorma = @"
             WITH OreUnice AS (
                 SELECT
                     vppm.ID_Profesor,
@@ -439,6 +443,8 @@ namespace LicentaV1.Controllers
                 SafeFile("Norma_Profesori", profesor));
         }
 
+        
+        // RAPORT 2
         private const string SqlTotaluri = @"
             WITH OreUnice AS (
                 SELECT
@@ -466,11 +472,21 @@ namespace LicentaV1.Controllers
                     ) AS Rn
                 FROM [pi].[View_PostProfesorMaterie] vppm
                 WHERE vppm.ID_AnUniv = @idAn
+            ),
+            -- Catedra → Facultate (pentru a afisa numele postului unde se preda).
+            -- Profesori_CF_AnUniv contine maparea Catedra → Facultate cu denumirile.
+            CatedraInfo AS (
+                SELECT DISTINCT ID_Catedra, DenumireCatedra, ID_Facultate, DenumireFacultate
+                FROM [dbo].[View_Profesori_CF_AnUniv]
+                WHERE ID_AnUnivCatedra = @idAn
             )
             SELECT
                 p.NumeIntreg                                                         AS Profesor,
-                MAX(p.DenumireFacultate)                                             AS Facultate,
-                MAX(p.DenumireCatedra)                                               AS Departament,
+                -- Facultate/Departament = unde se preda efectiv ora (din POSTUL vppm),
+                -- nu unde e angajat profesorul. Cand un prof are mai multe posturi in
+                -- departamente diferite, fiecare apare ca rand separat pe acel dept.
+                MAX(ci.DenumireFacultate)                                            AS Facultate,
+                MAX(ci.DenumireCatedra)                                              AS Departament,
                 MAX(p.DenumireGradDidactic)                                          AS Grad,
                 CASE ou.TitularSauSuplinitor WHEN 1 THEN N'Titular' ELSE N'Suplinitor' END AS TipPost,
                 CAST(SUM(CASE WHEN ou.FormaInv = N'IF'  THEN ou.NrOreConventionale ELSE 0 END) AS DECIMAL(10,2)) AS OreIF,
@@ -481,13 +497,17 @@ namespace LicentaV1.Controllers
             FROM OreUnice ou
             INNER JOIN [dbo].[View_Profesori_CF_AnUniv] p
                 ON ou.ID_Profesor = p.ID_Profesor AND p.ID_AnUnivCatedra = @idAn
+            LEFT JOIN CatedraInfo ci
+                ON ci.ID_Catedra = ou.ID_Catedra
             WHERE ou.Rn = 1
               AND (@idFac     = 0 OR ou.ID_Facultate = @idFac)
               AND (@idCatedra = 0 OR ou.ID_Catedra   = @idCatedra)
               AND (@prof      = N'Toti' OR p.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
               AND (@tipPost   = N'Toti' OR CASE ou.TitularSauSuplinitor WHEN 1 THEN N'Titular' ELSE N'Suplinitor' END = @tipPost)
               AND (@sem       = 0       OR ou.NrSemestruDinAn = @sem)
-            GROUP BY p.NumeIntreg, ou.TitularSauSuplinitor
+            -- GROUP BY pe (profesor, post-catedra, tip) astfel incat sa avem
+            -- un rand separat per (profesor, departament_postului, Tit/Sup)
+            GROUP BY p.NumeIntreg, ou.ID_Catedra, ou.TitularSauSuplinitor
             HAVING SUM(ou.NrOreConventionale) > 0
             ORDER BY p.NumeIntreg COLLATE Romanian_CI_AS";
 
@@ -576,6 +596,9 @@ namespace LicentaV1.Controllers
                 "Totaluri_Norme.xlsx");
         }
 
+        
+        // RAPORT 3
+        
         private const string SqlDistrib = @"
             WITH OreUnice AS (
                 SELECT
@@ -723,6 +746,9 @@ namespace LicentaV1.Controllers
                 SafeFile("Distributie_Ore", profesor));
         }
 
+        
+        // RAPORT 4
+        
         private const string SqlLimbi = @"
             WITH ProgrameStraine AS (
                 SELECT DISTINCT
@@ -837,6 +863,9 @@ namespace LicentaV1.Controllers
                 SafeFile("Limbi_Straine", profesor));
         }
 
+        
+        // RAPORT 5
+        
         private const string SqlDisc = @"
             WITH Identitate AS (
                 SELECT ID_Profesor, NumeIntreg, DenumireFacultate, DenumireCatedra, DenumireGradDidactic,
@@ -967,12 +996,158 @@ namespace LicentaV1.Controllers
                 SafeFile("Discipline", profesor));
         }
 
+       
         [HttpGet("export/discipline-zip")]
-        public Task<IActionResult> ExportDiscZip(
+        public async Task<IActionResult> ExportDiscZip(
             [FromQuery] int? idAnUniv, [FromQuery] int? idFacultate, [FromQuery] int? idCatedra,
             [FromQuery] string? profesor, [FromQuery] int? semestru, [FromQuery] string? specializare)
-            => ExportDisc(idAnUniv, idFacultate, idCatedra, profesor, semestru, specializare);
+        {
+            int idAn = idAnUniv ?? GetAnCurent();
 
+           
+            var forme = new[]
+            {
+                ("IF",  new[] { "CU FRECVENȚĂ", "CU FRECVENTA" }),
+                ("ID",  new[] { "ÎNVĂȚĂMÂNT LA DISTANȚĂ", "INVATAMANT LA DISTANTA",
+                                "LA DISTANTA", "LA DISTANȚĂ" }),
+                ("IFR", new[] { "FRECVENȚĂ REDUSĂ", "FRECVENTA REDUSA" })
+            };
+
+            using var ms = new MemoryStream();
+            using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                foreach (var (cod, denumiri) in forme)
+                {
+                    var dt = await BuildDiscDataTable(idAn, idFacultate ?? 0, idCatedra ?? 0,
+                        profesor, semestru ?? 0, specializare, denumiri);
+                    if (dt.Rows.Count == 0) continue;
+
+                    using var wb = new XLWorkbook();
+                    var ws = wb.Worksheets.Add($"Discipline {cod}");
+                    ws.Cell(1, 1).Value = $"Discipline Predate - {cod}";
+                    ws.Cell(1, 1).Style.Font.Bold = true;
+                    ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml(Green);
+                    ws.Range(1, 1, 1, dt.Columns.Count).Merge();
+
+                    var tbl = ws.Cell(3, 1).InsertTable(dt);
+                    tbl.Theme = XLTableTheme.None;
+                    StyleHdr(ws.Range(3, 1, 3, dt.Columns.Count));
+                    ws.Columns().AdjustToContents();
+
+                    using var fileMs = new MemoryStream();
+                    wb.SaveAs(fileMs);
+                    var entry = zip.CreateEntry($"Discipline_{cod}.xlsx");
+                    using var es = entry.Open();
+                    fileMs.Position = 0;
+                    fileMs.CopyTo(es);
+                }
+            }
+            ms.Position = 0;
+            return File(ms.ToArray(), "application/zip",
+                SafeFile("Discipline_IF_ID_IFR", profesor) + ".zip");
+        }
+
+       
+        private async Task<DataTable> BuildDiscDataTable(int idAn, int idFac, int idCat,
+            string? prof, int sem, string? spec, string[] formeAcceptate)
+        {
+            var dt = new DataTable();
+            dt.Columns.AddRange(new[]{
+                new DataColumn("Nr.Crt.", typeof(int)), new DataColumn("Profesor"),
+                new DataColumn("Facultate"), new DataColumn("Departament"), new DataColumn("Grad"),
+                new DataColumn("Discipline"), new DataColumn("Nr. Discipline", typeof(int))
+            });
+
+            
+            var paramsForma = new List<string>();
+            for (int i = 0; i < formeAcceptate.Length; i++)
+                paramsForma.Add($"@f{i}");
+            string inList = string.Join(", ", paramsForma);
+
+            string sqlFiltrat = $@"
+                WITH PpmFiltrat AS (
+                    SELECT vppm.ID_Profesor, vppm.Denumire AS MaterieBruta, vppm.NrSemestruDinAn,
+                           LTRIM(RTRIM(
+                               REPLACE(REPLACE(REPLACE(REPLACE(
+                                   UPPER(
+                                       CASE WHEN CHARINDEX(N'+', vppm.DenumireSpecializare) > 0
+                                            THEN LEFT(vppm.DenumireSpecializare, CHARINDEX(N'+', vppm.DenumireSpecializare)-1)
+                                            ELSE vppm.DenumireSpecializare END
+                                   ) COLLATE Latin1_General_CI_AI,
+                                   N'(', N' '), N')', N' '), N'  ', N' '), N'  ', N' ')
+                           )) AS SpecKey,
+                           vppm.ID_Facultate, vppm.ID_Catedra
+                    FROM [pi].[View_PostProfesorMaterie] vppm
+                    INNER JOIN [dbo].[View_FDS] f
+                        ON f.ID_Specializare = vppm.id_specializare AND f.ID_AnUniv = vppm.ID_AnUniv
+                    WHERE vppm.ID_AnUniv = @idAn
+                      AND f.DenumireFormaInv COLLATE Latin1_General_CI_AI IN ({inList})
+                      AND (vppm.Post_Profesor_Materie_Deleted IS NULL OR vppm.Post_Profesor_Materie_Deleted = 0)
+                ),
+                Identitate AS (
+                    SELECT ID_Profesor, NumeIntreg, DenumireFacultate, DenumireCatedra, DenumireGradDidactic,
+                           ID_Facultate, ID_Catedra,
+                           CAST(ID_Profesor AS VARCHAR) + '_' + NumeIntreg AS IdentificatorUnic
+                    FROM [dbo].[View_Profesori_CF_AnUniv]
+                    WHERE ID_AnUnivCatedra = @idAn
+                ),
+                Distinct_Mat AS (
+                    SELECT DISTINCT i.IdentificatorUnic, i.NumeIntreg,
+                        i.DenumireFacultate, i.DenumireCatedra, i.DenumireGradDidactic,
+                        LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(ppm.MaterieBruta, N'  ', N'><'), N'<>', N''), N'><', N' '))) AS DenumireMaterie
+                    FROM PpmFiltrat ppm
+                    INNER JOIN Identitate i ON i.ID_Profesor = ppm.ID_Profesor
+                    WHERE (@prof = N'Toti' OR i.NumeIntreg COLLATE DATABASE_DEFAULT = @prof COLLATE DATABASE_DEFAULT)
+                      AND (@sem  = 0       OR ppm.NrSemestruDinAn = @sem)
+                      AND (@idFac     = 0 OR i.ID_Facultate = @idFac)
+                      AND (@idCatedra = 0 OR i.ID_Catedra   = @idCatedra)
+                      AND (@spec = N'Toti' OR ppm.SpecKey =
+                           LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(
+                               UPPER(@spec) COLLATE Latin1_General_CI_AI,
+                               N'(', N' '), N')', N' '), N'  ', N' '), N'  ', N' '))))
+                      AND ppm.MaterieBruta != N''
+                )
+                SELECT dm.NumeIntreg, MAX(dm.DenumireFacultate) AS Facultate,
+                    MAX(dm.DenumireCatedra) AS Departament, MAX(dm.DenumireGradDidactic) AS Grad,
+                    STUFF((SELECT DISTINCT N' | ' + dm2.DenumireMaterie FROM Distinct_Mat dm2
+                           WHERE dm2.IdentificatorUnic = dm.IdentificatorUnic
+                             AND dm2.DenumireMaterie IS NOT NULL
+                           FOR XML PATH(N''), TYPE).value(N'.', N'NVARCHAR(MAX)'), 1, 3, N'') AS Discipline,
+                    COUNT(DISTINCT dm.DenumireMaterie) AS NrDisc
+                FROM Distinct_Mat dm
+                GROUP BY dm.IdentificatorUnic, dm.NumeIntreg
+                ORDER BY dm.NumeIntreg COLLATE Romanian_CI_AS";
+
+            using var conn = new SqlConnection(_cs); await conn.OpenAsync();
+            using var cmd = new SqlCommand(sqlFiltrat, conn);
+            cmd.CommandTimeout = TimeoutLong;
+            cmd.Parameters.AddWithValue("@idAn", idAn);
+            cmd.Parameters.AddWithValue("@idFac", idFac);
+            cmd.Parameters.AddWithValue("@idCatedra", idCat);
+            cmd.Parameters.AddWithValue("@prof", string.IsNullOrWhiteSpace(prof) ? "Toti" : prof.Trim());
+            cmd.Parameters.AddWithValue("@sem", sem);
+            cmd.Parameters.AddWithValue("@spec", string.IsNullOrWhiteSpace(spec) ? "Toti" : spec.Trim());
+            for (int i = 0; i < formeAcceptate.Length; i++)
+                cmd.Parameters.AddWithValue($"@f{i}", formeAcceptate[i]);
+
+            using var r = await cmd.ExecuteReaderAsync();
+            int nr = 1;
+            while (await r.ReadAsync())
+            {
+                dt.Rows.Add(nr++,
+                    r["NumeIntreg"]?.ToString() ?? "",
+                    r["Facultate"]?.ToString() ?? "",
+                    r["Departament"]?.ToString() ?? "",
+                    r["Grad"]?.ToString() ?? "",
+                    r["Discipline"]?.ToString() ?? "",
+                    r["NrDisc"] == DBNull.Value ? 0 : Convert.ToInt32(r["NrDisc"]));
+            }
+            return dt;
+        }
+
+        
+        // RAPORT 6
+      
         private const string SqlTitulari = @"
             SELECT DISTINCT
                 V.ID_Profesor,
@@ -1064,6 +1239,9 @@ namespace LicentaV1.Controllers
                 "Titulari.xlsx");
         }
 
+        
+        // RAPORT 7
+     
         private const string SqlColaboratori = @"
             SELECT DISTINCT
                 V.ID_Profesor,
@@ -1155,6 +1333,9 @@ namespace LicentaV1.Controllers
                 "Colaboratori.xlsx");
         }
 
+
+        // RAPORT 8
+       
         private const string SqlAnsMaster = @"
             -- Pas 1: snapshot StatDeFunctiiPeSpecializare cu maparea ramura ANS
             IF OBJECT_ID('tempdb..#DM') IS NOT NULL DROP TABLE #DM;
@@ -1274,12 +1455,14 @@ namespace LicentaV1.Controllers
                        ISNULL(enoc.NrOreTitular, ISNULL(noc.NrOreConventionaleTitular, @normaFallback))) > 0
             ORDER BY v.NumeIntreg COLLATE Romanian_CI_AS, s.ID_RamuraDeStiinta_ANS;";
 
+       
         private List<(int Id, string Den)> GetRamuriAns(SqlConnection conn)
         {
-            return _cache.GetOrCreate("RamuriANS_v3", e =>
+            return _cache.GetOrCreate("RamuriANS_v4", e =>
             {
                 e.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
 
+                
                 var rsa = new Dictionary<int, string>();
                 using (var cmd = new SqlCommand(
                     "SELECT ID_Element, Denumire FROM [dbo].[N_RAMURA_STIINTA_ANS]", conn))
@@ -1290,6 +1473,7 @@ namespace LicentaV1.Controllers
                         rsa[Convert.ToInt32(r[0])] = r[1]?.ToString() ?? "";
                 }
 
+                
                 using var cmd2 = new SqlCommand(@"
                     IF OBJECT_ID('tempdb..#DM_ramuri') IS NOT NULL DROP TABLE #DM_ramuri;
                     CREATE TABLE #DM_ramuri (
@@ -1308,7 +1492,14 @@ namespace LicentaV1.Controllers
                 while (rd.Read())
                 {
                     int id = Convert.ToInt32(rd[0]);
+                  
                     string den = rsa.TryGetValue(id, out var d) ? d : (rd[1]?.ToString() ?? "");
+                   
+                    if (den.Contains("Stiinta Sportului", StringComparison.OrdinalIgnoreCase) ||
+                        den.Contains("Ştiinţa Sportului", StringComparison.OrdinalIgnoreCase))
+                    {
+                        den = "Stiintele Sportului si Educatiei Fizice";
+                    }
                     lst.Add((id, den));
                 }
                 return lst;
@@ -1324,6 +1515,7 @@ namespace LicentaV1.Controllers
 
             var ramuri = GetRamuriAns(conn);
 
+           
             var profMap = new Dictionary<int, (string Nume, string Fac, string Dept, string Grad,
                 Dictionary<int, decimal> Frac)>();
 
